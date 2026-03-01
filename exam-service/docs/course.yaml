@@ -1,0 +1,190 @@
+openapi: 3.0.0
+info:
+  title: AutoGenEx API
+  version: 1.0.0
+  description: API for the AutoGenEx Application (Courses, Topics, Exams)
+
+servers:
+  - url: http://localhost:3000
+    description: Local Docker Environment
+
+paths:
+  # ==========================================
+  # COURSES
+  # ==========================================
+  /api/courses:
+    get:
+      summary: Get all courses (Paginated)
+      # Durch operationId generiert er schöne Namen wie 'getCourses' statt 'apiCoursesGet'
+      operationId: getCourses 
+      responses:
+        '200':
+          description: A paginated list of courses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCoursesDto'
+    post:
+      summary: Create a new course
+      operationId: createCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseDto'
+      responses:
+        '201':
+          description: Course successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDto'
+
+  /api/courses/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get course by ID
+      operationId: getCourseById
+      responses:
+        '200':
+          description: Course details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDto'
+    put:
+      summary: Update a course
+      operationId: updateCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCourseDto'
+      responses:
+        '200':
+          description: Course successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDto'
+    delete:
+      summary: Delete a course
+      operationId: deleteCourse
+      responses:
+        '204':
+          description: Course successfully deleted
+
+components:
+  schemas:
+    # ----------------------------------------
+    # PAGINATION WRAPPERS
+    # ----------------------------------------
+    MetaDto:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 3
+
+    PaginatedCoursesDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseDto'
+        meta:
+          $ref: '#/components/schemas/MetaDto'
+
+    PaginatedTopicsDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicDto' # (Angenommen, du hast ein TopicDto)
+        meta:
+          $ref: '#/components/schemas/MetaDto'
+
+    PaginatedExamsDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamDto' # (Angenommen, du hast ein ExamDto)
+        meta:
+          $ref: '#/components/schemas/MetaDto'
+
+    # ----------------------------------------
+    # ENTITY DTOs
+    # ----------------------------------------
+    CourseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateCourseDto:
+      type: object
+      required:
+        - title
+        - shortName
+      properties:
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+
+    UpdateCourseDto:
+      type: object
+      properties:
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+
+    TopicDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    ExamDto:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string

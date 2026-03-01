@@ -1,0 +1,206 @@
+\documentclass[a4paper,12pt]{article}
+
+%% -------
+%% List of packages must be dynamic
+%% -------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel} 
+\usepackage{amsmath, amssymb} 
+\usepackage{graphicx} 
+\usepackage{subcaption}
+\usepackage{hyperref} 
+\usepackage{geometry} 
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{tikz} \usetikzlibrary{decorations.pathreplacing,arrows.meta,positioning}
+\usepackage{listings}
+\usepackage{tabularx}
+\usepackage[most]{tcolorbox}
+\usepackage{comment}
+
+%% -------
+%% General configuration
+%% -------
+\usetikzlibrary{arrows, automata, positioning}
+\geometry{a4paper, left=2cm, right=2cm, top=2cm, bottom=2cm}
+\def \runninghead {Running head goes here ... }
+
+%% -------
+%% Header and Footer
+%% -------
+\usepackage{fancyhdr}
+\renewcommand{\headrulewidth}{0.4pt}  % Dicke des Striches
+\renewcommand{\footrulewidth}{0.4pt}  % Dicke des Striches
+\pagestyle{fancy}
+\lhead{Matrikelnr.:}
+\chead{}
+\rhead{}
+\lfoot{\runninghead}
+\cfoot{}
+\rfoot{Seite \thepage}
+
+%% -------
+%% Some more configuration
+%% -------
+\title{\textbf{\runninghead}} 
+\author{}
+\date{04.02.2025} 
+
+%% change subsections to have no linebreak afterwards
+\renewcommand{\thesubsection}{\alph{subsection})}
+\titleformat{\subsection}[runin]  % Run-in format
+  {\normalfont\bfseries}          % Style (bold text)
+  {\thesubsection}{1em}{}         % Numbering with spacing
+
+%% remove indents at start of new paragraphs
+\setlength{\parindent}{0pt}
+
+%% -------
+%% Create a box for displaying solutions
+%% -------
+
+% Define a flag to show or hide solution
+\newif\ifshowsolutions
+
+% Change to \showsolutionstrue to show solutions
+% Change to \showsolutionsfalse to hide solutions
+\showsolutionstrue
+
+% Define the solution environment if necessary
+\ifshowsolutions
+  \newtcolorbox{solution}{
+    colback=red!80,        % Darker red background
+    colframe=red!90!black, % Border color
+    fontupper=\color{white}\footnotesize, % Make text white and small
+    title=Solution,
+    boxrule=0.8pt,
+    arc=4pt,
+    top=6pt,
+    bottom=6pt,
+    left=6pt,
+    right=6pt
+  }
+\else %% hides the solution environment
+  \excludecomment{solution}
+\fi
+
+\begin{document}
+
+%% -------
+%% Front page start
+%% front pages are individual per exam
+%% -------
+\thispagestyle{empty} %% no header/footer for first page
+\begin{center}
+    \textbf{\LARGE Exam title goes here} \\
+    \vspace{0.5cm}
+    \textbf{Sommersemester 25 -- 2. Termin -- 17.10.2025} \\
+    \vspace{0.2cm}
+    \textbf{Prof. Dr. Marc Hesenius}
+\end{center}
+
+\vspace{0.5cm}
+\noindent
+%\textbf{Vor- und Nachname:}
+%\underline{\hspace{6cm}} \hfill 
+\textbf{Matrikelnr.:} \underline{\hspace{8cm}} \\
+
+\begin{itemize}
+    \item Bitte tragen Sie vor Beginn der Bearbeitung auf allen Blättern Ihren \textbf{Namen} und Ihre \textbf{Matrikelnummer} ein. Sie erhalten dafür 5 Minuten extra.
+    \item Die Bearbeitungszeit beträgt \textbf{120 Minuten}.
+    \item Legen Sie Ihren Studentenausweis oder einen amtlichen \textbf{Lichtbildausweis} (Personalausweis oder Reisepass) bereit.
+    \item Die \textbf{Heftung} der Klausurseiten muss bestehen bleiben!
+    \item Falls der gegebene Platz für die Lösungen nicht ausreichen sollte, benutzen Sie bitte die Rückseiten. Verweisen Sie an geeigneter Stelle mit Angabe der Seitennummer auf die Fortsetzung der Aufgabe.
+    \item Es sind ausschließlich dokumentenechte Stifte zulässig. \textbf{Keine Bleistifte! Keine Rotstifte! Kein Tipp-Ex!}
+    \item Ein beidseitig beschriebenes oder bedrucktes DIN-A4-Blatt ist das einzige erlaubte Hilfsmittel. 
+    \item Auf dem Tisch befinden sich ausschließlich: Stifte, Studentenausweis, Lichtbildausweis und das DIN-A4-Blatt.
+    \item Weitere persönliche Gegenstände verbleiben in den Taschen. Mobiltelefone, Taschenrechner, \textbf{Smartwatches} und andere elektronische Geräte werden ausgeschaltet vom Arbeitsplatz entfernt.
+\end{itemize}
+
+%% table should be dynamic depending on number of chosen topics
+		\vspace{0.5cm}
+		\hrule
+	
+		\begin{tabularx}{\linewidth}{|p{2.05cm}||p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{2.5cm}|}
+				\hline
+					Aufgabe & \centering 1 & \centering 2 & \centering 3 &  \centering 4 & \centering 5 & \centering 6 & \centering 7 & \centering 8 & Summe \\
+				\hline
+					Punkte &  &  &  &  &  &  &  &  & \\
+				\hline
+					Erreicht &  &  &  &  &  &  &  &  & \\
+				\hline
+			
+		\end{tabularx}
+		
+		\vspace{0.5cm}
+		
+		Für eine Veröffentlichung der Note im Learnweb unterschreiben Sie bitte hier auf der Linie: \\
+        
+		\vspace{1cm}
+        
+		\begin{tabularx}{\linewidth}{Xr}\cline{2-2}
+			&  Hildesheim, den 17.10.2025 
+		\end{tabularx}
+
+\newpage
+%% -------
+%% Front page end
+%% -------
+
+\thispagestyle{fancy} %% activate header/footer
+\setcounter{page}{1} 
+
+%% -------
+%% Topic 1
+%% -------
+\section{This is topic 1}
+Some description may go here. Can include text, images, source code, and other things. 
+
+\subsection{5P}
+This is the first task
+
+\begin{solution}
+    This is the solution for task a)
+\end{solution}
+
+\subsection{4P}
+This is the second task
+
+\begin{solution}
+    This is the solution for task b)
+\end{solution}
+
+
+%% -------
+%% Topic 2
+%% -------
+\section{This is topic 2}
+Some description may go here. Can include text, images, source code, and other things. 
+
+\subsection{2P}
+This is the first task
+
+\begin{solution}
+    This is the solution for task a)
+\end{solution}
+
+
+\subsection{3P}
+This is the second task
+
+\begin{solution}
+    This is the solution for task b)
+\end{solution}
+
+
+\subsection{4P}
+This is the third task
+
+\begin{solution}
+    This is the solution for task c)
+\end{solution}
+
+\end{document}

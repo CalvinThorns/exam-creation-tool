@@ -1,0 +1,240 @@
+openapi: 3.0.3
+info:
+  title: Topic API
+  version: 1.0.0
+  description: RESTful API for tasks and topic management.
+
+paths:
+  /api/topics:
+    get:
+      summary: Get all topics
+      tags: [Topics]
+      parameters:
+        - in: query
+          name: courseId
+          schema:
+            type: string
+          description: Filter topics by a specific course ID
+      responses:
+        '200':
+          description: A list of all topics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TopicDto'
+    post:
+      summary: Create a new topic
+      tags: [Topics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTopicDto'
+      responses:
+        '201':
+          description: Topic successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDto'
+
+  /api/topics/{id}:
+    get:
+      summary: Get a topic by ID
+      tags: [Topics]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Topic details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDto'
+        '404':
+          description: Topic not found
+    put:
+      summary: Update a topic by ID
+      tags: [Topics]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTopicDto'
+      responses:
+        '200':
+          description: Topic successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDto'
+    delete:
+      summary: Delete a topic by ID
+      tags: [Topics]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Topic successfully deleted
+
+  /api/topics/{id}/images:
+    post:
+      summary: Upload an image for a topic
+      tags: [Topics]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Image uploaded successfully
+
+components:
+  schemas:
+    ImageMetaDto:
+      type: object
+      description: Transformed metadata of an uploaded image
+      properties:
+        hasImage:
+          type: boolean
+        contentType:
+          type: string
+        filename:
+          type: string
+
+    TaskDto:
+      type: object
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        points:
+          type: number
+        question_img:
+          $ref: '#/components/schemas/ImageMetaDto'
+        solution:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+
+    CreateTaskDto:
+      type: object
+      required:
+        - question
+        - points
+      properties:
+        question:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        solution:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+          default: true
+
+    UpdateTaskDto:
+      type: object
+      properties:
+        question:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        solution:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+
+    TopicDto:
+      type: object
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+        description_img:
+          $ref: '#/components/schemas/ImageMetaDto'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskDto'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTopicDto:
+      type: object
+      required:
+        - courseId
+        - topic
+        - points
+      properties:
+        courseId:
+          type: string
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateTaskDto'
+
+    UpdateTopicDto:
+      type: object
+      properties:
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateTaskDto'

@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: Exam API
+  version: 1.0.0
+  description: RESTful API for exam generation and management.
+
+paths:
+  /api/exams:
+    get:
+      summary: Get all exams
+      tags: [Exams]
+      responses:
+        '200':
+          description: A list of all exams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExamDto'
+    post:
+      summary: Create a new exam
+      tags: [Exams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExamDto'
+      responses:
+        '201':
+          description: Exam successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDto'
+
+  /api/exams/{id}:
+    get:
+      summary: Get an exam by ID
+      tags: [Exams]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exam details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDto'
+        '404':
+          description: Exam not found
+    put:
+      summary: Update an exam by ID
+      tags: [Exams]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExamDto'
+      responses:
+        '200':
+          description: Exam successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDto'
+    delete:
+      summary: Delete an exam by ID
+      tags: [Exams]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Exam successfully deleted
+
+  /api/exams/generate:
+    post:
+      summary: Generate PDF for an exam
+      tags: [Exams]
+      description: Triggers the LaTeX builder and compiles the exam via the CLSI service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateExamRequestDto'
+      responses:
+        '200':
+          description: Exam generated successfully
+
+components:
+  schemas:
+    ExamDto:
+      type: object
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+          description: Reference to the corresponding Course ID
+        points:
+          type: number
+        topics:
+          type: array
+          items:
+            type: string
+            description: Array of Topic IDs included in this exam
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+            
+    CreateExamDto:
+      type: object
+      required:
+        - courseId
+        - points
+      properties:
+        courseId:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        topics:
+          type: array
+          items:
+            type: string
+          default: []
+
+    UpdateExamDto:
+      type: object
+      properties:
+        points:
+          type: number
+          minimum: 0
+        topics:
+          type: array
+          items:
+            type: string
+
+    GenerateExamRequestDto:
+      type: object
+      required:
+        - examId
+      properties:
+        examId:
+          type: string

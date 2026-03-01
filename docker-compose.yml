@@ -1,0 +1,118 @@
+services:
+  # ----------------------------------------
+  # 1. API GATEWAY 
+  # ----------------------------------------
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80" 
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - task-service
+      #- exam-service
+      #- auth-service
+    networks:
+      - app-network
+
+  # ----------------------------------------
+  # 2. FRONTEND (React / Vite)
+  # ----------------------------------------
+  frontend:
+    build: 
+      context: ./frontend-web-ui
+    networks:
+      - app-network
+    environment:
+      - VITE_API_BASE_URL=http://localhost/api 
+
+  # ----------------------------------------
+  # 3. TASK SERVICE (Courses & Topics)
+  # ----------------------------------------
+  task-service:
+    build: 
+      context: ./task-service
+    networks:
+      - app-network
+    environment:
+      - PORT=3000
+      - MONGO_URI=mongodb://mongodb:27017/autogenex
+    depends_on:
+      - mongodb
+
+  # ----------------------------------------
+  # 4. EXAM SERVICE 
+  # ----------------------------------------
+  exam-service:
+    build: 
+      context: ./exam-service
+    restart: always
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/exam-tool
+      - PORT=3000
+      - CLSI_URL=http://clsi:3013
+      - CLSI_HTTP_TIMEOUT_MS=900000
+      - API_INTERNAL_BASE_URL=http://exam-service:3000 
+    depends_on:
+      - mongodb
+      - clsi
+    networks:
+      - app-network
+  # ----------------------------------------
+  # 5. AUTH SERVICE (User Management)
+  # ----------------------------------------
+ # auth-service:
+   # build: 
+  #    context: ./auth-service
+   # networks:
+    #  - app-network
+    #environment:
+    #  - PORT=3000
+     # - MONGO_URI=mongodb://mongodb:27017/autogenex
+    #depends_on:
+     # - mongodb
+
+  # ----------------------------------------
+  # 6. OVERLEAF CLSI (LaTeX Compiler)
+  # ----------------------------------------
+  clsi:
+    build:
+      context: ./clsi
+      dockerfile: Dockerfile
+    container_name: autogenex-clsi
+    restart: unless-stopped
+    ports:
+      - "3013:3013"
+    environment:
+      LISTEN_ADDRESS: "0.0.0.0"
+      DOCKER_RUNNER: "false"
+      TEXLIVE_IMAGE: "texlive/texlive:latest"
+      ALLOWED_IMAGES: "texlive/texlive:latest"
+      TEXLIVE_IMAGE_USER: "root"
+      COMPILES_HOST_DIR: ${PWD}/compiles
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./compiles:/overleaf/services/clsi/compiles
+      - ./cache:/overleaf/services/clsi/cache
+    networks:
+      - app-network
+
+  # ----------------------------------------
+  # 7. DATENBANK (MongoDB)
+  # ----------------------------------------
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017" 
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-data:

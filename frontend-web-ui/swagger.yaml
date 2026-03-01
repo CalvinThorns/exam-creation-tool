@@ -1,0 +1,600 @@
+openapi: 3.0.3
+info:
+  title: Autogenex API
+  version: 1.0.0
+  description: RESTful API for managing courses, tasks (topics), and exams.
+tags:
+  - name: Courses
+    description: Endpoints for course management
+  - name: Exams
+    description: Endpoints for exam generation and management
+  - name: Topics
+    description: Endpoints for tasks and topic management
+
+paths:
+  # ==========================================
+  # COURSES
+  /api/courses:
+    get:
+      summary: Get all courses
+      tags: [Courses]
+      operationId: getCourses
+      responses:
+        '200':
+          description: A paginated list of all courses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCoursesDto'
+    post:
+      summary: Create a new course
+      tags: [Courses]
+      operationId: createCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseDto'
+      responses:
+        '201':
+          description: Course successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDto'
+
+  /api/courses/{id}:
+    get:
+      summary: Get a course by ID
+      tags: [Courses]
+      operationId: getCourseById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The unique course ID
+      responses:
+        '200':
+          description: Course details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDto'
+        '404':
+          description: Course not found
+    put:
+      summary: Update a course by ID
+      tags: [Courses]
+      operationId: updateCourse
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCourseDto'
+      responses:
+        '200':
+          description: Course successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDto'
+    delete:
+      summary: Delete a course by ID
+      tags: [Courses]
+      operationId: deleteCourse
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Course successfully deleted
+
+  # ==========================================
+  # EXAMS
+  /api/exams:
+    get:
+      summary: Get all exams
+      tags: [Exams]
+      operationId: getExams
+      responses:
+        '200':
+          description: A paginated list of all exams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExamsDto'
+    post:
+      summary: Create a new exam
+      tags: [Exams]
+      operationId: createExam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExamDto'
+      responses:
+        '201':
+          description: Exam successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDto'
+
+  /api/exams/{id}:
+    get:
+      summary: Get an exam by ID
+      tags: [Exams]
+      operationId: getExamById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exam details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDto'
+        '404':
+          description: Exam not found
+    put:
+      summary: Update an exam by ID
+      tags: [Exams]
+      operationId: updateExam
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExamDto'
+      responses:
+        '200':
+          description: Exam successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDto'
+    delete:
+      summary: Delete an exam by ID
+      tags: [Exams]
+      operationId: deleteExam
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Exam successfully deleted
+
+  /api/exams/generate:
+    post:
+      summary: Generate PDF for an exam
+      tags: [Exams]
+      operationId: generateExamPdf
+      description: Triggers the LaTeX builder and compiles the exam via the CLSI service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateExamRequestDto'
+      responses:
+        '200':
+          description: Exam generated successfully
+
+  # ==========================================
+  # TOPICS
+  /api/topics:
+    get:
+      summary: Get all topics
+      tags: [Topics]
+      operationId: getTopics
+      parameters:
+        - in: query
+          name: courseId
+          schema:
+            type: string
+          description: Filter topics by a specific course ID
+      responses:
+        '200':
+          description: A paginated list of all topics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTopicsDto'
+    post:
+      summary: Create a new topic
+      tags: [Topics]
+      operationId: createTopic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTopicDto'
+      responses:
+        '201':
+          description: Topic successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDto'
+
+  /api/topics/{id}:
+    get:
+      summary: Get a topic by ID
+      tags: [Topics]
+      operationId: getTopicById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Topic details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDto'
+        '404':
+          description: Topic not found
+    put:
+      summary: Update a topic by ID
+      tags: [Topics]
+      operationId: updateTopic
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTopicDto'
+      responses:
+        '200':
+          description: Topic successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDto'
+    delete:
+      summary: Delete a topic by ID
+      tags: [Topics]
+      operationId: deleteTopic
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Topic successfully deleted
+
+  /api/topics/{id}/images:
+    post:
+      summary: Upload an image for a topic
+      tags: [Topics]
+      operationId: uploadTopicImage
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Image uploaded successfully
+
+# ==========================================
+# DATA MODELS (DTOs)
+components:
+  schemas:
+    # ----------------------------------------
+    # PAGINATION META DATA
+    MetaDto:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 3
+
+    PaginatedCoursesDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseDto'
+        meta:
+          $ref: '#/components/schemas/MetaDto'
+
+    PaginatedExamsDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamDto'
+        meta:
+          $ref: '#/components/schemas/MetaDto'
+
+    PaginatedTopicsDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicDto'
+        meta:
+          $ref: '#/components/schemas/MetaDto'
+
+    # ----------------------------------------
+    # --- Course DTOs
+    CourseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Mongoose ObjectID
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateCourseDto:
+      type: object
+      required:
+        - title
+        - shortName
+        - coverPage
+      properties:
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+
+    UpdateCourseDto:
+      type: object
+      properties:
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+
+    # --- Exam DTOs ---
+    ExamDto:
+      type: object
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+          description: Reference to the corresponding Course ID
+        points:
+          type: number
+        topics:
+          type: array
+          items:
+            type: string
+            description: Array of Topic IDs included in this exam
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+            
+    CreateExamDto:
+      type: object
+      required:
+        - courseId
+        - points
+      properties:
+        courseId:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        topics:
+          type: array
+          items:
+            type: string
+          default: []
+
+    UpdateExamDto:
+      type: object
+      properties:
+        points:
+          type: number
+          minimum: 0
+        topics:
+          type: array
+          items:
+            type: string
+
+    GenerateExamRequestDto:
+      type: object
+      required:
+        - examId
+      properties:
+        examId:
+          type: string
+
+    # --- Topic / Task DTOs ---
+    ImageMetaDto:
+      type: object
+      description: Transformed metadata of an uploaded image
+      properties:
+        hasImage:
+          type: boolean
+        contentType:
+          type: string
+        filename:
+          type: string
+
+    TaskDto:
+      type: object
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        points:
+          type: number
+        question_img:
+          $ref: '#/components/schemas/ImageMetaDto'
+        solution:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+
+    CreateTaskDto:
+      type: object
+      required:
+        - question
+        - points
+      properties:
+        question:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        solution:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+          default: true
+
+    UpdateTaskDto:
+      type: object
+      properties:
+        question:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        solution:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+
+    TopicDto:
+      type: object
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+        description_img:
+          $ref: '#/components/schemas/ImageMetaDto'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskDto'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTopicDto:
+      type: object
+      required:
+        - courseId
+        - topic
+        - points
+      properties:
+        courseId:
+          type: string
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateTaskDto'
+
+    UpdateTopicDto:
+      type: object
+      properties:
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateTaskDto'
