@@ -7,23 +7,20 @@ function sanitizeTexInput(s) {
   return String(s || "");
 }
 
-// If user stored question beginning with \subsection{...}, remove it,
-// because we generate subsection ourselves from task.points.
 function stripLeadingSubsection(s) {
   const str = String(s || "");
-  // removes: \subsection{...} or \subsection*{...} plus trailing whitespace/newlines
   return str.replace(/^\\subsection\*?\{[^}]*\}\s*/m, "");
 }
 
-// If user stored solution already wrapped with solution env, unwrap it,
-// because we wrap once in the builder.
 function unwrapSolutionEnv(s) {
   const str = String(s || "");
   const m = str.match(/\\begin\{solution\}([\s\S]*?)\\end\{solution\}/m);
   return m ? m[1].trim() : str;
 }
 
-function buildDocumentPreamble() {
+function buildDocumentPreamble({ showSolutions }) {
+  const flag = showSolutions ? "\\showsolutionstrue" : "\\showsolutionsfalse";
+
   return String.raw`\documentclass[a4paper,12pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -44,6 +41,10 @@ function buildDocumentPreamble() {
 \usepackage{comment}
 \usepackage{fancyhdr}
 
+% Column helpers (needed for your marks table)
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
 \geometry{a4paper, left=2cm, right=2cm, top=2cm, bottom=2cm}
 \def \runninghead {Exam}
 
@@ -62,7 +63,8 @@ function buildDocumentPreamble() {
 \setlength{\parindent}{0pt}
 
 \newif\ifshowsolutions
-\showsolutionstrue
+${flag}
+
 \ifshowsolutions
   \newtcolorbox{solution}{
     colback=red!80,
@@ -82,28 +84,111 @@ function buildDocumentPreamble() {
 `;
 }
 
-function buildLatexFromDraft({ coverPageLatex, topics }) {
+/**
+ * Generates the dynamic marks table block for the cover page.
+ * Uses topics[].points and fills Summe.
+ */
+function buildMarksTableLatex(topics) {
+  const nTopics = Array.isArray(topics) ? topics.length : 0;
+  const n = Math.max(1, nTopics);
+
+  const headerNums = Array.from({ length: n }, (_, i) => String(i + 1));
+  const points = (topics || []).map((t) => num(t?.points));
+  while (points.length < n) points.push(0);
+
+  const sum = points.reduce((a, b) => a + num(b), 0);
+
+  const headerRow = `Aufgabe & ${headerNums.join(" & ")} & Summe \\\\`;
+  const pointsRow = `Punkte & ${points.join(" & ")} & ${sum} \\\\`;
+  const reachedRow = `Erreicht & ${Array(n).fill("").join(" & ")} & \\\\`;
+
+  // widths:
+  // - first column fixed
+  // - sum column fixed (a bit wider)
+  // - each task column = (linewidth - first - sum) / n
+  const firstW = "2.0cm";
+  const sumW = "2.5cm";
+
+  const taskW = `\\dimexpr(\\linewidth-${firstW}-${sumW})/${n}\\relax`;
+
+  const taskCols = Array(n).fill(`C{${taskW}}|`).join("");
+
+  const colSpec = `|L{${firstW}}||${taskCols}C{${sumW}}|`;
+
+  return String.raw`
+    \vspace{0.5cm}
+
+    {\renewcommand{\arraystretch}{1.2}
+    \setlength{\tabcolsep}{6pt}
+    \begin{tabular}{${colSpec}}
+    \hline
+    ${headerRow}
+    \hline
+    ${pointsRow}
+    \hline
+    ${reachedRow}
+    \hline
+    \end{tabular}
+    }
+  `;
+}
+
+/**
+ * Replaces the marks table block inside course.coverPage.
+ * This is robust for user-provided cover pages because it searches for a tabularx
+ * that contains the key rows: Aufgabe, Punkte, Erreicht.
+ */
+function injectMarksTableAuto(coverPageLatex, topics) {
+  const src = String(coverPageLatex || "");
+  const replacement = buildMarksTableLatex(topics);
+
+  // Find the tabularx that contains Aufgabe + Punkte + Erreicht.
+  // Then optionally include the preceding \vspace{0.5cm}\hrule block if present.
+  const re =
+    /(?:\\vspace\{0\.5cm\}\s*\\hrule\s*)?\\begin\{tabularx\}\{\\linewidth\}\{[\s\S]*?\}[\s\S]*?Aufgabe[\s\S]*?Punkte[\s\S]*?Erreicht[\s\S]*?\\end\{tabularx\}/m;
+
+  if (!re.test(src)) {
+    // Fallback: replace the first tabularx on cover page (better than failing compile),
+    // but only if there is at least one tabularx.
+    const firstTabularx =
+      /\\begin\{tabularx\}\{\\linewidth\}\{[\s\S]*?\\end\{tabularx\}/m;
+    if (firstTabularx.test(src)) {
+      return src.replace(firstTabularx, replacement);
+    }
+
+    // If there is no table at all, append it near the end (still usable).
+    return src + "\n\n" + replacement + "\n";
+  }
+
+  return src.replace(re, replacement);
+}
+
+function buildLatexFromDraft({ coverPageLatex, topics, version }) {
+  const v = String(version || "TEACHER").toUpperCase();
+  const showSolutions = v !== "STUDENT";
+
   const parts = [];
-  parts.push(buildDocumentPreamble());
+  parts.push(buildDocumentPreamble({ showSolutions }));
   parts.push(String.raw`\begin{document}`);
 
-  // Cover page block (front page is per course)
+  // cover page (and table injection) stays as you already have it
   if (coverPageLatex && String(coverPageLatex).trim()) {
-    parts.push(sanitizeTexInput(coverPageLatex));
+    const filledCover = injectMarksTableAuto(coverPageLatex, topics);
+    parts.push(sanitizeTexInput(filledCover));
   } else {
-    // fallback if course has no cover page
     parts.push(String.raw`\section*{Exam}`);
     parts.push(String.raw`\newpage`);
   }
 
-  // Ensure headers active after cover
   parts.push(String.raw`\thispagestyle{fancy}`);
   parts.push(String.raw`\setcounter{page}{1}`);
 
+  // rest of your topic/task rendering stays the same
+  // when STUDENT, the solution env is excluded automatically
+  // when TEACHER, it is shown automatically
+
   for (let i = 0; i < (topics || []).length; i++) {
     const t = topics[i] || {};
-
-    // Topic header: allow full LaTeX section or plain text
     const topicStr = String(t.topic || "").trim();
     const topicHeader = topicStr.startsWith("\\section")
       ? sanitizeTexInput(topicStr)
@@ -126,7 +211,6 @@ function buildLatexFromDraft({ coverPageLatex, topics }) {
       const task = tasks[j] || {};
       const pts = num(task.points);
 
-      // We generate subsection from points. Strip any user-supplied \subsection{...} in question.
       parts.push(String.raw`\subsection{${pts}P}`);
 
       const questionBody = stripLeadingSubsection(task.question || "");
@@ -140,7 +224,6 @@ function buildLatexFromDraft({ coverPageLatex, topics }) {
 \end{center}`);
       }
 
-      // Unwrap if user stored \begin{solution}...\end{solution}
       const solBody = unwrapSolutionEnv(task.solution || "");
       if (String(solBody).trim()) {
         parts.push(String.raw`\begin{solution}
@@ -153,5 +236,7 @@ ${sanitizeTexInput(solBody)}
   parts.push(String.raw`\end{document}`);
   return parts.join("\n\n");
 }
+
+module.exports = { buildLatexFromDraft };
 
 module.exports = { buildLatexFromDraft };

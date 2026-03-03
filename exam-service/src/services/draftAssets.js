@@ -58,7 +58,7 @@ async function buildClsiImageResourcesFromDraftTopics({
 
       resources.push({
         path: filename,
-        url: `${apiBaseUrl}/api/v1/exams/draft/assets/${token}/${filename}`,
+        url: `${apiBaseUrl}/api/exams/draft/assets/${token}/${filename}`,
         modified: Date.now(),
       });
 
@@ -79,7 +79,7 @@ async function buildClsiImageResourcesFromDraftTopics({
 
         resources.push({
           path: filename,
-          url: `${apiBaseUrl}/api/v1/exams/draft/assets/${token}/${filename}`,
+          url: `${apiBaseUrl}/api/exams/draft/assets/${token}/${filename}`,
           modified: Date.now(),
         });
 

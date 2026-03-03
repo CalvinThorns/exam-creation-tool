@@ -1,4 +1,4 @@
-const path = require("path"); // Add this
+const path = require("path");
 const fs = require("fs").promises;
 const mongoose = require("mongoose");
 const { Topic } = require("../models/topic.model");
@@ -260,9 +260,17 @@ function createExamService({ examRepo, courseRepo }) {
         apiBaseUrl,
       });
 
+    const version = String(body?.version || "STUDENT").toUpperCase();
+    if (version !== "TEACHER" && version !== "STUDENT") {
+      const e = new Error('version must be "TEACHER" or "STUDENT"');
+      e.status = 400;
+      throw e;
+    }
+
     const mainTex = buildLatexFromDraft({
       coverPageLatex: coverPage,
       topics: nextTopics,
+      version,
     });
 
     const projectId = randomProjectId();
@@ -280,7 +288,7 @@ function createExamService({ examRepo, courseRepo }) {
     };
 
     const client = createClsiClient({ clsiUrl, logger });
-    result = await client.compile({ projectId, compileBody, reqId });
+    const result = await client.compile({ projectId, compileBody, reqId });
 
     if (!result || !result.compile) {
       logger.error({ reqId, clsiResult: result }, "Invalid CLSI response");
