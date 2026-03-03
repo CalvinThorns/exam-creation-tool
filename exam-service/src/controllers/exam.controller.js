@@ -94,13 +94,19 @@ function createExamController({ examService }) {
 
     compileDraft: async (req, res, next) => {
       try {
-        const { pdfBuffer, filename } = await examService.compileDraft(
+        const { pdfBuffer, filename, errors } = await examService.compileDraft(
           req.body,
           req.id,
         );
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-        return res.status(200).send(pdfBuffer);
+
+        return sendSuccess(res, {
+          data: {
+            filename,
+            contentType: "application/pdf",
+            pdfBase64: pdfBuffer.toString("base64"),
+            errors: errors || null,
+          },
+        });
       } catch (err) {
         next(err);
       }
