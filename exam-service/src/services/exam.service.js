@@ -49,10 +49,8 @@ function createExamService({ examRepo, courseRepo }) {
 
   function snapshotFromTopicDoc(doc) {
     return {
-      topicId: String(doc._id),
-      courseId: String(doc.courseId),
+      courseId: doc.courseId,
       topic: doc.topic || "",
-      descriptionслан: "",
       description: doc.description || "",
       points: numOrZero(doc.points),
       description_img: doc.description_img || {
@@ -62,7 +60,7 @@ function createExamService({ examRepo, courseRepo }) {
       },
       tasks: Array.isArray(doc.tasks)
         ? doc.tasks.map((t) => ({
-            id: t.id || "",
+            id: t.id || null,
             question: t.question || "",
             points: numOrZero(t.points),
             question_img: t.question_img || {
@@ -190,24 +188,27 @@ function createExamService({ examRepo, courseRepo }) {
   }
 
   function validateDraftTopicsShape(topics) {
-    if (!Array.isArray(topics))
-      throw badRequest("currentDraftTopics must be an array");
+    if (!Array.isArray(topics)) throw badRequest("topics must be an array");
     for (const t of topics) {
       if (!t || typeof t !== "object")
-        throw badRequest("Invalid topic in draft");
+        throw badRequest("Each topic must be an object");
       if (!t.topic || typeof t.topic !== "string")
-        throw badRequest("Each draft topic must have topic");
-      if (!t.courseId || !isValidObjectId(t.courseId))
-        throw badRequest("Each draft topic must have a valid courseId");
-      if (t.topicId && !isValidObjectId(t.topicId))
-        throw badRequest("topicId must be a valid id");
+        throw badRequest("Each topic must have a string 'topic' property");
+      if (t.courseId && !isValidObjectId(t.courseId))
+        throw badRequest("topic.courseId must be a valid id");
+      if (t.tasks) {
+        if (!Array.isArray(t.tasks))
+          throw badRequest("Topic tasks must be an array");
+        for (const task of t.tasks) {
+          if (task.id && !isValidObjectId(task.id))
+            throw badRequest("Each task id must be a valid id");
+        }
+      }
       if (t.points !== undefined) {
         const p = Number(t.points);
         if (!Number.isFinite(p) || p < 0)
-          throw badRequest("Draft topic points must be >= 0");
+          throw badRequest("Topic points must be >= 0");
       }
-      if (t.tasks !== undefined && !Array.isArray(t.tasks))
-        throw badRequest("Draft topic tasks must be an array");
     }
   }
 
@@ -401,21 +402,10 @@ function createExamService({ examRepo, courseRepo }) {
       const variants = await Topic.find({ courseId, topic: topicName }).lean();
       if (!variants.length) throw badRequest("No variants found for topic");
 
-      // avoid returning same topicId repeatedly if possible
-      const currentTopicId = current[idx]?.topicId
-        ? String(current[idx].topicId)
-        : null;
-
       let best = null;
       let bestDiff = Infinity;
 
       for (const v of variants) {
-        if (
-          currentTopicId &&
-          String(v._id) === currentTopicId &&
-          variants.length > 1
-        )
-          continue;
         const total = othersSum + numOrZero(v.points);
         const diff = Math.abs(total - targetPoints);
         if (diff < bestDiff) {
@@ -443,47 +433,87 @@ function createExamService({ examRepo, courseRepo }) {
 
     // 3) Create exam: ONLY ON SAVE (DB WRITE)
     async createExam(data) {
-      const courseId = String(data.courseId || "").trim();
-      await validateCourseId(courseId);
+      try {
+        const courseId = String(data.courseId || "").trim();
+        await validateCourseId(courseId);
 
-      const targetPoints = numOrZero(data.targetPoints);
-      if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
+        const targetPoints = numOrZero(data.targetPoints);
+        if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
 
-      const topics = data.topics || [];
-      validateDraftTopicsShape(topics);
+        let topics = data.topics || [];
+        validateDraftTopicsShape(topics);
 
-      // ensure all topics belong to courseId
-      const mismatch = topics.find(
-        (t) => String(t.courseId) !== String(courseId),
-      );
-      if (mismatch)
-        throw badRequest("All topics must belong to the given courseId");
+        topics = topics.map((t) => {
+          const { topicId, ...rest } = t;
+          return {
+            ...rest,
+            courseId,
+          };
+        });
 
-      const points = sumTopicPoints(topics);
+        const points = sumTopicPoints(topics);
 
-      return examRepo.create({
-        courseId,
-        targetPoints,
-        points,
-        topics,
-      });
+        return examRepo.create({
+          courseId,
+          targetPoints,
+          points,
+          topics,
+        });
+      } catch (err) {
+        if (err.status && err.status < 500) throw err;
+        logger.error({ err, data }, "failed to create exam");
+        const e = new Error("Unable to create exam");
+        e.status = 500;
+        throw e;
+      }
     },
 
-    // Existing list/get/update/delete now work with snapshot topics
     async listExams(query) {
       const courseId = query.courseId
         ? String(query.courseId).trim()
         : undefined;
       if (courseId && !isValidObjectId(courseId))
         throw badRequest("courseId must be a valid id");
-      return examRepo.findAll({ ...query, courseId });
+
+      const { normalizePagination, buildMeta } = require("../utils/pagination");
+      const { parseFilters, parseSort } = require("../utils/query");
+
+      const { page, limit } = normalizePagination(
+        query.page,
+        query.pageSize || query.limit,
+      );
+
+      const filters = parseFilters(query.filter);
+      if (courseId) filters.courseId = courseId;
+      const sort = parseSort(query.sort);
+
+      const { items, total } = await examRepo.findAll({
+        page,
+        limit,
+        filter: filters,
+        sort,
+      });
+
+      const meta = buildMeta({ total, page, limit });
+      return { items, ...meta };
     },
 
     async getExam(id) {
       if (!isValidObjectId(id)) throw badRequest("id must be a valid id");
-      const exam = await examRepo.findById(id);
-      if (!exam) throw notFound("Exam not found");
-      return exam;
+
+      try {
+        const exam = await examRepo.findById(id);
+        if (!exam) throw notFound("Exam not found");
+        return exam;
+      } catch (err) {
+        if (err.status && err.status < 500) {
+          throw err;
+        }
+        logger.error({ err, examId: id }, "failed to load exam by id");
+        const e = new Error("Unable to retrieve exam");
+        e.status = 500;
+        throw e;
+      }
     },
 
     async updateExam(id, data) {
@@ -507,11 +537,16 @@ function createExamService({ examRepo, courseRepo }) {
 
       if (data.topics !== undefined) {
         validateDraftTopicsShape(data.topics);
-        update.topics = data.topics;
-        update.points = sumTopicPoints(data.topics);
+        const courseIdForTopics = update.courseId || undefined;
+        update.topics = (data.topics || []).map((t) => {
+          const { topicId, ...rest } = t;
+          return {
+            ...rest,
+            ...(courseIdForTopics ? { courseId: courseIdForTopics } : {}),
+          };
+        });
+        update.points = sumTopicPoints(update.topics);
       }
-
-      // Allow manual points override if you want. Usually points should always be sum of topics.
       if (data.points !== undefined) {
         const p = numOrZero(data.points);
         if (p < 0) throw badRequest("points must be >= 0");

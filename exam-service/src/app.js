@@ -13,7 +13,9 @@ app.use(express.json({ limit: "5mb" }));
 
 app.use(morgan("combined"));
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+const { sendSuccess } = require("./utils/response");
+
+app.get("/health", (_req, res) => sendSuccess(res, { data: { ok: true } }));
 
 app.use("/api", routes);
 

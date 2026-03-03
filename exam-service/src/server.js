@@ -1,9 +1,16 @@
 const { app } = require("./app");
 const { connectDB } = require("./config/db");
 const { env } = require("./config/env");
-const { httpLogger } = require("./middlewares/logger");
+const { httpLogger, logger } = require("./middlewares/logger");
 
 app.use(httpLogger);
+
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "uncaughtException");
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "unhandledRejection");
+});
 (async () => {
   try {
     await connectDB(env.mongoUri);

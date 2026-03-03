@@ -1,3 +1,7 @@
+const fs = require("fs");
+const path = require("path");
+const { sendSuccess, sendError } = require("../utils/response");
+
 function createExamController({ examService }) {
   function ensureDraftFns(svc) {
     if (!svc) {
@@ -21,7 +25,7 @@ function createExamController({ examService }) {
     create: async (req, res, next) => {
       try {
         const exam = await examService.createExam(req.body);
-        res.status(201).json({ data: exam });
+        return sendSuccess(res, { data: exam, status: 201 });
       } catch (err) {
         next(err);
       }
@@ -30,9 +34,10 @@ function createExamController({ examService }) {
     list: async (req, res, next) => {
       try {
         const result = await examService.listExams(req.query);
-        res.json({
-          data: result.items,
-          meta: { page: result.page, limit: result.limit, total: result.total },
+        const { items, ...meta } = result;
+        return sendSuccess(res, {
+          data: items,
+          meta,
         });
       } catch (err) {
         next(err);
@@ -42,7 +47,7 @@ function createExamController({ examService }) {
     getById: async (req, res, next) => {
       try {
         const exam = await examService.getExam(req.params.id);
-        res.json({ data: exam });
+        return sendSuccess(res, { data: exam });
       } catch (err) {
         next(err);
       }
@@ -51,7 +56,7 @@ function createExamController({ examService }) {
     updateById: async (req, res, next) => {
       try {
         const exam = await examService.updateExam(req.params.id, req.body);
-        res.json({ data: exam });
+        return sendSuccess(res, { data: exam });
       } catch (err) {
         next(err);
       }
@@ -60,29 +65,28 @@ function createExamController({ examService }) {
     deleteById: async (req, res, next) => {
       try {
         await examService.deleteExam(req.params.id);
-        res.status(204).send();
+        // successful deletion with no content
+        return res.status(204).send();
       } catch (err) {
         next(err);
       }
     },
 
-    // POST /api/v1/exams/draft
     generateDraft: async (req, res, next) => {
       try {
         ensureDraftFns(examService);
         const result = await examService.generateDraft(req.body);
-        res.json({ data: result });
+        return sendSuccess(res, { data: result });
       } catch (err) {
         next(err);
       }
     },
 
-    // POST /api/v1/exams/draft/regenerate-topic
     regenerateDraftTopic: async (req, res, next) => {
       try {
         ensureDraftFns(examService);
         const result = await examService.regenerateDraftTopic(req.body);
-        res.json({ data: result });
+        return sendSuccess(res, { data: result });
       } catch (err) {
         next(err);
       }
@@ -96,7 +100,7 @@ function createExamController({ examService }) {
         );
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-        res.status(200).send(pdfBuffer);
+        return res.status(200).send(pdfBuffer);
       } catch (err) {
         next(err);
       }
@@ -112,11 +116,10 @@ function createExamController({ examService }) {
         const filePath = path.join(root, token, filename);
 
         if (!fs.existsSync(filePath)) {
-          res.status(404).json({ error: { message: "Asset not found" } });
-          return;
+          return sendError(res, { status: 404, message: "Asset not found" });
         }
 
-        res.sendFile(filePath);
+        return res.sendFile(filePath);
       } catch (err) {
         next(err);
       }

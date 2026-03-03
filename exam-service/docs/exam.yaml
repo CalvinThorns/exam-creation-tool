@@ -8,16 +8,75 @@ paths:
   /api/exams:
     get:
       summary: Get all exams
+      description: >-
+        Retrieve a paginated list of exams. Supports sorting and filtering via
+        query parameters. Example:
+        `/api/exams?sort=createdAt:desc,amount:asc&filter=name:eq:Data Structures&filter=marks:gte:100&page=1&pageSize=20`
       tags: [Exams]
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+          description: Page number (1-based)
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Number of items per page (alias for `limit`)
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: >-
+            Comma-separated list of `field:direction` pairs. Direction may be
+            `asc` (default) or `desc`. Example: `createdAt:desc,points:asc`.
+        - in: query
+          name: filter
+          schema:
+            type: string
+          description: >-
+            Filter expression of the form `field:op:value`. Supported
+            operators: `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, `nin`,
+            `regex`. This parameter may be repeated.
       responses:
-        '200':
+        "200":
           description: A list of all exams
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ExamDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ExamDto"
+              examples:
+                sortedAndFiltered:
+                  summary: Page 2 of exams sorted by date desc and filtered by points
+                  value:
+                    success: true
+                    data:
+                      - id: "abcd1234"
+                        courseId: "62f0c1a5bde8f72f9e4d3a10"
+                        points: 120
+                        topics: []
+                      - id: "efgh5678"
+                        courseId: "62f0c1a5bde8f72f9e4d3a10"
+                        points: 150
+                        topics: []
+                    meta:
+                      page: 2
+                      limit: 20
+                      total: 53
+                      totalPages: 3
+                      hasNextPage: true
+                      hasPreviousPage: true
     post:
       summary: Create a new exam
       tags: [Exams]
@@ -26,14 +85,55 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateExamDto'
+              $ref: "#/components/schemas/CreateExamDto"
+            examples:
+              minimal:
+                summary: Minimum required fields
+                value:
+                  courseId: "62f0c1a5bde8f72f9e4d3a10"
+                  targetPoints: 100
+                  topics:
+                    - topic: "Algebra I"
+                      points: 20
+                      tasks: []
+                    - topic: "Geometry Basics"
+                      points: 30
+                      tasks: []
       responses:
-        '201':
+        "201":
           description: Exam successfully created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExamDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ExamDto"
+              examples:
+                success:
+                  summary: Example success response
+                  value:
+                    success: true
+                    data:
+                      id: "abcd1234"
+                      courseId: "62f0c1a5bde8f72f9e4d3a10"
+                      points: 50
+                      topics:
+                        - topic: "Algebra I"
+                          points: 20
+                          tasks: []
+                        - topic: "Geometry Basics"
+                          points: 30
+                          tasks: []
+                validationError:
+                  summary: Example validation error
+                  value:
+                    success: false
+                    error:
+                      message: "topics must be an array"
+                      code: null
 
   /api/exams/{id}:
     get:
@@ -46,14 +146,23 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Exam details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExamDto'
-        '404':
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ExamDto"
+        "404":
           description: Exam not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
     put:
       summary: Update an exam by ID
       tags: [Exams]
@@ -68,14 +177,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateExamDto'
+              $ref: "#/components/schemas/UpdateExamDto"
       responses:
-        '200':
+        "200":
           description: Exam successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExamDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ExamDto"
     delete:
       summary: Delete an exam by ID
       tags: [Exams]
@@ -86,7 +200,7 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        "204":
           description: Exam successfully deleted
 
   /api/exams/generate:
@@ -99,13 +213,54 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerateExamRequestDto'
+              $ref: "#/components/schemas/GenerateExamRequestDto"
       responses:
-        '200':
+        "200":
           description: Exam generated successfully
 
 components:
   schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          description: The payload of a successful response. May be an object, array, or null.
+        meta:
+          type: object
+          description: Optional metadata (pagination, links, etc.)
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            # single error fields
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            # or a list of errors (e.g. validation failures)
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+                  details:
+                    type: object
+
     ExamDto:
       type: object
       properties:
@@ -118,32 +273,89 @@ components:
           type: number
         topics:
           type: array
+          description: Snapshot of topic variants stored with the exam
           items:
-            type: string
-            description: Array of Topic IDs included in this exam
+            type: object
+            properties:
+              courseId:
+                type: string
+              topic:
+                type: string
+              points:
+                type: number
+              tasks:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+            required:
+              - courseId
+              - topic
+              - points
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-            
+
     CreateExamDto:
       type: object
+      # the body used when saving an exam to the database
       required:
         - courseId
-        - points
+        - targetPoints
+        - topics
       properties:
         courseId:
           type: string
-        points:
+          description: MongoDB _id of an existing course
+        targetPoints:
           type: number
-          minimum: 0
+          minimum: 1
+          description: Desired total points for the exam (must be >0)
         topics:
           type: array
+          description: Snapshot of the chosen topic variants; courseId will be populated from the parent object
           items:
-            type: string
+            type: object
+            required:
+              - topic
+              - points
+            properties:
+              topic:
+                type: string
+                description: The name of the topic variant
+              points:
+                type: number
+                minimum: 0
+                description: points assigned for this topic variant
+              tasks:
+                type: array
+                description: optional list of tasks associated with the topic
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    question:
+                      type: string
+                    points:
+                      type: number
+                      minimum: 0
           default: []
+      example:
+        courseId: "62f0c1a5bde8f72f9e4d3a10"
+        targetPoints: 100
+        topics:
+          - topic: "Algebra I"
+            points: 20
+            tasks: []
+          - topic: "Geometry Basics"
+            points: 30
+            tasks: []
 
     UpdateExamDto:
       type: object
