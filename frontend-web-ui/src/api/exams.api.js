@@ -1,19 +1,23 @@
-import { http } from "./http";
+import { toExamsListQuery } from "../utils/listQuery";
+import { examsHttp } from "./clients";
 
 export const examsApi = {
-  list: (params) => http.get("/exams", { params }).then((r) => r.data),
-  create: (body) => http.post("/exams", body).then((r) => r.data),
-  update: (id, body) => http.patch(`/exams/${id}`, body).then((r) => r.data),
-  remove: (id) => http.delete(`/exams/${id}`).then((r) => r.data),
+  list: (uiParams) =>
+    examsHttp
+      .get("", { params: toExamsListQuery(uiParams) })
+      .then((r) => r.data),
 
-  // NEW draft endpoints
-  draft: (body) => http.post("/exams/draft", body).then((r) => r.data),
+  create: (body) => examsHttp.post("/", body).then((r) => r.data),
+  update: (id, body) => examsHttp.patch(`/${id}`, body).then((r) => r.data),
+  remove: (id) => examsHttp.delete(`/${id}`).then((r) => r.data),
+
+  draft: (body) => examsHttp.post("/draft", body).then((r) => r.data),
   regenerateTopic: (body) =>
-    http.post("/exams/draft/regenerate-topic", body).then((r) => r.data),
+    examsHttp.post("/draft/regenerate-topic", body).then((r) => r.data),
 
   compileDraft: (body) =>
-    http
-      .post("/exams/draft/compile", body, {
+    examsHttp
+      .post("/draft/compile", body, {
         responseType: "blob",
         timeout: 600000,
       })

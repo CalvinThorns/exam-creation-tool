@@ -26,11 +26,6 @@ import {
 import { LatexEditor } from "../../components/ui/LatexEditor";
 import { examsApi } from "../../api/exams.api";
 
-const grayFieldSx = {
-  "& .MuiInputBase-root": { backgroundColor: "#d9d9d9", borderRadius: "10px" },
-  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#d9d9d9" },
-};
-
 function sumPoints(topics) {
   return (topics || []).reduce((acc, t) => acc + Number(t.points || 0), 0);
 }
@@ -194,7 +189,7 @@ export function GenerateExamPage() {
       <PageHeader title="Generate Exam" />
 
       {/* Top controls like mock */}
-      <Paper sx={{ p: 2, borderRadius: 1, mb: 2 }}>
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Box className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <TextField
             select
@@ -202,7 +197,6 @@ export function GenerateExamPage() {
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
             fullWidth
-            sx={grayFieldSx}
           >
             <MenuItem value="">Select course</MenuItem>
             {courses.map((c) => (
@@ -218,7 +212,6 @@ export function GenerateExamPage() {
             value={targetPoints}
             onChange={(e) => setTargetPoints(Number(e.target.value || 0))}
             fullWidth
-            sx={grayFieldSx}
           />
 
           <TextField
@@ -228,7 +221,6 @@ export function GenerateExamPage() {
             onChange={(e) => setTopicPick(e.target.value)}
             fullWidth
             disabled={!courseId}
-            sx={grayFieldSx}
           >
             <MenuItem value="">Select topic</MenuItem>
             {topicNames.map((name) => (
@@ -243,12 +235,7 @@ export function GenerateExamPage() {
             startIcon={<AddIcon />}
             onClick={addTopic}
             disabled={!courseId || !topicPick}
-            sx={{
-              height: 56,
-              borderRadius: 1.5,
-              bgcolor: "#111",
-              "&:hover": { bgcolor: "#000" },
-            }}
+            fullWidth
           >
             Add
           </Button>
@@ -308,9 +295,9 @@ export function GenerateExamPage() {
       {/* Two columns like mock */}
       <Box className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left: Editable generated exam */}
-        <Paper sx={{ p: 2, borderRadius: 1, minHeight: 520 }}>
+        <Paper sx={{ p: 2, minHeight: 520 }}>
           <Box className="flex items-center justify-between">
-            <Typography sx={{ fontWeight: 800 }}>
+            <Typography variant="h6">
               Exam{" "}
               {draft
                 ? `(Total: ${draft.totalPoints}, Target: ${draft.targetPoints})`
@@ -519,9 +506,9 @@ export function GenerateExamPage() {
         </Paper>
 
         {/* Right: Preview placeholder */}
-        <Paper sx={{ p: 2, borderRadius: 1, minHeight: 520 }}>
+        <Paper sx={{ p: 2, minHeight: 520 }}>
           <Box className="flex items-center justify-between">
-            <Typography sx={{ fontWeight: 800 }}>Preview</Typography>
+            <Typography variant="h6">Preview</Typography>
             <Button
               variant="contained"
               color="secondary"
@@ -534,15 +521,7 @@ export function GenerateExamPage() {
 
           <Divider sx={{ my: 2 }} />
 
-          <Box
-            sx={{
-              height: 440,
-              bgcolor: "#fff",
-              border: "1px solid #dcdcdc",
-              borderRadius: 1,
-            }}
-            className="flex items-center justify-center"
-          >
+          <Box sx={{ height: 440 }} className="flex items-center justify-center">
             {pdfUrl ? (
               <iframe
                 title="PDF Preview"
