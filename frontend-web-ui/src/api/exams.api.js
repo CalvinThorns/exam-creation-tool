@@ -2,6 +2,8 @@ import { toExamsListQuery } from "../utils/listQuery";
 import { examsHttp } from "./clients";
 
 export const examsApi = {
+  getById: (id) => examsHttp.get(`/${id}`).then((r) => r.data),
+
   list: (uiParams) =>
     examsHttp
       .get("", { params: toExamsListQuery(uiParams) })

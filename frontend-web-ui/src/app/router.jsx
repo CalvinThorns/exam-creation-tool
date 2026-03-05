@@ -14,6 +14,7 @@ export const router = createBrowserRouter([
       { path: "/tasks", element: <TopicsPage /> },
       { path: "/exams", element: <ExamsPage /> },
       { path: "/exams/generate", element: <GenerateExamPage /> },
+      { path: "/exams/:id/edit", element: <GenerateExamPage /> },
     ],
   },
 ]);

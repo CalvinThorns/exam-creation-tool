@@ -74,7 +74,7 @@ export function ExamsPage() {
         id: "edit",
         label: "Edit",
         icon: EditIcon,
-        // visible: () => false,
+        onClick: (row) => nav(`/exams/${row.id}/edit`),
       },
       {
         id: "delete",
@@ -84,7 +84,7 @@ export function ExamsPage() {
         onClick: (row) => setConfirm({ open: true, id: row.id }),
       },
     ],
-    [],
+    [nav],
   );
 
   const handlePageChange = useCallback((newPage, newPageSize) => {

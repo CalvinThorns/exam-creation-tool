@@ -1,5 +1,6 @@
 // GenerateExamPage.jsx
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import {
   Box,
   Button,
@@ -37,6 +38,7 @@ import { useCourses } from "../courses/courses.hooks";
 import { useTopics } from "../topics/topics.hooks";
 import {
   useCreateExam,
+  useExam,
   useGenerateDraft,
   useRegenerateDraftTopic,
 } from "./exams.hooks";
@@ -437,6 +439,8 @@ function TopicCard({
 // ---------------------------------------------------------------------------
 export function GenerateExamPage() {
   const theme = useTheme();
+  const { id: examId } = useParams(); // present only in edit mode (/exams/:id/edit)
+  const isEditMode = Boolean(examId);
 
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
   const courses = coursesData?.data || coursesData || [];
@@ -448,8 +452,42 @@ export function GenerateExamPage() {
   const [pdfUrl, setPdfUrl] = useState("");
   const [pdfFilename, setPdfFilename] = useState("exam.pdf");
   const [isCompiling, setIsCompiling] = useState(false);
-  // Tracks which version was last compiled — shown as a badge in the preview header
   const [compiledVersion, setCompiledVersion] = useState(null);
+  const [draft, setDraft] = useState(null);
+
+  // Fetch existing exam when in edit mode
+  const { data: examData, isLoading: examLoading } = useExam(examId, {
+    enabled: isEditMode,
+  });
+
+  // Hydrate form once exam data arrives
+  useEffect(() => {
+    if (!examData) return;
+    const exam = examData.data ?? examData;
+
+    const resolvedCourseId =
+      typeof exam.courseId === "object" ? exam.courseId?.id : exam.courseId;
+
+    setCourseId(resolvedCourseId || "");
+    setTargetPoints(exam.targetPoints ?? exam.points ?? 0);
+
+    const topicNames = (exam.topics || []).map((t) => t.topic);
+    setSelectedTopics(topicNames);
+
+    // Shape the exam into the same draft format GenerateExamPage uses
+    setDraft({
+      course:
+        typeof exam.courseId === "object"
+          ? exam.courseId
+          : { id: resolvedCourseId },
+      targetPoints: exam.targetPoints ?? exam.points ?? 0,
+      totalPoints:
+        exam.totalPoints ??
+        (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
+      diff: 0,
+      topics: exam.topics || [],
+    });
+  }, [examData]);
 
   const { data: topicsData } = useTopics({
     page: 1,
@@ -467,8 +505,6 @@ export function GenerateExamPage() {
   const generateM = useGenerateDraft();
   const regenM = useRegenerateDraftTopic();
   const saveM = useCreateExam();
-
-  const [draft, setDraft] = useState(null);
 
   const handleCourseChange = (e) => {
     setCourseId(e.target.value);
@@ -615,275 +651,306 @@ export function GenerateExamPage() {
     >
       {/* ── Page header ── */}
       <Box sx={{ flexShrink: 0 }}>
-        <PageHeader title="Generate Exam" />
+        <PageHeader title={isEditMode ? "Edit Exam" : "Generate Exam"} />
       </Box>
 
-      {/* ── Controls panel ── */}
-      <Paper
-        sx={{
-          p: 2.5,
-          flexShrink: 0,
-          border: `1px solid ${theme.palette.divider}`,
-        }}
-      >
+      {/* Loading skeleton while fetching exam in edit mode */}
+      {isEditMode && examLoading ? (
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
             gap: 2,
           }}
         >
-          <TextField
-            select
-            label="Course"
-            value={courseId}
-            onChange={handleCourseChange}
-            fullWidth
-            size="small"
-          >
-            <MenuItem value="">Select course</MenuItem>
-            {courses.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.title} ({c.shortName})
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            label="Total points"
-            type="number"
-            value={targetPoints}
-            onChange={(e) => setTargetPoints(Number(e.target.value || 0))}
-            fullWidth
-            size="small"
-          />
-
-          <TextField
-            select
-            label="Add topic"
-            value={topicPick}
-            onChange={(e) => setTopicPick(e.target.value)}
-            fullWidth
-            size="small"
-            disabled={!courseId}
-          >
-            <MenuItem value="">Select topic</MenuItem>
-            {topicNames.map((name) => (
-              <MenuItem key={name} value={name}>
-                {name}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={addTopic}
-            disabled={!courseId || !topicPick}
-            fullWidth
-          >
-            Add Topic
-          </Button>
+          <CircularProgress size={40} />
+          <Typography variant="body2" color="text.secondary">
+            Loading exam…
+          </Typography>
         </Box>
+      ) : (
+        <>
+          {/* ── Controls panel (generate mode only) ── */}
+          {!isEditMode && (
+            <Paper
+              sx={{
+                p: 2.5,
+                flexShrink: 0,
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 2,
+                }}
+              >
+                <TextField
+                  select
+                  label="Course"
+                  value={courseId}
+                  onChange={handleCourseChange}
+                  fullWidth
+                  size="small"
+                >
+                  <MenuItem value="">Select course</MenuItem>
+                  {courses.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.title} ({c.shortName})
+                    </MenuItem>
+                  ))}
+                </TextField>
 
-        {selectedTopics.length > 0 && (
-          <>
-            <Divider sx={{ my: 2 }} />
-            <Stack direction="row" flexWrap="wrap" gap={1}>
-              {selectedTopics.map((t) => (
-                <Chip
-                  key={t}
-                  label={t}
-                  onDelete={() => removeTopic(t)}
-                  color="primary"
-                  variant="outlined"
+                <TextField
+                  label="Total points"
+                  type="number"
+                  value={targetPoints}
+                  onChange={(e) => setTargetPoints(Number(e.target.value || 0))}
+                  fullWidth
                   size="small"
                 />
-              ))}
-            </Stack>
-          </>
-        )}
 
-        <Divider sx={{ my: 2 }} />
+                <TextField
+                  select
+                  label="Add topic"
+                  value={topicPick}
+                  onChange={(e) => setTopicPick(e.target.value)}
+                  fullWidth
+                  size="small"
+                  disabled={!courseId}
+                >
+                  <MenuItem value="">Select topic</MenuItem>
+                  {topicNames.map((name) => (
+                    <MenuItem key={name} value={name}>
+                      {name}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          {draft ? (
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                Target:{" "}
-                <Box component="span" fontWeight={700} color="text.primary">
-                  {draft.targetPoints}
-                </Box>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total:{" "}
-                <Box component="span" fontWeight={700} color="text.primary">
-                  {draft.totalPoints}
-                </Box>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Diff:{" "}
-                <Box component="span" fontWeight={700} color={diffColor}>
-                  {draft.diff > 0 ? `+${draft.diff}` : draft.diff}
-                </Box>
-              </Typography>
-            </Stack>
-          ) : (
-            <Typography variant="body2" color="text.disabled">
-              Select a course, add topics and click Generate
-            </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={addTopic}
+                  disabled={!courseId || !topicPick}
+                  fullWidth
+                >
+                  Add Topic
+                </Button>
+              </Box>
+
+              {selectedTopics.length > 0 && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {selectedTopics.map((t) => (
+                      <Chip
+                        key={t}
+                        label={t}
+                        onDelete={() => removeTopic(t)}
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                      />
+                    ))}
+                  </Stack>
+                </>
+              )}
+
+              <Divider sx={{ my: 2 }} />
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                {draft ? (
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Target:{" "}
+                      <Box
+                        component="span"
+                        fontWeight={700}
+                        color="text.primary"
+                      >
+                        {draft.targetPoints}
+                      </Box>
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total:{" "}
+                      <Box
+                        component="span"
+                        fontWeight={700}
+                        color="text.primary"
+                      >
+                        {draft.totalPoints}
+                      </Box>
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Diff:{" "}
+                      <Box component="span" fontWeight={700} color={diffColor}>
+                        {draft.diff > 0 ? `+${draft.diff}` : draft.diff}
+                      </Box>
+                    </Typography>
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" color="text.disabled">
+                    Select a course, add topics and click Generate
+                  </Typography>
+                )}
+
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="contained"
+                    startIcon={<RefreshIcon />}
+                    onClick={generateDraft}
+                    disabled={
+                      !courseId ||
+                      selectedTopics.length === 0 ||
+                      Number(targetPoints) <= 0 ||
+                      generateM.isPending
+                    }
+                  >
+                    Generate
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<SaveIcon />}
+                    onClick={saveExam}
+                    disabled={!draft || saveM.isPending}
+                  >
+                    Save
+                  </Button>
+                </Stack>
+              </Stack>
+            </Paper>
           )}
 
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
-              onClick={generateDraft}
-              disabled={
-                !courseId ||
-                selectedTopics.length === 0 ||
-                Number(targetPoints) <= 0 ||
-                generateM.isPending
-              }
-            >
-              Generate
-            </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              startIcon={<SaveIcon />}
-              onClick={saveExam}
-              disabled={!draft || saveM.isPending}
-            >
-              Save
-            </Button>
-          </Stack>
-        </Stack>
-      </Paper>
-
-      {/* ── Two-column panels row ── */}
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          display: "grid",
-          gridTemplateColumns: "2fr 1fr",
-          gap: 2,
-          overflow: "hidden",
-        }}
-      >
-        {/* Left: Exam panel */}
-        <Paper
-          sx={{
-            p: 2.5,
-            height: "100%",
-            boxSizing: "border-box",
-            border: `1px solid ${theme.palette.divider}`,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ flexShrink: 0, mb: 2 }}
-          >
-            <Typography variant="h6">
-              Exam{" "}
-              {draft && (
-                <Typography
-                  component="span"
-                  variant="body2"
-                  color="text.secondary"
-                >
-                  ({draft.totalPoints} / {draft.targetPoints} pts)
-                </Typography>
-              )}
-            </Typography>
-
-            {/* Compile dropdown button */}
-            {isCompiling ? (
-              <Button
-                variant="contained"
-                color="secondary"
-                size="small"
-                disabled
-                startIcon={<CircularProgress size={14} color="inherit" />}
-              >
-                Compiling…
-              </Button>
-            ) : (
-              <CompileButton disabled={!draft} onCompile={compileDraft} />
-            )}
-          </Stack>
-
-          <Divider sx={{ flexShrink: 0, mb: 2 }} />
-
+          {/* ── Two-column panels row ── */}
           <Box
             sx={{
               flex: 1,
               minHeight: 0,
-              overflowY: "auto",
-              "&::-webkit-scrollbar": { width: 6 },
-              "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-              "&::-webkit-scrollbar-thumb": {
-                bgcolor: alpha(theme.palette.primary.main, 0.2),
-                borderRadius: 3,
-              },
-              "&::-webkit-scrollbar-thumb:hover": {
-                bgcolor: alpha(theme.palette.primary.main, 0.4),
-              },
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr",
+              gap: 2,
+              overflow: "hidden",
             }}
           >
-            {!draft ? (
+            {/* Left: Exam panel */}
+            <Paper
+              sx={{
+                p: 2.5,
+                height: "100%",
+                boxSizing: "border-box",
+                border: `1px solid ${theme.palette.divider}`,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ flexShrink: 0, mb: 2 }}
+              >
+                <Typography variant="h6">
+                  Exam{" "}
+                  {draft && !isEditMode && (
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      ({draft.totalPoints} / {draft.targetPoints} pts)
+                    </Typography>
+                  )}
+                </Typography>
+
+                {/* Compile dropdown button */}
+                {isCompiling ? (
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    size="small"
+                    disabled
+                    startIcon={<CircularProgress size={14} color="inherit" />}
+                  >
+                    Compiling…
+                  </Button>
+                ) : (
+                  <CompileButton disabled={!draft} onCompile={compileDraft} />
+                )}
+              </Stack>
+
+              <Divider sx={{ flexShrink: 0, mb: 2 }} />
+
               <Box
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.primary.main, 0.03),
-                  border: `1px dashed ${theme.palette.divider}`,
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  "&::-webkit-scrollbar": { width: 6 },
+                  "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+                  "&::-webkit-scrollbar-thumb": {
+                    bgcolor: alpha(theme.palette.primary.main, 0.2),
+                    borderRadius: 3,
+                  },
+                  "&::-webkit-scrollbar-thumb:hover": {
+                    bgcolor: alpha(theme.palette.primary.main, 0.4),
+                  },
                 }}
               >
-                <Typography color="text.disabled" variant="body2">
-                  No exam generated yet
-                </Typography>
+                {!draft ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      borderRadius: 2,
+                      bgcolor: alpha(theme.palette.primary.main, 0.03),
+                      border: `1px dashed ${theme.palette.divider}`,
+                    }}
+                  >
+                    <Typography color="text.disabled" variant="body2">
+                      No exam generated yet
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Stack spacing={2} sx={{ pr: 0.5 }}>
+                    {draft.topics.map((topic, i) => (
+                      <TopicCard
+                        key={`${topic.topic}-${i}`}
+                        topic={topic}
+                        topicIndex={i}
+                        onTopicField={updateTopicField}
+                        onTaskField={updateTaskField}
+                        onRegenerate={regenerateTopic}
+                        regenPending={regenM.isPending}
+                        theme={theme}
+                      />
+                    ))}
+                  </Stack>
+                )}
               </Box>
-            ) : (
-              <Stack spacing={2} sx={{ pr: 0.5 }}>
-                {draft.topics.map((topic, i) => (
-                  <TopicCard
-                    key={`${topic.topic}-${i}`}
-                    topic={topic}
-                    topicIndex={i}
-                    onTopicField={updateTopicField}
-                    onTaskField={updateTaskField}
-                    onRegenerate={regenerateTopic}
-                    regenPending={regenM.isPending}
-                    theme={theme}
-                  />
-                ))}
-              </Stack>
-            )}
-          </Box>
-        </Paper>
+            </Paper>
 
-        {/* Right: PDF Preview */}
-        <PdfPreviewPanel
-          pdfUrl={pdfUrl}
-          onDownload={downloadPdf}
-          isCompiling={isCompiling}
-          compilingVersion={compiledVersion}
-        />
-      </Box>
+            {/* Right: PDF Preview */}
+            <PdfPreviewPanel
+              pdfUrl={pdfUrl}
+              onDownload={downloadPdf}
+              isCompiling={isCompiling}
+              compilingVersion={compiledVersion}
+            />
+          </Box>
+        </> // end of isEditMode && examLoading conditional
+      )}
     </Box>
   );
 }

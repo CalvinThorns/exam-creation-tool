@@ -43,3 +43,11 @@ export function useRegenerateDraftTopic() {
     mutationFn: examsApi.regenerateTopic,
   });
 }
+
+export function useExam(id, options) {
+  return useQuery({
+    queryKey: ["exams", id],
+    queryFn: () => examsApi.getById(id).then((r) => r.data),
+    ...options,
+  });
+}
