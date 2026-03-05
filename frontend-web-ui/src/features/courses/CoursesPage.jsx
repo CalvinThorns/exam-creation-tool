@@ -79,7 +79,9 @@ export function CoursesPage() {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", pb: 2 }}>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+    >
       <PageHeader
         title="Courses"
         right={
@@ -90,7 +92,9 @@ export function CoursesPage() {
       />
 
       {isLoading ? <Loader /> : null}
-      {error ? <ErrorState message={error.message || "Failed to load courses"} /> : null}
+      {error ? (
+        <ErrorState message={error.message || "Failed to load courses"} />
+      ) : null}
 
       {!isLoading && !error && rows.length === 0 ? (
         <EmptyState

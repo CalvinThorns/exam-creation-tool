@@ -17,9 +17,6 @@ export const examsApi = {
 
   compileDraft: (body) =>
     examsHttp
-      .post("/draft/compile", body, {
-        responseType: "blob",
-        timeout: 600000,
-      })
+      .post("/draft/compile", body, { timeout: 600000 })
       .then((r) => r.data),
 };

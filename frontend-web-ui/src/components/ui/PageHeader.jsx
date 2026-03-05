@@ -2,7 +2,7 @@ import { Paper, Stack, Typography, Box } from "@mui/material";
 
 export function PageHeader({ title, right }) {
   return (
-    <Paper sx={{ p: 2, mb: 2 }}>
+    <Paper sx={{ py: 1, px: 2, mb: 2 }}>
       <Stack
         direction="row"
         alignItems="center"

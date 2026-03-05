@@ -5,7 +5,7 @@ export const theme = createTheme({
     mode: "light",
     primary: {
       light: "#3b82f6", // bright blue for hovers
-      main: "#1d4ed8", // primary brand blue
+      main: "#142247", // primary brand blue
       dark: "#1e40af", // darker blue for headers
     },
     secondary: {
@@ -14,7 +14,7 @@ export const theme = createTheme({
       dark: "#0369a1",
     },
     background: {
-      default: "#f3f4f6", // light gray with a hint of blue
+      default: "#e6eaf2", // light gray with a hint of blue
       paper: "#ffffff", // white panels
     },
     text: {

@@ -8,10 +8,13 @@ export function AppLayout() {
     <Box className="min-h-screen">
       {/* <TopBar /> */}
 
-      <Box className="grid min-h-screen w-full" sx={{ gridTemplateColumns: "150px minmax(0,1fr)" }}>
+      <Box
+        className="grid min-h-screen w-full"
+        sx={{ gridTemplateColumns: "150px minmax(0,1fr)" }}
+      >
         <Sidebar />
 
-        <Box className="w-full min-w-0 p-6">
+        <Box className="w-full min-w-0 p-4">
           <Container maxWidth={false} disableGutters>
             <Outlet />
           </Container>

@@ -18,13 +18,12 @@ const toUpdateDto = (values) => {
   return dto;
 };
 
-export function useCourses() {
+export function useCourses(params) {
   return useQuery({
-    queryKey: ["courses"],
+    queryKey: ["courses", params],
     queryFn: async () => {
-      const response = await coursesApi.getCourses();
-
-      return response.data || [];
+      const response = await coursesApi.list(params);
+      return response;
     },
   });
 }

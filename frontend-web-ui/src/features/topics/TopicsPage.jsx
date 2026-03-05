@@ -19,14 +19,14 @@ import {
 import { useCourses } from "../courses/courses.hooks";
 
 export function TopicsPage() {
-  const [courseFilter, setCourseFilter] = useState("");
+  // const [courseFilter, setCourseFilter] = useState("");
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
   const courses = coursesData?.data || [];
 
   const { data, isLoading, error } = useTopics({
     page: 1,
     limit: 100,
-    courseId: courseFilter || undefined,
+    // courseId: courseFilter || undefined,
   });
 
   const createM = useCreateTopic();
@@ -101,7 +101,9 @@ export function TopicsPage() {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", pb: 2 }}>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+    >
       <PageHeader
         title="Tasks"
         right={
@@ -111,7 +113,7 @@ export function TopicsPage() {
         }
       />
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      {/* <Paper sx={{ p: 2, mb: 2 }}>
         <TextField
           select
           label="Course filter"
@@ -126,7 +128,7 @@ export function TopicsPage() {
             </MenuItem>
           ))}
         </TextField>
-      </Paper>
+      </Paper> */}
 
       {isLoading ? <Loader /> : null}
       {error ? <ErrorState message={error.userMessage} /> : null}

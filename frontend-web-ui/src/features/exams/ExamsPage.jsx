@@ -56,7 +56,7 @@ export function ExamsPage() {
           (typeof e.courseId === "string" ? e.courseId : ""),
         date: formatDate(e.createdAt),
       })),
-    [items]
+    [items],
   );
 
   const columns = useMemo(
@@ -65,7 +65,7 @@ export function ExamsPage() {
       { headerName: "Points", field: "points", colId: "points" },
       { headerName: "Date", field: "date", colId: "createdAt" },
     ],
-    []
+    [],
   );
 
   const actions = useMemo(
@@ -74,7 +74,7 @@ export function ExamsPage() {
         id: "edit",
         label: "Edit",
         icon: EditIcon,
-        visible: () => false,
+        // visible: () => false,
       },
       {
         id: "delete",
@@ -84,7 +84,7 @@ export function ExamsPage() {
         onClick: (row) => setConfirm({ open: true, id: row.id }),
       },
     ],
-    []
+    [],
   );
 
   const handlePageChange = useCallback((newPage, newPageSize) => {
@@ -112,7 +112,7 @@ export function ExamsPage() {
 
   return (
     <Box
-      sx={{ display: "flex", flexDirection: "column", height: "93vh", pb: 1 }}
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
     >
       <PageHeader
         title="Exams"
