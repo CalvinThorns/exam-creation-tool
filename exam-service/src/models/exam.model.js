@@ -1,17 +1,21 @@
 const mongoose = require("mongoose");
 
 const { topicSchema } = require("./topic.model");
+const { courseSchema } = require("./course.model");
 
 const topicSnapshotSchema = new mongoose.Schema(topicSchema.obj, {
   _id: false,
   timestamps: false,
 });
+
+const courseSnapshotSchema = new mongoose.Schema(courseSchema.obj, {
+  timestamps: false,
+});
+
 const examSchema = new mongoose.Schema(
   {
-    courseId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: true,
+    course: {
+      type: courseSnapshotSchema,
     },
     points: { type: Number, required: true, min: 0 },
     topics: {

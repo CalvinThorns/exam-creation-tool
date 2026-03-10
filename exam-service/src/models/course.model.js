@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const courseSchema = new mongoose.Schema(
   {
+    id: mongoose.Schema.Types.ObjectId,
     title: { type: String, required: true, trim: true },
     shortName: { type: String, required: true, trim: true, unique: true },
     coverPage: { type: String, required: true, trim: true },
@@ -23,4 +24,4 @@ const courseSchema = new mongoose.Schema(
 
 const Course = mongoose.model("Course", courseSchema);
 
-module.exports = { Course };
+module.exports = { Course, courseSchema};

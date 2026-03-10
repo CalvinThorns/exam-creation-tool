@@ -579,6 +579,9 @@ function createExamService({ examRepo, courseRepo }) {
         const targetPoints = numOrZero(data.targetPoints);
         if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
 
+        const course = await courseRepo.findById(courseId);
+        console.log("course object: ", course);
+
         let topics = data.topics || [];
         validateDraftTopicsShape(topics);
 
@@ -593,7 +596,7 @@ function createExamService({ examRepo, courseRepo }) {
         const points = sumTopicPoints(topics);
 
         return examRepo.create({
-          courseId,
+          course,
           targetPoints,
           points,
           topics,

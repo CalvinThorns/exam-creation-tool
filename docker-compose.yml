@@ -37,9 +37,10 @@ services:
       - app-network
     environment:
       - PORT=3000
-      - MONGO_URI=mongodb://mongodb:27017/autogenex
-    depends_on:
-      - mongodb
+      #- MONGO_URI=mongodb://mongodb:27017/autogenex
+      - MONGO_URI=mongodb+srv://lennart18_5:lennart18_5@autogenex-cluster.le5ryfv.mongodb.net/autogenex-db
+    #depends_on:
+      #- mongodb
 
   # ----------------------------------------
   # 4. EXAM SERVICE 
@@ -49,13 +50,14 @@ services:
       context: ./exam-service
     restart: always
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/exam-tool
+      #- MONGO_URI=mongodb://mongodb:27017/exam-tool
+      - MONGO_URI=mongodb+srv://lennart18_5:lennart18_5@autogenex-cluster.le5ryfv.mongodb.net/autogenex-db
       - PORT=3000
       - CLSI_URL=http://clsi:3013
       - CLSI_HTTP_TIMEOUT_MS=900000
       - API_INTERNAL_BASE_URL=http://exam-service:3000 
     depends_on:
-      - mongodb
+      #- mongodb
       - clsi
     networks:
       - app-network
@@ -101,14 +103,14 @@ services:
   # ----------------------------------------
   # 7. DATENBANK (MongoDB)
   # ----------------------------------------
-  mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017" 
-    volumes:
-      - mongo-data:/data/db
-    networks:
-      - app-network
+  #mongodb:
+    #image: mongo:latest
+    #ports:
+      #- "27017:27017" 
+    #volumes:
+      #- mongo-data:/data/db
+    #networks:
+      #- app-network
 
 networks:
   app-network:
