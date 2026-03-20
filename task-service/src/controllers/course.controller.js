@@ -1,3 +1,5 @@
+const { buildPaginationMeta } = require("../utils/pagination");
+
 function createCourseController({ courseService }) {
   return {
     create: async (req, res, next) => {
@@ -12,13 +14,10 @@ function createCourseController({ courseService }) {
     list: async (req, res, next) => {
       try {
         const result = await courseService.listCourses(req.query);
+        const meta = buildPaginationMeta(result);
         res.json({
           data: result.items,
-          meta: {
-            page: result.page,
-            limit: result.limit,
-            total: result.total,
-          },
+          meta,
         });
       } catch (err) {
         next(err);

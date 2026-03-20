@@ -5,6 +5,7 @@ const courseSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     shortName: { type: String, required: true, trim: true, unique: true },
     coverPage: { type: String, required: true, trim: true },
+    isDeleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

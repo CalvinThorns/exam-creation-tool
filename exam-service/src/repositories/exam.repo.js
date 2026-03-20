@@ -1,4 +1,5 @@
 const { Exam } = require("../models/exam.model");
+const { applySort } = require("./helpers/queryHelpers");
 
 function createExamRepo() {
   return {
@@ -7,15 +8,11 @@ function createExamRepo() {
     },
 
     async findAll({ page = 1, limit = 20, filter = {}, sort, courseId }) {
-      const qfilter = { ...filter };
+      const qfilter = { ...filter, isDeleted: { $ne: true } };
       if (courseId) qfilter.courseId = courseId;
 
       const query = Exam.find(qfilter).populate("courseId");
-      if (sort && Object.keys(sort).length) {
-        query.sort(sort);
-      } else {
-        query.sort({ createdAt: -1 });
-      }
+      applySort(query, sort);
 
       const [items, total] = await Promise.all([
         query.skip((page - 1) * limit).limit(limit),
@@ -26,19 +23,29 @@ function createExamRepo() {
     },
 
     async findById(id) {
-      const q = Exam.findById(id).populate("courseId");
+      const q = Exam.findOne({ _id: id, isDeleted: { $ne: true } }).populate(
+        "courseId",
+      );
       return q;
     },
 
     async updateById(id, update) {
-      return Exam.findByIdAndUpdate(id, update, {
-        new: true,
-        runValidators: true,
-      });
+      return Exam.findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        update,
+        {
+          new: true,
+          runValidators: true,
+        },
+      );
     },
 
     async deleteById(id) {
-      return Exam.findByIdAndDelete(id);
+      return Exam.findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        { isDeleted: true },
+        { new: true },
+      );
     },
   };
 }

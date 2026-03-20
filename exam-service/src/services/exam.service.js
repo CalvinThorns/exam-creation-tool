@@ -1,103 +1,38 @@
 const path = require("path");
 const fs = require("fs").promises;
-const mongoose = require("mongoose");
 const { Topic } = require("../models/topic.model");
-const crypto = require("crypto");
 const { createClsiClient } = require("./clsiClient");
 const { buildLatexFromDraft } = require("./examLatexBuilder");
 const { logger } = require("../middlewares/logger");
 const { Course } = require("../models/course.model");
 const { buildClsiImageResourcesFromDraftTopics } = require("./draftAssets");
+const {
+  badRequest,
+  notFound,
+  isValidObjectId,
+  randomProjectId,
+  safeFilename,
+  numOrZero,
+  sumTopicPoints,
+} = require("./helpers/examServiceCommon");
+const {
+  snapshotFromTopicDoc,
+  topicSignature,
+  loadVariantsByTopicNames,
+  pickBestCombination,
+  validateDraftTopicsShape,
+} = require("./helpers/examDraftHelpers");
+const {
+  hasLatexErrors,
+  pickOutputFile,
+  downloadTextFileIfAny,
+  parseLatexErrorsFromLog,
+  extractWarningsFromLog,
+} = require("./helpers/latexCompileHelpers");
+const { normalizePagination, buildMeta } = require("../utils/pagination");
+const { parseFilters, parseSort } = require("../utils/query");
 
 function createExamService({ examRepo, courseRepo }) {
-  function badRequest(message) {
-    const err = new Error(message);
-    err.status = 400;
-    return err;
-  }
-
-  function notFound(message) {
-    const err = new Error(message);
-    err.status = 404;
-    return err;
-  }
-
-  function isValidObjectId(id) {
-    return mongoose.Types.ObjectId.isValid(String(id));
-  }
-
-  function randomProjectId() {
-    return crypto.randomBytes(12).toString("hex");
-  }
-
-  function safeFilename(name) {
-    return (
-      String(name || "exam")
-        .replace(/[^a-z0-9-_]+/gi, "_")
-        .slice(0, 60) || "exam"
-    );
-  }
-
-  function numOrZero(v) {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function sumTopicPoints(topics) {
-    return (topics || []).reduce((acc, t) => acc + numOrZero(t.points), 0);
-  }
-
-  function snapshotFromTopicDoc(doc) {
-    return {
-      topicId: doc?._id ? String(doc._id) : undefined,
-      courseId: doc.courseId,
-      topic: doc.topic || "",
-      description: doc.description || "",
-      points: numOrZero(doc.points),
-      description_img: doc.description_img || {
-        base64: "",
-        contentType: "",
-        filename: "",
-      },
-      tasks: Array.isArray(doc.tasks)
-        ? doc.tasks.map((t) => ({
-            id: t.id || null,
-            question: t.question || "",
-            points: numOrZero(t.points),
-            question_img: t.question_img || {
-              base64: "",
-              contentType: "",
-              filename: "",
-            },
-            solution: t.solution || "",
-            isRelatedToTopic:
-              typeof t.isRelatedToTopic === "boolean"
-                ? t.isRelatedToTopic
-                : true,
-          }))
-        : [],
-    };
-  }
-
-  function topicSignature(topic) {
-    return JSON.stringify({
-      topic: topic?.topic || "",
-      description: topic?.description || "",
-      points: numOrZero(topic?.points),
-      tasks: Array.isArray(topic?.tasks)
-        ? topic.tasks.map((t) => ({
-            question: t?.question || "",
-            points: numOrZero(t?.points),
-            solution: t?.solution || "",
-            isRelatedToTopic:
-              typeof t?.isRelatedToTopic === "boolean"
-                ? t.isRelatedToTopic
-                : true,
-          }))
-        : [],
-    });
-  }
-
   async function validateCourseId(courseId) {
     const cid = String(courseId || "").trim();
     if (!cid) throw badRequest("courseId is required");
@@ -110,218 +45,6 @@ function createExamService({ examRepo, courseRepo }) {
     }
 
     return null;
-  }
-
-  async function loadVariantsByTopicNames(courseId, topicNames) {
-    if (!Array.isArray(topicNames)) throw badRequest("topics must be an array");
-    const cleaned = topicNames
-      .map((t) => String(t || "").trim())
-      .filter(Boolean);
-    if (cleaned.length === 0) throw badRequest("topics cannot be empty");
-
-    const docs = await Topic.find({
-      courseId,
-      topic: { $in: cleaned },
-    }).lean();
-
-    const missing = cleaned.filter(
-      (name) => !docs.some((d) => d.topic === name),
-    );
-    if (missing.length) {
-      throw badRequest(`No topics found for: ${missing.join(", ")}`);
-    }
-
-    const groups = cleaned.map((name) => docs.filter((d) => d.topic === name));
-    return { topicNames: cleaned, groups };
-  }
-
-  function pickBestCombination(groups, target) {
-    let dp = new Map();
-    dp.set(0, { prevSum: null, gi: -1, vi: -1 });
-
-    for (let gi = 0; gi < groups.length; gi++) {
-      const next = new Map();
-      for (const [sum] of dp.entries()) {
-        for (let vi = 0; vi < groups[gi].length; vi++) {
-          const ns = sum + numOrZero(groups[gi][vi].points);
-          if (!next.has(ns)) next.set(ns, { prevSum: sum, gi, vi });
-        }
-      }
-      dp = next;
-    }
-
-    const layers = [];
-    layers.push(new Map([[0, { prevSum: null, vi: null }]]));
-
-    for (let gi = 0; gi < groups.length; gi++) {
-      const prev = layers[gi];
-      const layer = new Map();
-      for (const [sum] of prev.entries()) {
-        for (let vi = 0; vi < groups[gi].length; vi++) {
-          const ns = sum + numOrZero(groups[gi][vi].points);
-          if (!layer.has(ns)) layer.set(ns, { prevSum: sum, vi });
-        }
-      }
-      layers.push(layer);
-    }
-
-    const finalLayer = layers[layers.length - 1];
-    let bestSum = null;
-    let bestDiff = Infinity;
-    for (const sum of finalLayer.keys()) {
-      const diff = Math.abs(sum - target);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestSum = sum;
-      }
-    }
-
-    const chosen = Array(groups.length).fill(null);
-    let cur = bestSum;
-    for (let gi = groups.length - 1; gi >= 0; gi--) {
-      const meta = layers[gi + 1].get(cur);
-      chosen[gi] = groups[gi][meta.vi];
-      cur = meta.prevSum;
-    }
-
-    return { chosen, sum: bestSum };
-  }
-
-  function validateDraftTopicsShape(topics) {
-    if (!Array.isArray(topics)) throw badRequest("topics must be an array");
-    for (const t of topics) {
-      if (!t || typeof t !== "object")
-        throw badRequest("Each topic must be an object");
-      if (!t.topic || typeof t.topic !== "string")
-        throw badRequest("Each topic must have a string 'topic' property");
-      if (t.courseId && !isValidObjectId(t.courseId))
-        throw badRequest("topic.courseId must be a valid id");
-      if (t.tasks) {
-        if (!Array.isArray(t.tasks))
-          throw badRequest("Topic tasks must be an array");
-        for (const task of t.tasks) {
-          if (task.id && !isValidObjectId(task.id))
-            throw badRequest("Each task id must be a valid id");
-        }
-      }
-      if (t.points !== undefined) {
-        const p = Number(t.points);
-        if (!Number.isFinite(p) || p < 0)
-          throw badRequest("Topic points must be >= 0");
-      }
-    }
-  }
-
-  function hasLatexErrors(compile, numOrZero) {
-    const stats = compile?.stats || {};
-    const latexmkErrors = numOrZero(stats["latexmk-errors"]);
-    const runsWithErrors = numOrZero(stats["latex-runs-with-errors"]);
-    return (
-      compile?.status !== "success" || latexmkErrors > 0 || runsWithErrors > 0
-    );
-  }
-
-  function pickOutputFile(outputFiles, type, ext) {
-    const files = outputFiles || [];
-    const byType = files.find((f) => f && f.type === type && f.url);
-    if (byType) return byType;
-
-    if (ext) {
-      const byExt = files.find(
-        (f) =>
-          f &&
-          f.url &&
-          typeof f.path === "string" &&
-          f.path.toLowerCase().endsWith(ext.toLowerCase()),
-      );
-      if (byExt) return byExt;
-    }
-
-    return null;
-  }
-
-  async function downloadTextFileIfAny(client, file) {
-    if (!file?.url) return null;
-    const buf = await client.downloadAsBuffer(file.url);
-    return buf.toString("utf8");
-  }
-
-  function parseLatexErrorsFromLog(
-    logText,
-    { maxErrors = 200, maxSnippet = 600 } = {},
-  ) {
-    if (!logText) return [];
-
-    const lines = logText.split(/\r?\n/);
-    const errors = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // TeX errors start with "! "
-      if (!line.startsWith("!")) continue;
-
-      const message = line.replace(/^!\s*/, "").trim();
-
-      // Look ahead for "l.<num>" and collect a short snippet
-      let texLine = null;
-      let snippetLines = [line];
-
-      for (let j = i + 1; j < lines.length && j < i + 40; j++) {
-        const lj = lines[j];
-        snippetLines.push(lj);
-
-        const m = lj.match(/^l\.(\d+)\s*(.*)$/);
-        if (m && texLine === null) texLine = Number(m[1]);
-
-        // Stop snippet on blank line after we've seen some context
-        if (j > i + 2 && lj.trim() === "") break;
-
-        // Stop if next error begins
-        if (j > i && lines[j + 1] && lines[j + 1].startsWith("!")) break;
-      }
-
-      const snippet = snippetLines.join("\n").slice(0, maxSnippet);
-
-      errors.push({
-        message,
-        line: texLine, // may be null
-        snippet,
-      });
-
-      if (errors.length >= maxErrors) break;
-    }
-
-    // De-dupe common repeats
-    const seen = new Set();
-    return errors.filter((e) => {
-      const key = `${e.message}@@${e.line ?? ""}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-
-  function extractWarningsFromLog(logText, { maxWarnings = 200 } = {}) {
-    if (!logText) return [];
-    const lines = logText.split(/\r?\n/);
-
-    const warnings = [];
-    const re = /^(LaTeX|Package|Class)\s+(.+?)\s+Warning:\s+(.*)$/;
-
-    for (let i = 0; i < lines.length; i++) {
-      const m = lines[i].match(re);
-      if (!m) continue;
-
-      const where = m[1];
-      const source = m[2];
-      const message = m[3];
-
-      warnings.push({ where, source, message });
-      if (warnings.length >= maxWarnings) break;
-    }
-
-    return warnings;
   }
 
   async function compileDraftImpl(body, reqId) {
@@ -346,7 +69,11 @@ function createExamService({ examRepo, courseRepo }) {
 
     let courseDoc = null;
     if (courseRepo?.findById) courseDoc = await courseRepo.findById(courseId);
-    else courseDoc = await Course.findById(courseId).lean();
+    else
+      courseDoc = await Course.findOne({
+        _id: courseId,
+        isDeleted: { $ne: true },
+      }).lean();
 
     if (!courseDoc) throw notFound("Course not found");
 
@@ -511,13 +238,18 @@ function createExamService({ examRepo, courseRepo }) {
       const targetPoints = numOrZero(data.targetPoints);
       if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
 
-      const { topicNames, groups } = await loadVariantsByTopicNames(
+      const { topicNames, groups } = await loadVariantsByTopicNames({
         courseId,
-        data.topics,
-      );
+        topicNames: data.topics,
+        badRequest,
+      });
 
-      const { chosen, sum } = pickBestCombination(groups, targetPoints);
-      const draftTopics = chosen.map((d) => snapshotFromTopicDoc(d));
+      const { chosen, sum } = pickBestCombination(
+        groups,
+        targetPoints,
+        numOrZero,
+      );
+      const draftTopics = chosen.map((d) => snapshotFromTopicDoc(d, numOrZero));
 
       const course = courseRepo?.findById
         ? await courseRepo.findById(courseId)
@@ -551,7 +283,7 @@ function createExamService({ examRepo, courseRepo }) {
       if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
 
       const current = data.currentDraftTopics || [];
-      validateDraftTopicsShape(current);
+      validateDraftTopicsShape(current, { badRequest, isValidObjectId });
 
       const idx = current.findIndex((t) => t.topic === topicName);
       if (idx === -1) throw badRequest("topicName not found in current draft");
@@ -560,19 +292,26 @@ function createExamService({ examRepo, courseRepo }) {
       const currentTopicId = String(
         currentTopic.topicId || currentTopic.id || "",
       ).trim();
-      const currentTopicSignature = topicSignature(currentTopic);
+      const currentTopicSignature = topicSignature(currentTopic, numOrZero);
 
       const others = current.filter((_, i) => i !== idx);
       const othersSum = sumTopicPoints(others);
 
-      const variants = await Topic.find({ courseId, topic: topicName }).lean();
+      const variants = await Topic.find({
+        courseId,
+        topic: topicName,
+        isDeleted: { $ne: true },
+      }).lean();
       if (!variants.length) throw badRequest("No variants found for topic");
 
       const candidates = variants.filter((variant) => {
         if (currentTopicId && String(variant._id) === currentTopicId) {
           return false;
         }
-        const variantSignature = topicSignature(snapshotFromTopicDoc(variant));
+        const variantSignature = topicSignature(
+          snapshotFromTopicDoc(variant, numOrZero),
+          numOrZero,
+        );
         return variantSignature !== currentTopicSignature;
       });
 
@@ -592,7 +331,7 @@ function createExamService({ examRepo, courseRepo }) {
 
       if (!best) best = pool[0];
 
-      const replaced = snapshotFromTopicDoc(best);
+      const replaced = snapshotFromTopicDoc(best, numOrZero);
 
       const next = [...current];
       next[idx] = replaced;
@@ -616,7 +355,7 @@ function createExamService({ examRepo, courseRepo }) {
         if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
 
         let topics = data.topics || [];
-        validateDraftTopicsShape(topics);
+        validateDraftTopicsShape(topics, { badRequest, isValidObjectId });
 
         topics = topics.map((t) => {
           const { topicId, ...rest } = t;
@@ -649,9 +388,6 @@ function createExamService({ examRepo, courseRepo }) {
         : undefined;
       if (courseId && !isValidObjectId(courseId))
         throw badRequest("courseId must be a valid id");
-
-      const { normalizePagination, buildMeta } = require("../utils/pagination");
-      const { parseFilters, parseSort } = require("../utils/query");
 
       const { page, limit } = normalizePagination(
         query.page,
@@ -711,7 +447,7 @@ function createExamService({ examRepo, courseRepo }) {
       }
 
       if (data.topics !== undefined) {
-        validateDraftTopicsShape(data.topics);
+        validateDraftTopicsShape(data.topics, { badRequest, isValidObjectId });
         const courseIdForTopics = update.courseId || undefined;
         update.topics = (data.topics || []).map((t) => {
           const { topicId, ...rest } = t;

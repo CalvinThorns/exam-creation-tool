@@ -1,9 +1,11 @@
 // helpers for parsing filter/sort query parameters into mongoose-friendly objects
+const {
+  tryParsePrimitive,
+  toTrimmedArray,
+} = require("./helpers/queryValueHelpers");
 
 function tryParse(val) {
-  if (val === "true" || val === "false") return val === "true";
-  const n = Number(val);
-  return Number.isFinite(n) ? n : val;
+  return tryParsePrimitive(val);
 }
 
 function parseFilters(raw) {
@@ -41,10 +43,10 @@ function parseFilters(raw) {
         built[field] = { $gte: val };
         break;
       case "in":
-        built[field] = { $in: String(val).split(",") };
+        built[field] = { $in: toTrimmedArray(val) };
         break;
       case "nin":
-        built[field] = { $nin: String(val).split(",") };
+        built[field] = { $nin: toTrimmedArray(val) };
         break;
       case "regex":
         built[field] = { $regex: String(val), $options: "i" };
@@ -57,9 +59,7 @@ function parseFilters(raw) {
 function parseSort(raw) {
   if (!raw) return undefined;
   const obj = {};
-  for (const part of String(raw)
-    .split(",")
-    .map((s) => s.trim())) {
+  for (const part of toTrimmedArray(raw)) {
     if (!part) continue;
     const [field, dir] = part.split(":").map((s) => s.trim());
     if (!field) continue;

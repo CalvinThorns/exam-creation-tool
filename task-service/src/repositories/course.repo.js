@@ -1,4 +1,6 @@
 const { Course } = require("../models/course.model");
+const { normalizePagination } = require("../utils/pagination");
+const { buildCourseSearchFilter } = require("../utils/query");
 
 function createCourseRepo() {
   return {
@@ -7,17 +9,15 @@ function createCourseRepo() {
     },
 
     async findAll({ page = 1, limit = 20, q = "" }) {
-      const safePage = Math.max(1, Number(page) || 1);
-      const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+      const { page: safePage, limit: safeLimit } = normalizePagination(
+        page,
+        limit,
+      );
 
-      const filter = q
-        ? {
-            $or: [
-              { title: { $regex: q, $options: "i" } },
-              { shortName: { $regex: q, $options: "i" } },
-            ],
-          }
-        : {};
+      const filter = {
+        ...buildCourseSearchFilter(q),
+        isDeleted: { $ne: true },
+      };
 
       const [items, total] = await Promise.all([
         Course.find(filter)
@@ -31,22 +31,30 @@ function createCourseRepo() {
     },
 
     async findById(id) {
-      return Course.findById(id);
+      return Course.findOne({ _id: id, isDeleted: { $ne: true } });
     },
 
     async findByShortName(shortName) {
-      return Course.findOne({ shortName });
+      return Course.findOne({ shortName, isDeleted: { $ne: true } });
     },
 
     async updateById(id, update) {
-      return Course.findByIdAndUpdate(id, update, {
-        new: true,
-        runValidators: true,
-      });
+      return Course.findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        update,
+        {
+          new: true,
+          runValidators: true,
+        },
+      );
     },
 
     async deleteById(id) {
-      return Course.findByIdAndDelete(id);
+      return Course.findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        { isDeleted: true },
+        { new: true },
+      );
     },
   };
 }

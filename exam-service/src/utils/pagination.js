@@ -1,8 +1,9 @@
 // utilities for normalizing and computing pagination metadata
+const { toNumberOrFallback, clamp } = require("./helpers/numberHelpers");
 
 function normalizePagination(page, limit) {
-  const p = Math.max(1, Number(page) || 1);
-  const l = Math.min(100, Math.max(1, Number(limit) || 20));
+  const p = Math.max(1, toNumberOrFallback(page, 1));
+  const l = clamp(toNumberOrFallback(limit, 20), 1, 100);
   return { page: p, limit: l };
 }
 

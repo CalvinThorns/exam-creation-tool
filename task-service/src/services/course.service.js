@@ -1,34 +1,22 @@
+const { notFound, conflict } = require("./helpers/serviceErrors");
+const {
+  normalizeCourseInput,
+  validateCreateCoursePayload,
+  validateNonEmptyCourseFields,
+} = require("./helpers/courseValidation");
+
 function createCourseService({ courseRepo }) {
   return {
     async createCourse(data) {
-      const title = String(data.title || "").trim();
-      const shortName = String(data.shortName || "").trim();
-      const coverPage = String(data.coverPage || "").trim();
+      const payload = normalizeCourseInput(data);
+      validateCreateCoursePayload(payload);
 
-      if (!title) {
-        const err = new Error("title is required");
-        err.status = 400;
-        throw err;
-      }
-      if (!shortName) {
-        const err = new Error("shortName is required");
-        err.status = 400;
-        throw err;
-      }
-      if (!coverPage) {
-        const err = new Error("coverPage is required");
-        err.status = 400;
-        throw err;
-      }
-
-      const existing = await courseRepo.findByShortName(shortName);
+      const existing = await courseRepo.findByShortName(payload.shortName);
       if (existing) {
-        const err = new Error("shortName already exists");
-        err.status = 409;
-        throw err;
+        throw conflict("shortName already exists");
       }
 
-      return courseRepo.create({ title, shortName, coverPage });
+      return courseRepo.create(payload);
     },
 
     async listCourses(query) {
@@ -38,9 +26,7 @@ function createCourseService({ courseRepo }) {
     async getCourse(id) {
       const course = await courseRepo.findById(id);
       if (!course) {
-        const err = new Error("Course not found");
-        err.status = 404;
-        throw err;
+        throw notFound("Course not found");
       }
       return course;
     },
@@ -54,27 +40,11 @@ function createCourseService({ courseRepo }) {
       if (data.coverPage !== undefined)
         update.coverPage = String(data.coverPage).trim();
 
-      if (update.title !== undefined && !update.title) {
-        const err = new Error("title cannot be empty");
-        err.status = 400;
-        throw err;
-      }
-      if (update.shortName !== undefined && !update.shortName) {
-        const err = new Error("shortName cannot be empty");
-        err.status = 400;
-        throw err;
-      }
-      if (update.coverPage !== undefined && !update.coverPage) {
-        const err = new Error("coverPage cannot be empty");
-        err.status = 400;
-        throw err;
-      }
+      validateNonEmptyCourseFields(update);
 
       const updated = await courseRepo.updateById(id, update);
       if (!updated) {
-        const err = new Error("Course not found");
-        err.status = 404;
-        throw err;
+        throw notFound("Course not found");
       }
 
       return updated;
@@ -83,9 +53,7 @@ function createCourseService({ courseRepo }) {
     async deleteCourse(id) {
       const deleted = await courseRepo.deleteById(id);
       if (!deleted) {
-        const err = new Error("Course not found");
-        err.status = 404;
-        throw err;
+        throw notFound("Course not found");
       }
       return deleted;
     },
