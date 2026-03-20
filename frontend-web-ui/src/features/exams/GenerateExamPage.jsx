@@ -2,6 +2,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import {
+  Autocomplete,
   Box,
   Button,
   Paper,
@@ -18,7 +19,6 @@ import {
   ListItemIcon,
   ListItemText,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import BuildIcon from "@mui/icons-material/Build";
@@ -129,7 +129,6 @@ export function GenerateExamPage() {
 
   const [courseId, setCourseId] = useState("");
   const [targetPoints, setTargetPoints] = useState(0);
-  const [topicPick, setTopicPick] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
   const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
     usePdfPreview("exam.pdf");
@@ -191,7 +190,6 @@ export function GenerateExamPage() {
   const handleCourseChange = (e) => {
     setCourseId(e.target.value);
     setSelectedTopics([]);
-    setTopicPick("");
     setDraft(null);
   };
 
@@ -216,16 +214,6 @@ export function GenerateExamPage() {
       setIsCompiling(false);
     }
   };
-
-  const addTopic = () => {
-    const name = String(topicPick || "").trim();
-    if (!name || selectedTopics.includes(name)) return;
-    setSelectedTopics((prev) => [...prev, name]);
-    setTopicPick("");
-  };
-
-  const removeTopic = (name) =>
-    setSelectedTopics((prev) => prev.filter((x) => x !== name));
 
   const recalcDraftTotals = (nextDraft) => {
     const total = sumPoints(nextDraft.topics);
@@ -348,7 +336,7 @@ export function GenerateExamPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gridTemplateColumns: "20% 10% 65%",
                   gap: 2,
                 }}
               >
@@ -377,51 +365,48 @@ export function GenerateExamPage() {
                   size="small"
                 />
 
-                <TextField
-                  select
-                  label="Add topic"
-                  value={topicPick}
-                  onChange={(e) => setTopicPick(e.target.value)}
+                <Autocomplete
+                  multiple
+                  options={topicNames}
+                  value={selectedTopics}
+                  onChange={(_, value) => setSelectedTopics(value)}
+                  disabled={!courseId}
                   fullWidth
                   size="small"
-                  disabled={!courseId}
-                >
-                  <MenuItem value="">Select topic</MenuItem>
-                  {topicNames.map((name) => (
-                    <MenuItem key={name} value={name}>
-                      {name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={addTopic}
-                  disabled={!courseId || !topicPick}
-                  fullWidth
-                >
-                  Add Topic
-                </Button>
+                  filterSelectedOptions
+                  sx={{
+                    "& .MuiAutocomplete-inputRoot": {
+                      flexWrap: "nowrap",
+                      overflowX: "auto",
+                      overflowY: "hidden",
+                      minHeight: 40,
+                    },
+                    "& .MuiAutocomplete-tag": {
+                      flexShrink: 0,
+                    },
+                    "& .MuiAutocomplete-input": {
+                      minWidth: 80,
+                    },
+                  }}
+                  slotProps={{
+                    listbox: {
+                      sx: {
+                        maxHeight: 240,
+                        overflowY: "auto",
+                      },
+                    },
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Topics"
+                      placeholder={
+                        courseId ? "Select topics" : "Select course first"
+                      }
+                    />
+                  )}
+                />
               </Box>
-
-              {selectedTopics.length > 0 && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Stack direction="row" flexWrap="wrap" gap={1}>
-                    {selectedTopics.map((t) => (
-                      <Chip
-                        key={t}
-                        label={t}
-                        onDelete={() => removeTopic(t)}
-                        color="primary"
-                        variant="outlined"
-                        size="small"
-                      />
-                    ))}
-                  </Stack>
-                </>
-              )}
 
               <Divider sx={{ my: 2 }} />
 
@@ -461,7 +446,7 @@ export function GenerateExamPage() {
                   </Stack>
                 ) : (
                   <Typography variant="body2" color="text.disabled">
-                    Select a course, add topics and click Generate
+                    Select a course, choose topics and click Generate
                   </Typography>
                 )}
 
