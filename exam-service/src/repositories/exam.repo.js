@@ -10,7 +10,7 @@ function createExamRepo() {
       const qfilter = { ...filter };
       if (courseId) qfilter.courseId = courseId;
 
-      const query = Exam.find(qfilter);
+      const query = Exam.find(qfilter).populate("courseId");
       if (sort && Object.keys(sort).length) {
         query.sort(sort);
       } else {
