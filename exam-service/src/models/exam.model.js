@@ -1,5 +1,11 @@
 const mongoose = require("mongoose");
 
+const { topicSchema } = require("./topic.model");
+
+const topicSnapshotSchema = new mongoose.Schema(topicSchema.obj, {
+  _id: false,
+  timestamps: false,
+});
 const examSchema = new mongoose.Schema(
   {
     courseId: {
@@ -8,9 +14,10 @@ const examSchema = new mongoose.Schema(
       required: true,
     },
     points: { type: Number, required: true, min: 0 },
-    topics: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "Topic", default: [] },
-    ],
+    topics: {
+      type: [topicSnapshotSchema],
+      default: [],
+    },
   },
   {
     timestamps: true,

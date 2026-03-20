@@ -1,4 +1,4 @@
-const path = require("path"); // Add this
+const path = require("path");
 const fs = require("fs").promises;
 const mongoose = require("mongoose");
 const { Topic } = require("../models/topic.model");
@@ -49,10 +49,8 @@ function createExamService({ examRepo, courseRepo }) {
 
   function snapshotFromTopicDoc(doc) {
     return {
-      topicId: String(doc._id),
-      courseId: String(doc.courseId),
+      courseId: doc.courseId,
       topic: doc.topic || "",
-      descriptionслан: "",
       description: doc.description || "",
       points: numOrZero(doc.points),
       description_img: doc.description_img || {
@@ -62,7 +60,7 @@ function createExamService({ examRepo, courseRepo }) {
       },
       tasks: Array.isArray(doc.tasks)
         ? doc.tasks.map((t) => ({
-            id: t.id || "",
+            id: t.id || null,
             question: t.question || "",
             points: numOrZero(t.points),
             question_img: t.question_img || {
@@ -106,7 +104,6 @@ function createExamService({ examRepo, courseRepo }) {
       topic: { $in: cleaned },
     }).lean();
 
-    // Ensure each requested topic name has at least one variant
     const missing = cleaned.filter(
       (name) => !docs.some((d) => d.topic === name),
     );
@@ -114,12 +111,10 @@ function createExamService({ examRepo, courseRepo }) {
       throw badRequest(`No topics found for: ${missing.join(", ")}`);
     }
 
-    // Preserve the user order
     const groups = cleaned.map((name) => docs.filter((d) => d.topic === name));
     return { topicNames: cleaned, groups };
   }
 
-  // Multi choice DP: pick 1 variant per group to minimize abs(sum - target)
   function pickBestCombination(groups, target) {
     let dp = new Map();
     dp.set(0, { prevSum: null, gi: -1, vi: -1 });
@@ -134,23 +129,6 @@ function createExamService({ examRepo, courseRepo }) {
       }
       dp = next;
     }
-
-    let bestSum = null;
-    let bestDiff = Infinity;
-    for (const sum of dp.keys()) {
-      const diff = Math.abs(sum - target);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestSum = sum;
-      }
-    }
-
-    const chosen = Array(groups.length).fill(null);
-    let cur = bestSum;
-
-    // Reconstruct: we need per-layer dp states; easiest is store parents per layer.
-    // To keep code simple, do reconstruction with a second DP that stores parent pointers per layer.
-    // Since groups are small, this is fine.
 
     const layers = [];
     layers.push(new Map([[0, { prevSum: null, vi: null }]]));
@@ -167,10 +145,9 @@ function createExamService({ examRepo, courseRepo }) {
       layers.push(layer);
     }
 
-    // find bestSum again from final layer
     const finalLayer = layers[layers.length - 1];
-    bestSum = null;
-    bestDiff = Infinity;
+    let bestSum = null;
+    let bestDiff = Infinity;
     for (const sum of finalLayer.keys()) {
       const diff = Math.abs(sum - target);
       if (diff < bestDiff) {
@@ -179,7 +156,8 @@ function createExamService({ examRepo, courseRepo }) {
       }
     }
 
-    cur = bestSum;
+    const chosen = Array(groups.length).fill(null);
+    let cur = bestSum;
     for (let gi = groups.length - 1; gi >= 0; gi--) {
       const meta = layers[gi + 1].get(cur);
       chosen[gi] = groups[gi][meta.vi];
@@ -190,25 +168,140 @@ function createExamService({ examRepo, courseRepo }) {
   }
 
   function validateDraftTopicsShape(topics) {
-    if (!Array.isArray(topics))
-      throw badRequest("currentDraftTopics must be an array");
+    if (!Array.isArray(topics)) throw badRequest("topics must be an array");
     for (const t of topics) {
       if (!t || typeof t !== "object")
-        throw badRequest("Invalid topic in draft");
+        throw badRequest("Each topic must be an object");
       if (!t.topic || typeof t.topic !== "string")
-        throw badRequest("Each draft topic must have topic");
-      if (!t.courseId || !isValidObjectId(t.courseId))
-        throw badRequest("Each draft topic must have a valid courseId");
-      if (t.topicId && !isValidObjectId(t.topicId))
-        throw badRequest("topicId must be a valid id");
+        throw badRequest("Each topic must have a string 'topic' property");
+      if (t.courseId && !isValidObjectId(t.courseId))
+        throw badRequest("topic.courseId must be a valid id");
+      if (t.tasks) {
+        if (!Array.isArray(t.tasks))
+          throw badRequest("Topic tasks must be an array");
+        for (const task of t.tasks) {
+          if (task.id && !isValidObjectId(task.id))
+            throw badRequest("Each task id must be a valid id");
+        }
+      }
       if (t.points !== undefined) {
         const p = Number(t.points);
         if (!Number.isFinite(p) || p < 0)
-          throw badRequest("Draft topic points must be >= 0");
+          throw badRequest("Topic points must be >= 0");
       }
-      if (t.tasks !== undefined && !Array.isArray(t.tasks))
-        throw badRequest("Draft topic tasks must be an array");
     }
+  }
+
+  function hasLatexErrors(compile, numOrZero) {
+    const stats = compile?.stats || {};
+    const latexmkErrors = numOrZero(stats["latexmk-errors"]);
+    const runsWithErrors = numOrZero(stats["latex-runs-with-errors"]);
+    return (
+      compile?.status !== "success" || latexmkErrors > 0 || runsWithErrors > 0
+    );
+  }
+
+  function pickOutputFile(outputFiles, type, ext) {
+    const files = outputFiles || [];
+    const byType = files.find((f) => f && f.type === type && f.url);
+    if (byType) return byType;
+
+    if (ext) {
+      const byExt = files.find(
+        (f) =>
+          f &&
+          f.url &&
+          typeof f.path === "string" &&
+          f.path.toLowerCase().endsWith(ext.toLowerCase()),
+      );
+      if (byExt) return byExt;
+    }
+
+    return null;
+  }
+
+  async function downloadTextFileIfAny(client, file) {
+    if (!file?.url) return null;
+    const buf = await client.downloadAsBuffer(file.url);
+    return buf.toString("utf8");
+  }
+
+  function parseLatexErrorsFromLog(
+    logText,
+    { maxErrors = 200, maxSnippet = 600 } = {},
+  ) {
+    if (!logText) return [];
+
+    const lines = logText.split(/\r?\n/);
+    const errors = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // TeX errors start with "! "
+      if (!line.startsWith("!")) continue;
+
+      const message = line.replace(/^!\s*/, "").trim();
+
+      // Look ahead for "l.<num>" and collect a short snippet
+      let texLine = null;
+      let snippetLines = [line];
+
+      for (let j = i + 1; j < lines.length && j < i + 40; j++) {
+        const lj = lines[j];
+        snippetLines.push(lj);
+
+        const m = lj.match(/^l\.(\d+)\s*(.*)$/);
+        if (m && texLine === null) texLine = Number(m[1]);
+
+        // Stop snippet on blank line after we've seen some context
+        if (j > i + 2 && lj.trim() === "") break;
+
+        // Stop if next error begins
+        if (j > i && lines[j + 1] && lines[j + 1].startsWith("!")) break;
+      }
+
+      const snippet = snippetLines.join("\n").slice(0, maxSnippet);
+
+      errors.push({
+        message,
+        line: texLine, // may be null
+        snippet,
+      });
+
+      if (errors.length >= maxErrors) break;
+    }
+
+    // De-dupe common repeats
+    const seen = new Set();
+    return errors.filter((e) => {
+      const key = `${e.message}@@${e.line ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function extractWarningsFromLog(logText, { maxWarnings = 200 } = {}) {
+    if (!logText) return [];
+    const lines = logText.split(/\r?\n/);
+
+    const warnings = [];
+    const re = /^(LaTeX|Package|Class)\s+(.+?)\s+Warning:\s+(.*)$/;
+
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(re);
+      if (!m) continue;
+
+      const where = m[1];
+      const source = m[2];
+      const message = m[3];
+
+      warnings.push({ where, source, message });
+      if (warnings.length >= maxWarnings) break;
+    }
+
+    return warnings;
   }
 
   async function compileDraftImpl(body, reqId) {
@@ -244,7 +337,6 @@ function createExamService({ examRepo, courseRepo }) {
 
     const topics = Array.isArray(body?.topics) ? body.topics : [];
 
-    // Prepare temp asset folder
     const token = randomProjectId();
     const assetsRoot =
       process.env.DRAFT_ASSETS_DIR || "/tmp/autogenex-draft-assets";
@@ -259,19 +351,26 @@ function createExamService({ examRepo, courseRepo }) {
         apiBaseUrl,
       });
 
+    const version = String(body?.version || "STUDENT").toUpperCase();
+    if (version !== "TEACHER" && version !== "STUDENT") {
+      const e = new Error('version must be "TEACHER" or "STUDENT"');
+      e.status = 400;
+      throw e;
+    }
+
     const mainTex = buildLatexFromDraft({
       coverPageLatex: coverPage,
       topics: nextTopics,
+      version,
     });
 
     const projectId = randomProjectId();
 
-    // CLSI expects: content for .tex, url for binaries (images)
     const compileBody = {
       compile: {
         options: {
           compiler: "pdflatex",
-          timeout: 300, // seconds
+          timeout: 300,
         },
         rootResourcePath: "main.tex",
         resources: [{ path: "main.tex", content: mainTex }, ...imgResources],
@@ -279,7 +378,7 @@ function createExamService({ examRepo, courseRepo }) {
     };
 
     const client = createClsiClient({ clsiUrl, logger });
-    result = await client.compile({ projectId, compileBody, reqId });
+    const result = await client.compile({ projectId, compileBody, reqId });
 
     if (!result || !result.compile) {
       logger.error({ reqId, clsiResult: result }, "Invalid CLSI response");
@@ -291,40 +390,86 @@ function createExamService({ examRepo, courseRepo }) {
       throw e;
     }
 
-    if (result.compile.status !== "success") {
-      logger.error({ reqId, clsiResult: result }, "CLSI compile failed");
+    let errors = null;
 
-      const logFile = (result.compile.outputFiles || []).find(
-        (f) => f.type === "log",
+    if (hasLatexErrors(result.compile, numOrZero)) {
+      logger.warn(
+        { reqId, clsiResult: result },
+        "CLSI compile produced LaTeX errors",
       );
-      let details = JSON.stringify(result).slice(0, 20000);
 
-      if (logFile?.url) {
-        try {
-          const buf = await client.downloadAsBuffer(logFile.url);
-          details = buf.toString("utf8").slice(0, 20000);
-        } catch (downloadErr) {
-          details = `Compile failed and log download failed: ${downloadErr.message}`;
-        }
-      }
+      const logFile = pickOutputFile(result.compile.outputFiles, "log", ".log");
+      const stdoutFile = pickOutputFile(
+        result.compile.outputFiles,
+        "stdout",
+        ".stdout",
+      );
+      const stderrFile = pickOutputFile(
+        result.compile.outputFiles,
+        "stderr",
+        ".stderr",
+      );
 
-      const e = new Error("LaTeX compile failed");
-      e.status = 400;
-      e.details = details;
-      throw e;
+      let logText = null;
+      let stdoutText = null;
+      let stderrText = null;
+
+      try {
+        logText = await downloadTextFileIfAny(client, logFile);
+      } catch {}
+      try {
+        stdoutText = await downloadTextFileIfAny(client, stdoutFile);
+      } catch {}
+      try {
+        stderrText = await downloadTextFileIfAny(client, stderrFile);
+      } catch {}
+
+      const parsedErrors = parseLatexErrorsFromLog(logText, {
+        maxErrors: 200,
+        maxSnippet: 800,
+      });
+
+      const parsedWarnings = extractWarningsFromLog(logText, {
+        maxWarnings: 200,
+      });
+
+      errors = {
+        clsiStatus: result.compile.status,
+        buildId: result.compile.buildId,
+        stats: result.compile.stats || {},
+        timings: result.compile.timings || {},
+        errorCount: parsedErrors.length,
+        warningCount: parsedWarnings.length,
+        errors: parsedErrors, // ALL errors
+        warnings: parsedWarnings, // optional
+        // keep full log snippet if you want, but it can be large
+        log: logText ? logText.slice(0, 20000) : null,
+        stdout: stdoutText ? stdoutText.slice(0, 20000) : null,
+        stderr: stderrText ? stderrText.slice(0, 20000) : null,
+      };
     }
 
-    const pdfFile = (result.compile.outputFiles || []).find(
-      (f) => f.type === "pdf",
-    );
-    if (!pdfFile?.url) {
-      logger.error(
-        { reqId, clsiResult: result },
-        "CLSI success but no PDF output",
+    // ALWAYS try to fetch the PDF (like before)
+    const pdfFile =
+      (result.compile.outputFiles || []).find((f) => f.type === "pdf") ||
+      (result.compile.outputFiles || []).find(
+        (f) =>
+          typeof f.path === "string" &&
+          f.path.toLowerCase().endsWith(".pdf") &&
+          f.url,
       );
+
+    if (!pdfFile?.url) {
+      logger.error({ reqId, clsiResult: result }, "No PDF output URL");
       const e = new Error("CLSI did not return a PDF output URL");
       e.status = 502;
-      e.details = JSON.stringify(result).slice(0, 20000);
+      e.details = {
+        clsiStatus: result.compile.status,
+        buildId: result.compile.buildId,
+        stats: result.compile.stats || {},
+        outputFiles: result.compile.outputFiles || [],
+        errors,
+      };
       throw e;
     }
 
@@ -335,11 +480,10 @@ function createExamService({ examRepo, courseRepo }) {
     );
     const filename = safeFilename(filenameBase) + ".pdf";
 
-    return { pdfBuffer, filename };
+    return { pdfBuffer, filename, errors };
   }
 
   return {
-    // 1) Draft generate: NO DB WRITE
     async generateDraft(data) {
       const courseId = String(data.courseId || "").trim();
       await validateCourseId(courseId);
@@ -353,7 +497,6 @@ function createExamService({ examRepo, courseRepo }) {
       );
 
       const { chosen, sum } = pickBestCombination(groups, targetPoints);
-
       const draftTopics = chosen.map((d) => snapshotFromTopicDoc(d));
 
       const course = courseRepo?.findById
@@ -377,7 +520,6 @@ function createExamService({ examRepo, courseRepo }) {
       };
     },
 
-    // 2) Draft regenerate topic: NO DB WRITE
     async regenerateDraftTopic(data) {
       const courseId = String(data.courseId || "").trim();
       await validateCourseId(courseId);
@@ -391,7 +533,6 @@ function createExamService({ examRepo, courseRepo }) {
       const current = data.currentDraftTopics || [];
       validateDraftTopicsShape(current);
 
-      // keep order: replace in same index if exists
       const idx = current.findIndex((t) => t.topic === topicName);
       if (idx === -1) throw badRequest("topicName not found in current draft");
 
@@ -401,21 +542,10 @@ function createExamService({ examRepo, courseRepo }) {
       const variants = await Topic.find({ courseId, topic: topicName }).lean();
       if (!variants.length) throw badRequest("No variants found for topic");
 
-      // avoid returning same topicId repeatedly if possible
-      const currentTopicId = current[idx]?.topicId
-        ? String(current[idx].topicId)
-        : null;
-
       let best = null;
       let bestDiff = Infinity;
 
       for (const v of variants) {
-        if (
-          currentTopicId &&
-          String(v._id) === currentTopicId &&
-          variants.length > 1
-        )
-          continue;
         const total = othersSum + numOrZero(v.points);
         const diff = Math.abs(total - targetPoints);
         if (diff < bestDiff) {
@@ -441,49 +571,88 @@ function createExamService({ examRepo, courseRepo }) {
       };
     },
 
-    // 3) Create exam: ONLY ON SAVE (DB WRITE)
     async createExam(data) {
-      const courseId = String(data.courseId || "").trim();
-      await validateCourseId(courseId);
+      try {
+        const courseId = String(data.courseId || "").trim();
+        await validateCourseId(courseId);
 
-      const targetPoints = numOrZero(data.targetPoints);
-      if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
+        const targetPoints = numOrZero(data.targetPoints);
+        if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
 
-      const topics = data.topics || [];
-      validateDraftTopicsShape(topics);
+        let topics = data.topics || [];
+        validateDraftTopicsShape(topics);
 
-      // ensure all topics belong to courseId
-      const mismatch = topics.find(
-        (t) => String(t.courseId) !== String(courseId),
-      );
-      if (mismatch)
-        throw badRequest("All topics must belong to the given courseId");
+        topics = topics.map((t) => {
+          const { topicId, ...rest } = t;
+          return {
+            ...rest,
+            courseId,
+          };
+        });
 
-      const points = sumTopicPoints(topics);
+        const points = sumTopicPoints(topics);
 
-      return examRepo.create({
-        courseId,
-        targetPoints,
-        points,
-        topics,
-      });
+        return examRepo.create({
+          courseId,
+          targetPoints,
+          points,
+          topics,
+        });
+      } catch (err) {
+        if (err.status && err.status < 500) throw err;
+        logger.error({ err, data }, "failed to create exam");
+        const e = new Error("Unable to create exam");
+        e.status = 500;
+        throw e;
+      }
     },
 
-    // Existing list/get/update/delete now work with snapshot topics
     async listExams(query) {
       const courseId = query.courseId
         ? String(query.courseId).trim()
         : undefined;
       if (courseId && !isValidObjectId(courseId))
         throw badRequest("courseId must be a valid id");
-      return examRepo.findAll({ ...query, courseId });
+
+      const { normalizePagination, buildMeta } = require("../utils/pagination");
+      const { parseFilters, parseSort } = require("../utils/query");
+
+      const { page, limit } = normalizePagination(
+        query.page,
+        query.pageSize || query.limit,
+      );
+
+      const filters = parseFilters(query.filter);
+      if (courseId) filters.courseId = courseId;
+      const sort = parseSort(query.sort);
+
+      const { items, total } = await examRepo.findAll({
+        page,
+        limit,
+        filter: filters,
+        sort,
+      });
+
+      const meta = buildMeta({ total, page, limit });
+      return { items, ...meta };
     },
 
     async getExam(id) {
       if (!isValidObjectId(id)) throw badRequest("id must be a valid id");
-      const exam = await examRepo.findById(id);
-      if (!exam) throw notFound("Exam not found");
-      return exam;
+
+      try {
+        const exam = await examRepo.findById(id);
+        if (!exam) throw notFound("Exam not found");
+        return exam;
+      } catch (err) {
+        if (err.status && err.status < 500) {
+          throw err;
+        }
+        logger.error({ err, examId: id }, "failed to load exam by id");
+        const e = new Error("Unable to retrieve exam");
+        e.status = 500;
+        throw e;
+      }
     },
 
     async updateExam(id, data) {
@@ -507,11 +676,16 @@ function createExamService({ examRepo, courseRepo }) {
 
       if (data.topics !== undefined) {
         validateDraftTopicsShape(data.topics);
-        update.topics = data.topics;
-        update.points = sumTopicPoints(data.topics);
+        const courseIdForTopics = update.courseId || undefined;
+        update.topics = (data.topics || []).map((t) => {
+          const { topicId, ...rest } = t;
+          return {
+            ...rest,
+            ...(courseIdForTopics ? { courseId: courseIdForTopics } : {}),
+          };
+        });
+        update.points = sumTopicPoints(update.topics);
       }
-
-      // Allow manual points override if you want. Usually points should always be sum of topics.
       if (data.points !== undefined) {
         const p = numOrZero(data.points);
         if (p < 0) throw badRequest("points must be >= 0");

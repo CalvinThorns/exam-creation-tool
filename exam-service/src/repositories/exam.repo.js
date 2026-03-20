@@ -6,27 +6,27 @@ function createExamRepo() {
       return Exam.create(data);
     },
 
-    async findAll({ page = 1, limit = 20, courseId }) {
-      const safePage = Math.max(1, Number(page) || 1);
-      const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+    async findAll({ page = 1, limit = 20, filter = {}, sort, courseId }) {
+      const qfilter = { ...filter };
+      if (courseId) qfilter.courseId = courseId;
 
-      const filter = {};
-      if (courseId) filter.courseId = courseId;
+      const query = Exam.find(qfilter);
+      if (sort && Object.keys(sort).length) {
+        query.sort(sort);
+      } else {
+        query.sort({ createdAt: -1 });
+      }
 
       const [items, total] = await Promise.all([
-        Exam.find(filter)
-          .sort({ createdAt: -1 })
-          .skip((safePage - 1) * safeLimit)
-          .limit(safeLimit),
-        Exam.countDocuments(filter),
+        query.skip((page - 1) * limit).limit(limit),
+        Exam.countDocuments(qfilter),
       ]);
 
-      return { items, total, page: safePage, limit: safeLimit };
+      return { items, total };
     },
 
-    async findById(id, { populateTopics = false } = {}) {
-      const q = Exam.findById(id);
-      if (populateTopics) q.populate("topics");
+    async findById(id) {
+      const q = Exam.findById(id).populate("courseId");
       return q;
     },
 

@@ -14,4 +14,18 @@ const httpLogger = pinoHttp({
   genReqId: (req) => req.headers["x-request-id"] || undefined,
 });
 
-module.exports = { logger, httpLogger };
+function safeHttpLogger(req, res, next) {
+  try {
+    httpLogger(req, res, (err) => {
+      if (err) {
+        logger.error({ err }, "httpLogger internal error");
+      }
+      next();
+    });
+  } catch (err) {
+    logger.error({ err }, "httpLogger threw synchronously");
+    next();
+  }
+}
+
+module.exports = { logger, httpLogger: safeHttpLogger };
