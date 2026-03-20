@@ -1,5 +1,5 @@
 // GenerateExamPage.jsx
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import {
   Box,
@@ -9,14 +9,10 @@ import {
   MenuItem,
   Typography,
   Divider,
-  Card,
-  CardContent,
   Stack,
   Chip,
   useTheme,
   alpha,
-  Tooltip,
-  IconButton,
   CircularProgress,
   Menu,
   ListItemIcon,
@@ -26,14 +22,14 @@ import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import BuildIcon from "@mui/icons-material/Build";
-import DownloadIcon from "@mui/icons-material/Download";
-import OpenInFullIcon from "@mui/icons-material/OpenInFull";
-import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 
 import { PageHeader } from "../../components/ui/PageHeader";
+import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
+import { usePdfPreview } from "../../hooks/usePdfPreview";
+import { TopicCard } from "./components/TopicCard";
 import { useCourses } from "../courses/courses.hooks";
 import { useTopics } from "../topics/topics.hooks";
 import {
@@ -42,7 +38,6 @@ import {
   useGenerateDraft,
   useRegenerateDraftTopic,
 } from "./exams.hooks";
-import { LatexEditor } from "../../components/ui/LatexEditor";
 import { examsApi } from "../../api/exams.api";
 
 function sumPoints(topics) {
@@ -122,319 +117,6 @@ function CompileButton({ disabled, onCompile }) {
 }
 
 // ---------------------------------------------------------------------------
-// PDF Preview Panel
-// ---------------------------------------------------------------------------
-function PdfPreviewPanel({
-  pdfUrl,
-  onDownload,
-  isCompiling,
-  compilingVersion,
-}) {
-  const theme = useTheme();
-  const [expanded, setExpanded] = useState(false);
-  const panelRef = useRef(null);
-
-  return (
-    <Paper
-      ref={panelRef}
-      sx={{
-        p: 2,
-        display: "flex",
-        flexDirection: "column",
-        border: `1px solid ${theme.palette.divider}`,
-        overflow: "hidden",
-        height: "100%",
-        boxSizing: "border-box",
-        ...(expanded && {
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: "100vh",
-          zIndex: theme.zIndex.modal,
-        }),
-      }}
-    >
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ flexShrink: 0 }}
-      >
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="h6" color="text.primary">
-            Preview
-          </Typography>
-          {pdfUrl && !isCompiling && compilingVersion && (
-            <Chip
-              label={compilingVersion === "STUDENT" ? "Student" : "Teacher"}
-              size="small"
-              color={compilingVersion === "STUDENT" ? "primary" : "secondary"}
-              variant="outlined"
-              icon={
-                compilingVersion === "STUDENT" ? (
-                  <SchoolIcon style={{ fontSize: 13 }} />
-                ) : (
-                  <MenuBookIcon style={{ fontSize: 13 }} />
-                )
-              }
-              sx={{ fontWeight: 600, fontSize: 11, paddingInline: "6px" }}
-            />
-          )}
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="contained"
-            color="secondary"
-            size="small"
-            startIcon={<DownloadIcon />}
-            disabled={!pdfUrl || isCompiling}
-            onClick={onDownload}
-          >
-            Download
-          </Button>
-          <Tooltip title={expanded ? "Collapse" : "Expand"}>
-            <IconButton size="small" onClick={() => setExpanded((p) => !p)}>
-              {expanded ? (
-                <CloseFullscreenIcon fontSize="small" />
-              ) : (
-                <OpenInFullIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Stack>
-
-      <Divider sx={{ my: 1.5, flexShrink: 0 }} />
-
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          borderRadius: 1,
-          overflow: "hidden",
-          bgcolor: alpha(theme.palette.primary.main, 0.04),
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: `1px dashed ${theme.palette.divider}`,
-        }}
-      >
-        {isCompiling ? (
-          <Stack alignItems="center" spacing={2}>
-            <CircularProgress
-              size={48}
-              thickness={3}
-              sx={{ color: "primary.main" }}
-            />
-            <Typography variant="body2" color="text.secondary" fontWeight={500}>
-              Compiling {compilingVersion === "STUDENT" ? "Student" : "Teacher"}{" "}
-              version…
-            </Typography>
-          </Stack>
-        ) : pdfUrl ? (
-          <iframe
-            title="PDF Preview"
-            src={pdfUrl}
-            style={{ width: "100%", height: "100%", border: "none" }}
-          />
-        ) : (
-          <Stack alignItems="center" spacing={1} sx={{ opacity: 0.45 }}>
-            <BuildIcon sx={{ fontSize: 40, color: "text.secondary" }} />
-            <Typography variant="body2" color="text.secondary">
-              Compile to see the PDF preview
-            </Typography>
-          </Stack>
-        )}
-      </Box>
-    </Paper>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Topic Card
-// ---------------------------------------------------------------------------
-function TopicCard({
-  topic,
-  topicIndex,
-  onTopicField,
-  onTaskField,
-  onRegenerate,
-  regenPending,
-  theme,
-}) {
-  return (
-    <Card
-      variant="outlined"
-      sx={{
-        borderRadius: 2,
-        borderColor: theme.palette.divider,
-        "&:hover": { borderColor: theme.palette.primary.light },
-        transition: "border-color 0.2s",
-      }}
-    >
-      <CardContent>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 2 }}
-        >
-          <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-            {topic.topic}
-          </Typography>
-          <Chip
-            label={`${topic.points} pts`}
-            size="small"
-            color="primary"
-            variant="outlined"
-            sx={{ fontWeight: 700, mr: 1 }}
-          />
-          <Button
-            variant="outlined"
-            color="secondary"
-            size="small"
-            startIcon={<RefreshIcon />}
-            onClick={() => onRegenerate(topic.topic)}
-            disabled={regenPending}
-          >
-            Regenerate
-          </Button>
-        </Stack>
-
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 2,
-            alignItems: "start",
-            mb: 2,
-          }}
-        >
-          <LatexEditor
-            value={topic.topic || ""}
-            onChange={(v) => onTopicField(topicIndex, "topic", v)}
-            height={200}
-          />
-          <TextField
-            label="Points"
-            type="number"
-            value={topic.points ?? 0}
-            onChange={(e) =>
-              onTopicField(topicIndex, "points", Number(e.target.value || 0))
-            }
-            sx={{ width: 110 }}
-            size="small"
-          />
-        </Box>
-
-        <TextField
-          label="Description"
-          value={topic.description || ""}
-          onChange={(e) =>
-            onTopicField(topicIndex, "description", e.target.value)
-          }
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          sx={{ mb: 2 }}
-        />
-
-        {(topic.tasks || []).length > 0 && (
-          <Box>
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              color="text.secondary"
-              sx={{ mb: 1 }}
-            >
-              Tasks ({topic.tasks.length})
-            </Typography>
-            <Stack spacing={1.5}>
-              {(topic.tasks || []).map((task, ti) => (
-                <Card
-                  key={`${topicIndex}-${ti}`}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 1.5,
-                    bgcolor: alpha(theme.palette.primary.main, 0.02),
-                    borderColor: alpha(theme.palette.primary.main, 0.12),
-                  }}
-                >
-                  <CardContent sx={{ pb: "12px !important" }}>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      justifyContent="space-between"
-                      sx={{ mb: 1.5 }}
-                    >
-                      <Typography
-                        variant="caption"
-                        fontWeight={700}
-                        color="text.secondary"
-                      >
-                        Task {ti + 1}
-                      </Typography>
-                      <TextField
-                        label="Points"
-                        type="number"
-                        value={task.points ?? 0}
-                        onChange={(e) =>
-                          onTaskField(
-                            topicIndex,
-                            ti,
-                            "points",
-                            Number(e.target.value || 0),
-                          )
-                        }
-                        sx={{ width: 100 }}
-                        size="small"
-                      />
-                    </Stack>
-
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mb: 0.5 }}
-                    >
-                      Question
-                    </Typography>
-                    <LatexEditor
-                      value={task.question || ""}
-                      onChange={(v) =>
-                        onTaskField(topicIndex, ti, "question", v)
-                      }
-                      height={160}
-                    />
-
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 1.5, mb: 0.5 }}
-                    >
-                      Solution
-                    </Typography>
-                    <LatexEditor
-                      value={task.solution || ""}
-                      onChange={(v) =>
-                        onTaskField(topicIndex, ti, "solution", v)
-                      }
-                      height={120}
-                    />
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
-          </Box>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 export function GenerateExamPage() {
@@ -449,8 +131,8 @@ export function GenerateExamPage() {
   const [targetPoints, setTargetPoints] = useState(0);
   const [topicPick, setTopicPick] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
-  const [pdfUrl, setPdfUrl] = useState("");
-  const [pdfFilename, setPdfFilename] = useState("exam.pdf");
+  const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
+    usePdfPreview("exam.pdf");
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledVersion, setCompiledVersion] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -495,7 +177,7 @@ export function GenerateExamPage() {
     courseId: courseId || undefined,
   });
 
-  const topics = topicsData?.data || [];
+  const topics = useMemo(() => topicsData?.data || [], [topicsData?.data]);
   const topicNames = useMemo(() => {
     const s = new Set();
     topics.forEach((t) => s.add(t.topic));
@@ -516,7 +198,7 @@ export function GenerateExamPage() {
   // version: "STUDENT" | "TEACHER"
   const compileDraft = async (version) => {
     if (!draft) return;
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    clearPdf();
 
     setIsCompiling(true);
     setCompiledVersion(version);
@@ -529,26 +211,10 @@ export function GenerateExamPage() {
       });
 
       const { pdfBase64, filename } = res.data;
-      setPdfFilename(filename || "exam.pdf");
-
-      const binary = atob(pdfBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      setPdfUrl(URL.createObjectURL(blob));
+      setPdfFromBase64({ base64: pdfBase64, filename });
     } finally {
       setIsCompiling(false);
     }
-  };
-
-  const downloadPdf = () => {
-    if (!pdfUrl) return;
-    const a = document.createElement("a");
-    a.href = pdfUrl;
-    a.download = pdfFilename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
   };
 
   const addTopic = () => {
@@ -573,10 +239,7 @@ export function GenerateExamPage() {
       return;
     // Clear previous content immediately so the UI shows empty states while loading
     setDraft(null);
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-      setPdfUrl("");
-    }
+    clearPdf();
     setCompiledVersion(null);
     const res = await generateM.mutateAsync({
       courseId,
@@ -933,7 +596,6 @@ export function GenerateExamPage() {
                         onTaskField={updateTaskField}
                         onRegenerate={regenerateTopic}
                         regenPending={regenM.isPending}
-                        theme={theme}
                       />
                     ))}
                   </Stack>
@@ -945,8 +607,32 @@ export function GenerateExamPage() {
             <PdfPreviewPanel
               pdfUrl={pdfUrl}
               onDownload={downloadPdf}
-              isCompiling={isCompiling}
-              compilingVersion={compiledVersion}
+              isLoading={isCompiling}
+              loadingText={`Compiling ${compiledVersion === "STUDENT" ? "Student" : "Teacher"} version…`}
+              statusContent={
+                pdfUrl &&
+                !isCompiling &&
+                compiledVersion && (
+                  <Chip
+                    label={
+                      compiledVersion === "STUDENT" ? "Student" : "Teacher"
+                    }
+                    size="small"
+                    color={
+                      compiledVersion === "STUDENT" ? "primary" : "secondary"
+                    }
+                    variant="outlined"
+                    icon={
+                      compiledVersion === "STUDENT" ? (
+                        <SchoolIcon style={{ fontSize: 13 }} />
+                      ) : (
+                        <MenuBookIcon style={{ fontSize: 13 }} />
+                      )
+                    }
+                    sx={{ fontWeight: 600, fontSize: 11, paddingInline: "6px" }}
+                  />
+                )
+              }
             />
           </Box>
         </> // end of isEditMode && examLoading conditional
