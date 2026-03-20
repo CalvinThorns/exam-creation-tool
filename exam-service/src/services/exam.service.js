@@ -49,6 +49,7 @@ function createExamService({ examRepo, courseRepo }) {
 
   function snapshotFromTopicDoc(doc) {
     return {
+      topicId: doc?._id ? String(doc._id) : undefined,
       courseId: doc.courseId,
       topic: doc.topic || "",
       description: doc.description || "",
@@ -76,6 +77,25 @@ function createExamService({ examRepo, courseRepo }) {
           }))
         : [],
     };
+  }
+
+  function topicSignature(topic) {
+    return JSON.stringify({
+      topic: topic?.topic || "",
+      description: topic?.description || "",
+      points: numOrZero(topic?.points),
+      tasks: Array.isArray(topic?.tasks)
+        ? topic.tasks.map((t) => ({
+            question: t?.question || "",
+            points: numOrZero(t?.points),
+            solution: t?.solution || "",
+            isRelatedToTopic:
+              typeof t?.isRelatedToTopic === "boolean"
+                ? t.isRelatedToTopic
+                : true,
+          }))
+        : [],
+    });
   }
 
   async function validateCourseId(courseId) {
@@ -536,16 +556,32 @@ function createExamService({ examRepo, courseRepo }) {
       const idx = current.findIndex((t) => t.topic === topicName);
       if (idx === -1) throw badRequest("topicName not found in current draft");
 
+      const currentTopic = current[idx] || {};
+      const currentTopicId = String(
+        currentTopic.topicId || currentTopic.id || "",
+      ).trim();
+      const currentTopicSignature = topicSignature(currentTopic);
+
       const others = current.filter((_, i) => i !== idx);
       const othersSum = sumTopicPoints(others);
 
       const variants = await Topic.find({ courseId, topic: topicName }).lean();
       if (!variants.length) throw badRequest("No variants found for topic");
 
+      const candidates = variants.filter((variant) => {
+        if (currentTopicId && String(variant._id) === currentTopicId) {
+          return false;
+        }
+        const variantSignature = topicSignature(snapshotFromTopicDoc(variant));
+        return variantSignature !== currentTopicSignature;
+      });
+
+      const pool = candidates.length ? candidates : variants;
+
       let best = null;
       let bestDiff = Infinity;
 
-      for (const v of variants) {
+      for (const v of pool) {
         const total = othersSum + numOrZero(v.points);
         const diff = Math.abs(total - targetPoints);
         if (diff < bestDiff) {
@@ -554,7 +590,7 @@ function createExamService({ examRepo, courseRepo }) {
         }
       }
 
-      if (!best) best = variants[0];
+      if (!best) best = pool[0];
 
       const replaced = snapshotFromTopicDoc(best);
 
