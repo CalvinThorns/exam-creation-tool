@@ -1,16 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Button,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Stack,
-  TextField,
-  MenuItem,
-} from "@mui/material";
+import { Box, Button, Paper, TextField, MenuItem } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -19,6 +8,7 @@ import { Loader } from "../../components/ui/Loader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { DataTable } from "../../components/ui/DataTable";
 import { TopicFormDialog } from "./TopicFormDialog";
 import {
   useTopics,
@@ -29,14 +19,14 @@ import {
 import { useCourses } from "../courses/courses.hooks";
 
 export function TopicsPage() {
-  const [courseFilter, setCourseFilter] = useState("");
+  // const [courseFilter, setCourseFilter] = useState("");
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
   const courses = coursesData?.data || [];
 
   const { data, isLoading, error } = useTopics({
     page: 1,
     limit: 100,
-    courseId: courseFilter || undefined,
+    // courseId: courseFilter || undefined,
   });
 
   const createM = useCreateTopic();
@@ -47,23 +37,57 @@ export function TopicsPage() {
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, id: null });
 
-  const rows = useMemo(() => data?.data || [], [data]);
-
   const courseTitleById = useMemo(() => {
     const m = new Map();
     courses.forEach((c) => m.set(c.id, c.title));
     return m;
   }, [courses]);
 
+  const rows = useMemo(
+    () =>
+      (data?.data || []).map((t) => ({
+        ...t,
+        courseTitle: courseTitleById.get(t.courseId) || t.courseId,
+      })),
+    [data, courseTitleById],
+  );
+
+  const columns = useMemo(
+    () => [
+      { headerName: "Topic", field: "topic" },
+      { headerName: "Course", field: "courseTitle" },
+      { headerName: "Points", field: "points" },
+    ],
+    [],
+  );
+
+  const actions = useMemo(
+    () => [
+      {
+        id: "edit",
+        label: "Edit",
+        icon: EditIcon,
+        onClick: (row) => {
+          setEditing(row);
+          setFormOpen(true);
+        },
+      },
+      {
+        id: "delete",
+        label: "Delete",
+        icon: DeleteIcon,
+        onClick: (row) => {
+          setConfirm({ open: true, id: row.id });
+        },
+      },
+    ],
+    [],
+  );
+
   const openAdd = () => {
     setEditing(null);
     setFormOpen(true);
   };
-  const openEdit = (row) => {
-    setEditing(row);
-    setFormOpen(true);
-  };
-  const openDelete = (id) => setConfirm({ open: true, id });
 
   const submit = async (values) => {
     if (editing) await updateM.mutateAsync({ id: editing.id, body: values });
@@ -77,7 +101,9 @@ export function TopicsPage() {
   };
 
   return (
-    <>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+    >
       <PageHeader
         title="Tasks"
         right={
@@ -87,7 +113,7 @@ export function TopicsPage() {
         }
       />
 
-      <Paper sx={{ p: 2, borderRadius: 1, mb: 2 }}>
+      {/* <Paper sx={{ p: 2, mb: 2 }}>
         <TextField
           select
           label="Course filter"
@@ -102,7 +128,7 @@ export function TopicsPage() {
             </MenuItem>
           ))}
         </TextField>
-      </Paper>
+      </Paper> */}
 
       {isLoading ? <Loader /> : null}
       {error ? <ErrorState message={error.userMessage} /> : null}
@@ -115,55 +141,18 @@ export function TopicsPage() {
       ) : null}
 
       {!isLoading && !error && rows.length > 0 ? (
-        <Paper sx={{ borderRadius: 1, overflow: "hidden" }}>
-          <Table>
-            <TableHead sx={{ bgcolor: "#d9d9d9" }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800 }}>Topic</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Course</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Points</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>
-                  {" "}
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((t) => (
-                <TableRow key={t.id} hover>
-                  <TableCell>{t.topic}</TableCell>
-                  <TableCell>
-                    {courseTitleById.get(t.courseId) || t.courseId}
-                  </TableCell>
-                  <TableCell>{t.points}</TableCell>
-                  <TableCell align="right">
-                    <Stack
-                      direction="row"
-                      justifyContent="flex-end"
-                      spacing={1}
-                    >
-                      <Button
-                        variant="contained"
-                        color="secondary"
-                        startIcon={<EditIcon />}
-                        onClick={() => openEdit(t)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => openDelete(t.id)}
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+          <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
+            <DataTable
+              columnDefs={columns}
+              rowData={rows}
+              actions={actions}
+              actionsHeaderName="Actions"
+              pageSize={10}
+              height="100%"
+            />
+          </Paper>
+        </Box>
       ) : null}
 
       <TopicFormDialog
@@ -182,6 +171,6 @@ export function TopicsPage() {
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />
-    </>
+    </Box>
   );
 }

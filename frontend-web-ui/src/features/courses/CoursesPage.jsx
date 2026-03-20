@@ -1,14 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Button,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Stack,
-} from "@mui/material";
+import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -17,6 +8,7 @@ import { Loader } from "../../components/ui/Loader";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { DataTable } from "../../components/ui/DataTable";
 import { CourseFormDialog } from "./CourseFormDialog";
 import {
   useCourses,
@@ -36,17 +28,41 @@ export function CoursesPage() {
   const [confirm, setConfirm] = useState({ open: false, id: null });
   const rows = useMemo(() => data?.data || [], [data]);
 
+  const columns = useMemo(
+    () => [
+      { headerName: "Name", field: "title" },
+      { headerName: "Short Name", field: "shortName" },
+    ],
+    [],
+  );
+
+  const actions = useMemo(
+    () => [
+      {
+        id: "edit",
+        label: "Edit",
+        icon: EditIcon,
+        onClick: (row) => {
+          setEditing(row);
+          setFormOpen(true);
+        },
+      },
+      {
+        id: "delete",
+        label: "Delete",
+        icon: DeleteIcon,
+        onClick: (row) => {
+          setConfirm({ open: true, id: row.id });
+        },
+      },
+    ],
+    [],
+  );
+
   const openAdd = () => {
     setEditing(null);
     setFormOpen(true);
   };
-
-  const openEdit = (row) => {
-    setEditing(row);
-    setFormOpen(true);
-  };
-
-  const openDelete = (id) => setConfirm({ open: true, id });
 
   const submit = async (values) => {
     if (editing) {
@@ -63,7 +79,9 @@ export function CoursesPage() {
   };
 
   return (
-    <>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+    >
       <PageHeader
         title="Courses"
         right={
@@ -74,7 +92,9 @@ export function CoursesPage() {
       />
 
       {isLoading ? <Loader /> : null}
-      {error ? <ErrorState message={error.message || "Failed to load courses"} /> : null}
+      {error ? (
+        <ErrorState message={error.message || "Failed to load courses"} />
+      ) : null}
 
       {!isLoading && !error && rows.length === 0 ? (
         <EmptyState
@@ -84,53 +104,18 @@ export function CoursesPage() {
       ) : null}
 
       {!isLoading && !error && rows.length > 0 ? (
-        <Paper sx={{ borderRadius: 1, overflow: "hidden" }}>
-          <Table>
-            <TableHead sx={{ bgcolor: "#d9d9d9" }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Short Name</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((c) => (
-                <TableRow key={c.id} hover>
-                  <TableCell>{c.title}</TableCell>
-                  <TableCell>{c.shortName}</TableCell>
-                  <TableCell align="right">
-                    <Stack
-                      direction="row"
-                      justifyContent="flex-end"
-                      spacing={1}
-                    >
-                      <Button
-                        variant="contained"
-                        color="secondary"
-                        size="small"
-                        startIcon={<EditIcon />}
-                        onClick={() => openEdit(c)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="error"
-                        size="small"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => openDelete(c.id)}
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+          <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
+            <DataTable
+              columnDefs={columns}
+              rowData={rows}
+              actions={actions}
+              actionsHeaderName="Actions"
+              pageSize={10}
+              height="100%"
+            />
+          </Paper>
+        </Box>
       ) : null}
 
       <CourseFormDialog
@@ -148,6 +133,6 @@ export function CoursesPage() {
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />
-    </>
+    </Box>
   );
 }

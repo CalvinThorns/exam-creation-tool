@@ -11,19 +11,6 @@ import UploadIcon from "@mui/icons-material/Upload";
 import { fileToBase64 } from "../../utils/fileToBase64";
 import { resizableTextAreaSx } from "../../components/ui/fieldStyles";
 
-const grayFieldSx = {
-  "& .MuiInputBase-root": {
-    backgroundColor: "#d9d9d9",
-    borderRadius: "10px",
-  },
-  "& .MuiOutlinedInput-notchedOutline": {
-    borderColor: "#d9d9d9",
-  },
-  "&:hover .MuiOutlinedInput-notchedOutline": {
-    borderColor: "#cfcfcf",
-  },
-};
-
 export function TaskEditor({ control, register, setValue, errors }) {
   const { fields, remove } = useFieldArray({ control, name: "tasks" });
 
@@ -43,7 +30,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
   return (
     <Box className="flex flex-col gap-5">
       {fields.map((f, idx) => (
-        <Box key={f.id} className="bg-white rounded-2xl p-5">
+        <Box key={f.id} className="rounded-2xl border p-5">
           <div className="flex items-center justify-between mb-3">
             <Typography className="font-semibold">Task {idx + 1}</Typography>
             {fields.length > 1 ? (
@@ -62,10 +49,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
             {...register(`tasks.${idx}.question`)}
             error={!!errors?.tasks?.[idx]?.question}
             helperText={errors?.tasks?.[idx]?.question?.message}
-            sx={{
-              ...grayFieldSx,
-              ...resizableTextAreaSx,
-            }}
+            sx={resizableTextAreaSx}
           />
 
           <div className="mt-5">
@@ -76,10 +60,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
               multiline
               minRows={2}
               {...register(`tasks.${idx}.solution`)}
-              sx={{
-                ...grayFieldSx,
-                ...resizableTextAreaSx,
-              }}
+            sx={resizableTextAreaSx}
             />
           </div>
 
@@ -88,12 +69,6 @@ export function TaskEditor({ control, register, setValue, errors }) {
               variant="outlined"
               component="label"
               startIcon={<UploadIcon />}
-              sx={{
-                height: 56,
-                borderRadius: 1.5,
-                borderColor: "#d9d9d9",
-                color: "#111",
-              }}
               fullWidth
             >
               Upload task image
@@ -113,7 +88,6 @@ export function TaskEditor({ control, register, setValue, errors }) {
               {...register(`tasks.${idx}.points`)}
               error={!!errors?.tasks?.[idx]?.points}
               helperText={errors?.tasks?.[idx]?.points?.message}
-              sx={grayFieldSx}
             />
           </div>
 

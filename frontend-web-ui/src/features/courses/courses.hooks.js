@@ -1,29 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { coursesApi } from "../../api/client";
+// import { coursesApi } from "../../api/client";
+import { coursesApi } from "../../api/courses.api";
 
 const toCreateDto = (values) => {
   return {
     title: values.title,
     shortName: values.shortName,
-    coverPage: values.coverPage
+    coverPage: values.coverPage,
   };
 };
 
 const toUpdateDto = (values) => {
-  const dto = {}; 
+  const dto = {};
   if (values.title) dto.title = values.title;
   if (values.shortName) dto.shortName = values.shortName;
   if (values.coverPage) dto.coverPage = values.coverPage;
   return dto;
 };
 
-export function useCourses() {
+export function useCourses(params) {
   return useQuery({
-    queryKey: ["courses"],
+    queryKey: ["courses", params],
     queryFn: async () => {
-      const response = await coursesApi.getCourses();
-      
-      return response.data || []; 
+      const response = await coursesApi.list(params);
+      return response;
     },
   });
 }

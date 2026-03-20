@@ -5,22 +5,17 @@ import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f0f0f0", width: "100vw" }}>
+    <Box className="min-h-screen">
       {/* <TopBar /> */}
 
       <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "150px 1fr",
-          // minHeight: "calc(100vh - 72px)",
-          minHeight: "100vh",
-          width: "100%",
-        }}
+        className="grid min-h-screen w-full"
+        sx={{ gridTemplateColumns: "150px minmax(0,1fr)" }}
       >
         <Sidebar />
 
-        <Box sx={{ p: 3, width: "100%", minWidth: 0 }}>
-          <Container maxWidth={false} disableGutters sx={{ width: "100%" }}>
+        <Box className="w-full min-w-0 p-4">
+          <Container maxWidth={false} disableGutters>
             <Outlet />
           </Container>
         </Box>

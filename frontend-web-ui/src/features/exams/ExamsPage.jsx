@@ -1,15 +1,7 @@
-import { useMemo, useState } from "react";
-import {
-  Button,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Stack,
-} from "@mui/material";
+import { useCallback, useMemo, useState } from "react";
+import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -17,37 +9,111 @@ import { Loader } from "../../components/ui/Loader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { DataTable } from "../../components/ui/DataTable";
 import { useExams, useDeleteExam } from "./exams.hooks";
-import { useCourses } from "../courses/courses.hooks";
 import { formatDate } from "../../utils/format";
+import { agGridFilterToApiFilters } from "../../utils/listQuery";
+
+const DEFAULT_PAGE_SIZE = 10;
 
 export function ExamsPage() {
   const nav = useNavigate();
-  const {
-    data: examsData,
-    isLoading,
-    error,
-  } = useExams({ page: 1, limit: 100 });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [sortModel, setSortModel] = useState([
+    { colId: "createdAt", sort: "desc" },
+  ]);
+  const [filterModel, setFilterModel] = useState(null);
+  const [confirm, setConfirm] = useState({ open: false, id: null });
+
+  const queryParams = useMemo(() => {
+    const sort =
+      sortModel?.length > 0
+        ? sortModel.map((s) => `${s.colId}:${s.sort || "asc"}`).join(",")
+        : undefined;
+    const filters = agGridFilterToApiFilters(filterModel);
+    return {
+      page: page + 1,
+      limit: pageSize,
+      sort,
+      filters: filters.length ? filters : undefined,
+    };
+  }, [page, pageSize, sortModel, filterModel]);
+
+  const { data: examsResponse, isLoading, error } = useExams(queryParams);
   const deleteM = useDeleteExam();
 
-  const { data: coursesData } = useCourses({ page: 1, limit: 200 });
-  const courses = coursesData?.data || [];
-  const courseTitleById = useMemo(() => {
-    const m = new Map();
-    courses.forEach((c) => m.set(c.id, c.title));
-    return m;
-  }, [courses]);
+  const items = examsResponse?.data ?? [];
+  const meta = examsResponse?.meta ?? {};
+  const rowCount = meta.total ?? 0;
 
-  const rows = examsData?.data || [];
-  const [confirm, setConfirm] = useState({ open: false, id: null });
+  const rows = useMemo(
+    () =>
+      items.map((e) => ({
+        ...e,
+        courseTitle:
+          (e.courseId && (e.courseId.title ?? e.courseId.shortName)) ||
+          (typeof e.courseId === "string" ? e.courseId : ""),
+        date: formatDate(e.createdAt),
+      })),
+    [items],
+  );
+
+  const columns = useMemo(
+    () => [
+      { headerName: "Course", field: "courseTitle", colId: "courseId" },
+      { headerName: "Points", field: "points", colId: "points" },
+      { headerName: "Date", field: "date", colId: "createdAt" },
+    ],
+    [],
+  );
+
+  const actions = useMemo(
+    () => [
+      {
+        id: "edit",
+        label: "Edit",
+        icon: EditIcon,
+        onClick: (row) => nav(`/exams/${row.id}/edit`),
+      },
+      {
+        id: "delete",
+        label: "Delete",
+        icon: DeleteIcon,
+        maxWidth: 100,
+        onClick: (row) => setConfirm({ open: true, id: row.id }),
+      },
+    ],
+    [nav],
+  );
+
+  const handlePageChange = useCallback((newPage, newPageSize) => {
+    setPage(newPage);
+    if (newPageSize != null) setPageSize(newPageSize);
+  }, []);
+
+  const handleSortChange = useCallback((newSortModel) => {
+    setSortModel(newSortModel ?? []);
+    setPage(0);
+  }, []);
+
+  const handleFilterChange = useCallback((newFilterModel) => {
+    setFilterModel(newFilterModel ?? null);
+    setPage(0);
+  }, []);
 
   const remove = async () => {
     await deleteM.mutateAsync(confirm.id);
     setConfirm({ open: false, id: null });
   };
 
+  const hasData =
+    rowCount > 0 || (items.length > 0 && meta.total === undefined);
+
   return (
-    <>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+    >
       <PageHeader
         title="Exams"
         right={
@@ -64,55 +130,34 @@ export function ExamsPage() {
       {isLoading ? <Loader /> : null}
       {error ? <ErrorState message={error.userMessage} /> : null}
 
-      {!isLoading && !error && rows.length === 0 ? (
+      {!isLoading && !error && rowCount === 0 && !filterModel ? (
         <EmptyState
           title="No exams"
           hint="Click Add New to generate and save an exam."
         />
       ) : null}
 
-      {!isLoading && !error && rows.length > 0 ? (
-        <Paper sx={{ borderRadius: 1, overflow: "hidden" }}>
-          <Table>
-            <TableHead sx={{ bgcolor: "#d9d9d9" }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800 }}>Course</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Points</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>
-                  {" "}
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((e) => (
-                <TableRow key={e.id} hover>
-                  <TableCell>
-                    {courseTitleById.get(e.courseId) || e.courseId}
-                  </TableCell>
-                  <TableCell>{e.points}</TableCell>
-                  <TableCell>{formatDate(e.createdAt)}</TableCell>
-                  <TableCell align="right">
-                    <Stack
-                      direction="row"
-                      justifyContent="flex-end"
-                      spacing={1}
-                    >
-                      <Button
-                        variant="contained"
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => setConfirm({ open: true, id: e.id })}
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+      {!isLoading && !error && (hasData || filterModel) ? (
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+          <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
+            <DataTable
+              columnDefs={columns}
+              rowData={rows}
+              actions={actions}
+              actionsHeaderName="Actions"
+              height="100%"
+              serverSide
+              rowCount={rowCount}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onSortChange={handleSortChange}
+              onFilterChange={handleFilterChange}
+              sortModel={sortModel}
+              filterModel={filterModel}
+            />
+          </Paper>
+        </Box>
       ) : null}
 
       <ConfirmDialog
@@ -122,6 +167,6 @@ export function ExamsPage() {
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />
-    </>
+    </Box>
   );
 }
