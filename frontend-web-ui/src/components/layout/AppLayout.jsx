@@ -1,18 +1,29 @@
 import { Outlet } from "react-router-dom";
 import { Box, Container } from "@mui/material";
+import { useState } from "react";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   return (
     <Box className="min-h-screen">
       {/* <TopBar /> */}
 
       <Box
         className="grid min-h-screen w-full"
-        sx={{ gridTemplateColumns: "150px minmax(0,1fr)" }}
+        sx={{
+          gridTemplateColumns: isSidebarCollapsed
+            ? "72px minmax(0,1fr)"
+            : "180px minmax(0,1fr)",
+          transition: "grid-template-columns 0.2s ease-in-out",
+        }}
       >
-        <Sidebar />
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggle={() => setIsSidebarCollapsed((value) => !value)}
+        />
 
         <Box className="w-full min-w-0 p-4">
           <Container maxWidth={false} disableGutters>
