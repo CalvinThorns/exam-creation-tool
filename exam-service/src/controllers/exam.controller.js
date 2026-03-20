@@ -1,26 +1,10 @@
-const fs = require("fs");
-const path = require("path");
 const { sendSuccess, sendError } = require("../utils/response");
+const {
+  ensureDraftFns,
+  resolveDraftAssetFilePath,
+} = require("./helpers/examControllerHelpers");
 
 function createExamController({ examService }) {
-  function ensureDraftFns(svc) {
-    if (!svc) {
-      const e = new Error("examService is not wired");
-      e.status = 500;
-      throw e;
-    }
-    if (typeof svc.generateDraft !== "function") {
-      const e = new Error("examService.generateDraft is not wired");
-      e.status = 500;
-      throw e;
-    }
-    if (typeof svc.regenerateDraftTopic !== "function") {
-      const e = new Error("examService.regenerateDraftTopic is not wired");
-      e.status = 500;
-      throw e;
-    }
-  }
-
   return {
     create: async (req, res, next) => {
       try {
@@ -117,11 +101,8 @@ function createExamController({ examService }) {
         const token = String(req.params.token || "");
         const filename = String(req.params.filename || "");
 
-        const root =
-          process.env.DRAFT_ASSETS_DIR || "/tmp/autogenex-draft-assets";
-        const filePath = path.join(root, token, filename);
-
-        if (!fs.existsSync(filePath)) {
+        const filePath = resolveDraftAssetFilePath(token, filename);
+        if (!filePath) {
           return sendError(res, { status: 404, message: "Asset not found" });
         }
 

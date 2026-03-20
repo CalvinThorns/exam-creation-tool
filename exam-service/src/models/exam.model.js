@@ -14,6 +14,7 @@ const examSchema = new mongoose.Schema(
       required: true,
     },
     points: { type: Number, required: true, min: 0 },
+    isDeleted: { type: Boolean, default: false },
     topics: {
       type: [topicSnapshotSchema],
       default: [],

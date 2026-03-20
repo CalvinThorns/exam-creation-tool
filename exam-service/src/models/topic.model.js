@@ -55,6 +55,7 @@ const topicSchema = new mongoose.Schema(
     topic: { type: String, required: true, trim: true }, // LaTeX
     description: { type: String, default: "", trim: true }, // LaTeX
     points: { type: Number, required: true, min: 0 },
+    isDeleted: { type: Boolean, default: false },
 
     description_img: { type: imageSchema, default: () => ({}) }, // stored in DB
     tasks: { type: [taskSchema], default: [] },
