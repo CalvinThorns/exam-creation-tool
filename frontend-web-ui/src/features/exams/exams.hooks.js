@@ -1,10 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { examsApi } from "../../api/exams.api";
 
 export function useExams(params) {
   return useQuery({
     queryKey: ["exams", params],
     queryFn: () => examsApi.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 

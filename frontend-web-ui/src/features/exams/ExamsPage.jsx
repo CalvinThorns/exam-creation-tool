@@ -5,9 +5,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Loader } from "../../components/ui/Loader";
 import { ErrorState } from "../../components/ui/ErrorState";
-import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
 import { useExams, useDeleteExam } from "./exams.hooks";
@@ -40,11 +38,16 @@ export function ExamsPage() {
     };
   }, [page, pageSize, sortModel, filterModel]);
 
-  const { data: examsResponse, isLoading, error } = useExams(queryParams);
+  const {
+    data: examsResponse,
+    isLoading,
+    isFetching,
+    error,
+  } = useExams(queryParams);
   const deleteM = useDeleteExam();
 
-  const items = examsResponse?.data ?? [];
-  const meta = examsResponse?.meta ?? {};
+  const items = useMemo(() => examsResponse?.data ?? [], [examsResponse]);
+  const meta = useMemo(() => examsResponse?.meta ?? {}, [examsResponse]);
   const rowCount = meta.total ?? 0;
 
   const rows = useMemo(
@@ -107,9 +110,6 @@ export function ExamsPage() {
     setConfirm({ open: false, id: null });
   };
 
-  const hasData =
-    rowCount > 0 || (items.length > 0 && meta.total === undefined);
-
   return (
     <Box
       sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
@@ -127,22 +127,19 @@ export function ExamsPage() {
         }
       />
 
-      {isLoading ? <Loader /> : null}
       {error ? <ErrorState message={error.userMessage} /> : null}
 
-      {!isLoading && !error && rowCount === 0 && !filterModel ? (
-        <EmptyState
-          title="No exams"
-          hint="Click Add New to generate and save an exam."
-        />
-      ) : null}
-
-      {!isLoading && !error && (hasData || filterModel) ? (
+      {!error ? (
         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
           <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
             <DataTable
               columnDefs={columns}
               rowData={rows}
+              loading={isLoading || isFetching}
+              noRowsTitle="No exams"
+              noRowsHint="Click Add New to generate and save an exam."
+              noFilteredRowsTitle="No matching exams"
+              noFilteredRowsHint="Try adjusting or clearing filters."
               actions={actions}
               actionsHeaderName="Actions"
               height="100%"

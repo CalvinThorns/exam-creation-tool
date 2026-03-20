@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
+  CircularProgress,
   IconButton,
   Stack,
   TablePagination,
+  Typography,
   Tooltip,
 } from "@mui/material";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
@@ -13,6 +15,27 @@ import "ag-grid-community/styles/ag-theme-quartz.css";
 
 // Register all community features so AG Grid v33 works out-of-the-box
 ModuleRegistry.registerModules([AllCommunityModule]);
+
+function GridLoadingOverlay() {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        height: "100%",
+      }}
+    >
+      <Stack direction="column" spacing={1.5} alignItems="center">
+        <CircularProgress size={28} />
+        <Typography variant="body2" color="text.secondary">
+          Loading...
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
 
 /**
  * Reusable data table built on ag-grid-react.
@@ -49,36 +72,96 @@ export function DataTable({
   onFilterChange,
   sortModel,
   filterModel,
+  loading = false,
+  noRowsTitle = "No rows",
+  noRowsHint,
+  noFilteredRowsTitle = "No matching results",
+  noFilteredRowsHint = "Try adjusting or clearing filters.",
   gridOptions,
   ...rest
 }) {
   const gridRef = useRef(null);
   const apiRef = useRef(null);
+  const isApplyingServerStateRef = useRef(false);
+  const [isFilterActive, setIsFilterActive] = useState(false);
+
+  const isEqual = useCallback((a, b) => {
+    if (a === b) return true;
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  }, []);
+
+  const GridNoRowsOverlay = useMemo(
+    () =>
+      function NoRowsOverlay() {
+        const title = isFilterActive ? noFilteredRowsTitle : noRowsTitle;
+        const hint = isFilterActive ? noFilteredRowsHint : noRowsHint;
+
+        return (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            <Stack direction="column" spacing={1} alignItems="center">
+              <Typography variant="subtitle2" color="text.primary">
+                {title}
+              </Typography>
+              {hint ? (
+                <Typography variant="body2" color="text.secondary">
+                  {hint}
+                </Typography>
+              ) : null}
+            </Stack>
+          </Box>
+        );
+      },
+    [
+      isFilterActive,
+      noFilteredRowsHint,
+      noFilteredRowsTitle,
+      noRowsHint,
+      noRowsTitle,
+    ],
+  );
 
   const applyServerState = useCallback(
     (api) => {
       if (!api) return;
-      if (sortModel != null && sortModel.length > 0) {
-        const state = sortModel.map((s, i) => ({
-          colId: s.colId,
-          sort: s.sort || "asc",
-          sortIndex: i,
-        }));
-        api.applyColumnState({ state });
-      }
-      if (filterModel != null && Object.keys(filterModel).length > 0) {
-        api.setFilterModel(filterModel);
+      isApplyingServerStateRef.current = true;
+      try {
+        if (sortModel != null) {
+          const state = (sortModel || []).map((s, i) => ({
+            colId: s.colId,
+            sort: s.sort || "asc",
+            sortIndex: i,
+          }));
+          api.applyColumnState({
+            state,
+            defaultState: { sort: null },
+            applyOrder: false,
+          });
+        }
+        if (filterModel != null) {
+          api.setFilterModel(filterModel);
+        }
+      } finally {
+        isApplyingServerStateRef.current = false;
       }
     },
-    [sortModel, filterModel]
+    [sortModel, filterModel],
   );
 
   const onGridReady = useCallback(
     (e) => {
       apiRef.current = e.api;
+      setIsFilterActive(e.api.isAnyFilterPresent());
       if (serverSide) applyServerState(e.api);
     },
-    [serverSide, applyServerState]
+    [serverSide, applyServerState],
   );
 
   useEffect(() => {
@@ -94,27 +177,39 @@ export function DataTable({
       flex: 1,
       minWidth: 120,
     }),
-    []
+    [],
   );
 
   const onSortChanged = useCallback(
     (e) => {
       if (!e.api || !onSortChange) return;
+      if (isApplyingServerStateRef.current) return;
+
       const model = e.api
         .getColumnState()
         .filter((c) => c.sort != null)
+        .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
         .map((c) => ({ colId: c.colId, sort: c.sort }));
+
+      if (isEqual(model, sortModel ?? [])) return;
       onSortChange(model);
     },
-    [onSortChange]
+    [isEqual, onSortChange, sortModel],
   );
 
   const onFilterChanged = useCallback(
     (e) => {
-      if (!e.api || !onFilterChange) return;
-      onFilterChange(e.api.getFilterModel());
+      if (!e.api) return;
+      setIsFilterActive(e.api.isAnyFilterPresent());
+
+      if (!onFilterChange) return;
+      if (isApplyingServerStateRef.current) return;
+
+      const nextFilterModel = e.api.getFilterModel();
+      if (isEqual(nextFilterModel, filterModel ?? null)) return;
+      onFilterChange(nextFilterModel);
     },
-    [onFilterChange]
+    [filterModel, isEqual, onFilterChange],
   );
 
   const columnsWithActions = useMemo(() => {
@@ -140,7 +235,7 @@ export function DataTable({
             >
               {actions
                 .filter((action) =>
-                  action.visible ? action.visible(row) : true
+                  action.visible ? action.visible(row) : true,
                 )
                 .map((action) => {
                   const disabled = action.disabled
@@ -188,7 +283,7 @@ export function DataTable({
     (_, newPage) => {
       onPageChange?.(newPage, pageSize);
     },
-    [onPageChange, pageSize]
+    [onPageChange, pageSize],
   );
 
   const handleRowsPerPageChange = useCallback(
@@ -196,8 +291,32 @@ export function DataTable({
       const newSize = Math.max(10, parseInt(e.target.value, 10) || 10);
       onPageChange?.(0, newSize);
     },
-    [onPageChange]
+    [onPageChange],
   );
+
+  useEffect(() => {
+    if (!serverSide) return;
+    setIsFilterActive(
+      (filterModel && Object.keys(filterModel).length > 0) || false,
+    );
+  }, [filterModel, serverSide]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+
+    if (loading) {
+      api.showLoadingOverlay();
+      return;
+    }
+
+    if ((rowData?.length ?? 0) === 0) {
+      api.showNoRowsOverlay();
+      return;
+    }
+
+    api.hideOverlay();
+  }, [loading, rowData, isFilterActive]);
 
   return (
     <Box
@@ -217,8 +336,8 @@ export function DataTable({
           height: serverSide
             ? undefined
             : typeof height === "number"
-            ? `${height}px`
-            : height,
+              ? `${height}px`
+              : height,
           ...(serverSide && { minHeight: 200 }),
         }}
       >
@@ -226,6 +345,9 @@ export function DataTable({
           ref={gridRef}
           columnDefs={columnsWithActions}
           rowData={rowData}
+          loading={loading}
+          loadingOverlayComponent={GridLoadingOverlay}
+          noRowsOverlayComponent={GridNoRowsOverlay}
           pagination={!serverSide}
           paginationPageSize={pageSize}
           theme="legacy"
@@ -233,9 +355,9 @@ export function DataTable({
           enableCellTextSelection
           defaultColDef={defaultColDef}
           animateRows
-          onGridReady={serverSide ? onGridReady : undefined}
+          onGridReady={onGridReady}
           onSortChanged={serverSide ? onSortChanged : undefined}
-          onFilterChanged={serverSide ? onFilterChanged : undefined}
+          onFilterChanged={onFilterChanged}
           {...gridOptions}
           {...rest}
         />
