@@ -13,12 +13,12 @@ import {
 } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
 import AddIcon from "@mui/icons-material/Add";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
 import { fileToBase64 } from "../../utils/fileToBase64";
 import { TaskEditor } from "./TaskEditor";
-import { resizableTextAreaSx } from "../../components/ui/fieldStyles";
+import { LatexEditor } from "../../components/ui/LatexEditor";
 
 export function TopicFormDialog({
   open,
@@ -72,6 +72,7 @@ export function TopicFormDialog({
 
   const { register, handleSubmit, formState, setValue, control, getValues } =
     form;
+  const descriptionValue = useWatch({ control, name: "description" }) || "";
 
   const setDescriptionImage = async (file) => {
     if (!file) {
@@ -145,17 +146,33 @@ export function TopicFormDialog({
 
           {/* Description */}
           <div className="mt-8">
-            <TextField
-              label="Description"
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 0.5, display: "block" }}
+            >
+              Description
+            </Typography>
+            <LatexEditor
+              value={descriptionValue}
+              onChange={(value) =>
+                setValue("description", value, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              height={300}
               placeholder="Description LaTeX"
-              fullWidth
-              multiline
-              minRows={5}
-              {...register("description")}
-              sx={{
-                ...resizableTextAreaSx,
-              }}
             />
+            {formState.errors.description?.message ? (
+              <Typography
+                variant="caption"
+                color="error.main"
+                sx={{ mt: 0.75, display: "block" }}
+              >
+                {formState.errors.description.message}
+              </Typography>
+            ) : null}
           </div>
 
           {/* Row 3: Image + Points */}
@@ -191,15 +208,8 @@ export function TopicFormDialog({
 
           {/* Task block */}
           <div className="mt-10 rounded-2xl border p-5">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center mb-4">
               <Typography className="font-semibold">Task</Typography>
-
-              {/* Plus button on right like mock */}
-              <IconButton
-                onClick={addTask}
-              >
-                <AddIcon />
-              </IconButton>
             </div>
 
             <TaskEditor
@@ -208,16 +218,18 @@ export function TopicFormDialog({
               setValue={setValue}
               errors={formState.errors}
             />
+
+            <div className="mt-4 flex justify-end">
+              <IconButton onClick={addTask}>
+                <AddIcon />
+              </IconButton>
+            </div>
           </div>
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ px: 10, py: 4, gap: 2 }}>
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={onClose}
-        >
+        <Button variant="contained" color="secondary" onClick={onClose}>
           Cancel
         </Button>
 

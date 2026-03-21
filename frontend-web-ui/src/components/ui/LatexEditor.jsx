@@ -49,10 +49,17 @@ export function LatexEditor({
   return (
     <Box
       className={className}
-      sx={{ borderRadius: 1, overflow: "hidden", border: "1px solid #d0d0d0" }}
+      sx={{
+        borderRadius: 1,
+        overflow: "auto",
+        border: "1px solid #d0d0d0",
+        resize: "vertical",
+        height,
+        minHeight: 120,
+      }}
     >
       <Editor
-        height={height}
+        height="100%"
         defaultLanguage="latex"
         value={value || ""}
         onChange={(v) => onChange?.(v ?? "")}
@@ -69,11 +76,11 @@ export function LatexEditor({
           tabSize: 2,
           formatOnPaste: false,
           formatOnType: false,
+          automaticLayout: true,
           padding: { top: 10, bottom: 10 },
         }}
         theme="vs"
       />
-      {/* Placeholder: Monaco does not support placeholder directly; optional to skip */}
     </Box>
   );
 }

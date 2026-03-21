@@ -1,4 +1,4 @@
-import { useFieldArray } from "react-hook-form";
+import { useFieldArray, useWatch } from "react-hook-form";
 import {
   Box,
   TextField,
@@ -9,10 +9,11 @@ import {
 } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
 import { fileToBase64 } from "../../utils/fileToBase64";
-import { resizableTextAreaSx } from "../../components/ui/fieldStyles";
+import { LatexEditor } from "../../components/ui/LatexEditor";
 
 export function TaskEditor({ control, register, setValue, errors }) {
   const { fields, remove } = useFieldArray({ control, name: "tasks" });
+  const watchedTasks = useWatch({ control, name: "tasks" }) || [];
 
   const setTaskImage = async (index, file) => {
     if (!file) {
@@ -40,28 +41,62 @@ export function TaskEditor({ control, register, setValue, errors }) {
             ) : null}
           </div>
 
-          <TextField
-            label="Task"
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mb: 0.5, display: "block" }}
+          >
+            Task
+          </Typography>
+          <LatexEditor
+            value={watchedTasks[idx]?.question || ""}
+            onChange={(value) =>
+              setValue(`tasks.${idx}.question`, value, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            height={300}
             placeholder="Task LaTeX"
-            fullWidth
-            multiline
-            minRows={4}
-            {...register(`tasks.${idx}.question`)}
-            error={!!errors?.tasks?.[idx]?.question}
-            helperText={errors?.tasks?.[idx]?.question?.message}
-            sx={resizableTextAreaSx}
           />
+          {errors?.tasks?.[idx]?.question?.message ? (
+            <Typography
+              variant="caption"
+              color="error.main"
+              sx={{ mt: 0.75, display: "block" }}
+            >
+              {errors.tasks[idx].question.message}
+            </Typography>
+          ) : null}
 
           <div className="mt-5">
-            <TextField
-              label="Solution"
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 0.5, display: "block" }}
+            >
+              Solution
+            </Typography>
+            <LatexEditor
+              value={watchedTasks[idx]?.solution || ""}
+              onChange={(value) =>
+                setValue(`tasks.${idx}.solution`, value, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              height={300}
               placeholder="Solution LaTeX"
-              fullWidth
-              multiline
-              minRows={2}
-              {...register(`tasks.${idx}.solution`)}
-            sx={resizableTextAreaSx}
             />
+            {errors?.tasks?.[idx]?.solution?.message ? (
+              <Typography
+                variant="caption"
+                color="error.main"
+                sx={{ mt: 0.75, display: "block" }}
+              >
+                {errors.tasks[idx].solution.message}
+              </Typography>
+            ) : null}
           </div>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
