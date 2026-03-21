@@ -1,4 +1,8 @@
-const { Topic } = require("../../models/topic.model");
+const {
+  Topic,
+  SOLUTION_SPACE_OPTIONS,
+  DEFAULT_SOLUTION_SPACE,
+} = require("../../models/topic.model");
 
 function snapshotFromTopicDoc(doc, numOrZero) {
   return {
@@ -23,6 +27,9 @@ function snapshotFromTopicDoc(doc, numOrZero) {
             filename: "",
           },
           solution: t.solution || "",
+          solutionSpace: SOLUTION_SPACE_OPTIONS.includes(t.solutionSpace)
+            ? t.solutionSpace
+            : DEFAULT_SOLUTION_SPACE,
           isRelatedToTopic:
             typeof t.isRelatedToTopic === "boolean" ? t.isRelatedToTopic : true,
         }))
@@ -40,6 +47,9 @@ function topicSignature(topic, numOrZero) {
           question: t?.question || "",
           points: numOrZero(t?.points),
           solution: t?.solution || "",
+          solutionSpace: SOLUTION_SPACE_OPTIONS.includes(t?.solutionSpace)
+            ? t.solutionSpace
+            : DEFAULT_SOLUTION_SPACE,
           isRelatedToTopic:
             typeof t?.isRelatedToTopic === "boolean"
               ? t.isRelatedToTopic
@@ -122,6 +132,14 @@ function validateDraftTopicsShape(topics, { badRequest, isValidObjectId }) {
       for (const task of t.tasks) {
         if (task.id && !isValidObjectId(task.id))
           throw badRequest("Each task id must be a valid id");
+        if (
+          task.solutionSpace !== undefined &&
+          !SOLUTION_SPACE_OPTIONS.includes(String(task.solutionSpace).trim())
+        ) {
+          throw badRequest(
+            `task.solutionSpace must be one of: ${SOLUTION_SPACE_OPTIONS.join(", ")}`,
+          );
+        }
       }
     }
     if (t.points !== undefined) {

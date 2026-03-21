@@ -3,8 +3,43 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const SOLUTION_SPACE_TO_PAGES = {
+  "1/4 Page": 0.25,
+  "1/2 Page": 0.5,
+  "3/4 Page": 0.75,
+  "1 Page": 1,
+  "2 Pages": 2,
+};
+const DEFAULT_SOLUTION_SPACE = "1 Page";
+
 function sanitizeTexInput(s) {
   return String(s || "");
+}
+
+function normalizeSolutionSpace(space) {
+  const normalized = String(space || "").trim();
+  if (
+    Object.prototype.hasOwnProperty.call(SOLUTION_SPACE_TO_PAGES, normalized)
+  ) {
+    return normalized;
+  }
+  return DEFAULT_SOLUTION_SPACE;
+}
+
+function buildStudentAnswerSpaceLatex(space) {
+  const normalized = normalizeSolutionSpace(space);
+  const pages = SOLUTION_SPACE_TO_PAGES[normalized];
+  if (pages === 1) {
+    return String.raw`\vspace*{\fill}`;
+  }
+
+  if (pages === 2) {
+    return String.raw`\vspace*{\fill}
+\newpage
+\null`;
+  }
+
+  return `\\vspace*{${pages}\\textheight}`;
 }
 
 function stripLeadingSubsection(s) {
@@ -166,6 +201,7 @@ function injectMarksTableAuto(coverPageLatex, topics) {
 function buildLatexFromDraft({ coverPageLatex, topics, version }) {
   const v = String(version || "TEACHER").toUpperCase();
   const showSolutions = v !== "STUDENT";
+  const isStudentVersion = v === "STUDENT";
 
   const parts = [];
   parts.push(buildDocumentPreamble({ showSolutions }));
@@ -189,6 +225,9 @@ function buildLatexFromDraft({ coverPageLatex, topics, version }) {
 
   for (let i = 0; i < (topics || []).length; i++) {
     const t = topics[i] || {};
+    if (i > 0) {
+      parts.push(String.raw`\newpage`);
+    }
     const topicStr = String(t.topic || "").trim();
     const topicHeader = topicStr.startsWith("\\section")
       ? sanitizeTexInput(topicStr)
@@ -211,6 +250,10 @@ function buildLatexFromDraft({ coverPageLatex, topics, version }) {
       const task = tasks[j] || {};
       const pts = num(task.points);
 
+      if (isStudentVersion) {
+        parts.push(String.raw`\newpage`);
+      }
+
       parts.push(String.raw`\subsection{${pts}P}`);
 
       const questionBody = stripLeadingSubsection(task.question || "");
@@ -229,6 +272,10 @@ function buildLatexFromDraft({ coverPageLatex, topics, version }) {
         parts.push(String.raw`\begin{solution}
 ${sanitizeTexInput(solBody)}
 \end{solution}`);
+      }
+
+      if (isStudentVersion) {
+        parts.push(buildStudentAnswerSpaceLatex(task.solutionSpace));
       }
     }
   }
