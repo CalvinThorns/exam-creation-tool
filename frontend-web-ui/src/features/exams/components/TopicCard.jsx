@@ -11,6 +11,8 @@ import {
   useTheme,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { LatexEditor } from "../../../components/ui/LatexEditor";
 
 export function TopicCard({
@@ -18,6 +20,8 @@ export function TopicCard({
   topicIndex,
   onTopicField,
   onTaskField,
+  onAddTask,
+  onRemoveTask,
   onRegenerate,
   regenPending,
 }) {
@@ -71,10 +75,12 @@ export function TopicCard({
             mb: 2,
           }}
         >
-          <LatexEditor
+          <TextField
+            label="Topic"
             value={topic.topic || ""}
-            onChange={(value) => onTopicField(topicIndex, "topic", value)}
-            height={200}
+            onChange={(e) => onTopicField(topicIndex, "topic", e.target.value)}
+            fullWidth
+            size="small"
           />
           <TextField
             label="Points"
@@ -88,29 +94,43 @@ export function TopicCard({
           />
         </Box>
 
-        <TextField
-          label="Description"
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mb: 0.5 }}
+        >
+          Description
+        </Typography>
+        <LatexEditor
           value={topic.description || ""}
-          onChange={(e) =>
-            onTopicField(topicIndex, "description", e.target.value)
-          }
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          sx={{ mb: 2 }}
+          onChange={(value) => onTopicField(topicIndex, "description", value)}
+          height={140}
         />
 
         {(topic.tasks || []).length > 0 && (
           <Box>
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              color="text.secondary"
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
               sx={{ mb: 1 }}
             >
-              Tasks ({topic.tasks.length})
-            </Typography>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                color="text.secondary"
+              >
+                Tasks ({topic.tasks.length})
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => onAddTask(topicIndex)}
+              >
+                Add task
+              </Button>
+            </Stack>
             <Stack spacing={1.5}>
               {(topic.tasks || []).map((task, taskIndex) => (
                 <Card
@@ -136,21 +156,32 @@ export function TopicCard({
                       >
                         Task {taskIndex + 1}
                       </Typography>
-                      <TextField
-                        label="Points"
-                        type="number"
-                        value={task.points ?? 0}
-                        onChange={(e) =>
-                          onTaskField(
-                            topicIndex,
-                            taskIndex,
-                            "points",
-                            Number(e.target.value || 0),
-                          )
-                        }
-                        sx={{ width: 100 }}
-                        size="small"
-                      />
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <TextField
+                          label="Points"
+                          type="number"
+                          value={task.points ?? 0}
+                          onChange={(e) =>
+                            onTaskField(
+                              topicIndex,
+                              taskIndex,
+                              "points",
+                              Number(e.target.value || 0),
+                            )
+                          }
+                          sx={{ width: 100 }}
+                          size="small"
+                        />
+                        <Button
+                          variant="text"
+                          color="error"
+                          size="small"
+                          startIcon={<DeleteOutlineIcon />}
+                          onClick={() => onRemoveTask(topicIndex, taskIndex)}
+                        >
+                          Remove
+                        </Button>
+                      </Stack>
                     </Stack>
 
                     <Typography
@@ -185,6 +216,32 @@ export function TopicCard({
                   </CardContent>
                 </Card>
               ))}
+            </Stack>
+          </Box>
+        )}
+
+        {(topic.tasks || []).length === 0 && (
+          <Box>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                color="text.secondary"
+              >
+                Tasks (0)
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => onAddTask(topicIndex)}
+              >
+                Add task
+              </Button>
             </Stack>
           </Box>
         )}

@@ -22,6 +22,14 @@ export function useCreateExam() {
   });
 }
 
+export function useUpdateExam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }) => examsApi.update(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["exams"] }),
+  });
+}
+
 export function useDeleteExam() {
   const qc = useQueryClient();
   return useMutation({

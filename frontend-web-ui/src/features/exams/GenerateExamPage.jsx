@@ -12,6 +12,7 @@ import {
   Divider,
   Stack,
   Chip,
+  IconButton,
   useTheme,
   alpha,
   CircularProgress,
@@ -25,6 +26,8 @@ import BuildIcon from "@mui/icons-material/Build";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { PageHeader } from "../../components/ui/PageHeader";
 import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
@@ -37,11 +40,22 @@ import {
   useExam,
   useGenerateDraft,
   useRegenerateDraftTopic,
+  useUpdateExam,
 } from "./exams.hooks";
 import { examsApi } from "../../api/exams.api";
 
 function sumPoints(topics) {
-  return (topics || []).reduce((acc, t) => acc + Number(t.points || 0), 0);
+  return (topics || []).reduce((acc, topic) => {
+    const tasks = topic?.tasks || [];
+    if (tasks.length > 0) {
+      const taskPoints = tasks.reduce(
+        (taskAcc, task) => taskAcc + Number(task?.points || 0),
+        0,
+      );
+      return acc + taskPoints;
+    }
+    return acc + Number(topic?.points || 0);
+  }, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +139,10 @@ export function GenerateExamPage() {
   const isEditMode = Boolean(examId);
 
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
-  const courses = coursesData?.data || coursesData || [];
+  const courses = useMemo(
+    () => coursesData?.data || coursesData || [],
+    [coursesData],
+  );
 
   const [courseId, setCourseId] = useState("");
   const [targetPoints, setTargetPoints] = useState(0);
@@ -135,6 +152,7 @@ export function GenerateExamPage() {
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledVersion, setCompiledVersion] = useState(null);
   const [draft, setDraft] = useState(null);
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
 
   // Fetch existing exam when in edit mode
   const { data: examData, isLoading: examLoading } = useExam(examId, {
@@ -186,11 +204,46 @@ export function GenerateExamPage() {
   const generateM = useGenerateDraft();
   const regenM = useRegenerateDraftTopic();
   const saveM = useCreateExam();
+  const updateM = useUpdateExam();
+
+  const courseLabel = useMemo(() => {
+    const courseFromDraft = draft?.course;
+    if (courseFromDraft?.title || courseFromDraft?.shortName) {
+      return `${courseFromDraft.title || ""}${courseFromDraft.shortName ? ` (${courseFromDraft.shortName})` : ""}`;
+    }
+
+    const matchedCourse = courses.find((c) => c.id === courseId);
+    if (matchedCourse) {
+      return `${matchedCourse.title} (${matchedCourse.shortName})`;
+    }
+
+    if (examData) {
+      const exam = examData.data ?? examData;
+      const course = exam.courseId;
+      if (typeof course === "object" && course) {
+        return `${course.title || ""}${course.shortName ? ` (${course.shortName})` : ""}`;
+      }
+    }
+
+    return courseId || "";
+  }, [draft, courses, courseId, examData]);
 
   const handleCourseChange = (e) => {
     setCourseId(e.target.value);
     setSelectedTopics([]);
     setDraft(null);
+  };
+
+  const handleTargetPointsChange = (e) => {
+    const nextTarget = Number(e.target.value || 0);
+    setTargetPoints(nextTarget);
+
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = structuredClone(prev);
+      next.targetPoints = nextTarget;
+      return recalcDraftTotals(next);
+    });
   };
 
   // version: "STUDENT" | "TEACHER"
@@ -219,6 +272,19 @@ export function GenerateExamPage() {
     const total = sumPoints(nextDraft.topics);
     nextDraft.totalPoints = total;
     nextDraft.diff = Number(nextDraft.targetPoints || 0) - total;
+    return nextDraft;
+  };
+
+  const syncTopicPointsFromTasks = (nextDraft, topicIndex) => {
+    const tasks = nextDraft.topics?.[topicIndex]?.tasks || [];
+    if (tasks.length === 0) {
+      return nextDraft;
+    }
+
+    nextDraft.topics[topicIndex].points = tasks.reduce(
+      (acc, task) => acc + Number(task?.points || 0),
+      0,
+    );
     return nextDraft;
   };
 
@@ -251,7 +317,34 @@ export function GenerateExamPage() {
       if (!prev) return prev;
       const next = structuredClone(prev);
       next.topics[topicIndex].tasks[taskIndex][field] = value;
-      return next;
+      syncTopicPointsFromTasks(next, topicIndex);
+      return recalcDraftTotals(next);
+    });
+  };
+
+  const addTask = (topicIndex) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = structuredClone(prev);
+      next.topics[topicIndex].tasks = next.topics[topicIndex].tasks || [];
+      next.topics[topicIndex].tasks.push({
+        question: "",
+        solution: "",
+        points: 0,
+      });
+      syncTopicPointsFromTasks(next, topicIndex);
+      return recalcDraftTotals(next);
+    });
+  };
+
+  const removeTask = (topicIndex, taskIndex) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = structuredClone(prev);
+      next.topics[topicIndex].tasks = next.topics[topicIndex].tasks || [];
+      next.topics[topicIndex].tasks.splice(taskIndex, 1);
+      syncTopicPointsFromTasks(next, topicIndex);
+      return recalcDraftTotals(next);
     });
   };
 
@@ -275,11 +368,18 @@ export function GenerateExamPage() {
 
   const saveExam = async () => {
     if (!draft) return;
-    await saveM.mutateAsync({
+    const body = {
       courseId: draft.course?.id || courseId,
       targetPoints: Number(draft.targetPoints),
       topics: draft.topics,
-    });
+    };
+
+    if (isEditMode) {
+      await updateM.mutateAsync({ id: examId, body });
+      return;
+    }
+
+    await saveM.mutateAsync(body);
   };
 
   const diffColor = !draft
@@ -296,14 +396,12 @@ export function GenerateExamPage() {
         height: "95vh",
         display: "flex",
         flexDirection: "column",
-        gap: 1,
+        pb: 1,
         overflow: "hidden",
       }}
     >
       {/* ── Page header ── */}
-      <Box sx={{ flexShrink: 0 }}>
-        <PageHeader title={isEditMode ? "Edit Exam" : "Generate Exam"} />
-      </Box>
+      <PageHeader title={isEditMode ? "Edit Exam" : "Generate Exam"} />
 
       {/* Loading skeleton while fetching exam in edit mode */}
       {isEditMode && examLoading ? (
@@ -324,15 +422,114 @@ export function GenerateExamPage() {
         </Box>
       ) : (
         <>
-          {/* ── Controls panel (generate mode only) ── */}
-          {!isEditMode && (
-            <Paper
-              sx={{
-                p: 2.5,
-                flexShrink: 0,
-                border: `1px solid ${theme.palette.divider}`,
-              }}
+          {/* ── Controls panel ── */}
+          <Paper
+            sx={{
+              px: 2.5,
+              py: 1,
+              flexShrink: 0,
+              border: `1px solid ${theme.palette.divider}`,
+              mb: 1,
+            }}
+          >
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
             >
+              <Stack direction="row" spacing={2} alignItems="center">
+                {isControlsCollapsed &&
+                  (draft ? (
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Typography variant="body2" color="text.secondary">
+                        Target:{" "}
+                        <Box
+                          component="span"
+                          fontWeight={700}
+                          color="text.primary"
+                        >
+                          {draft.targetPoints}
+                        </Box>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Total:{" "}
+                        <Box
+                          component="span"
+                          fontWeight={700}
+                          color="text.primary"
+                        >
+                          {draft.totalPoints}
+                        </Box>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Diff:{" "}
+                        <Box
+                          component="span"
+                          fontWeight={700}
+                          color={diffColor}
+                        >
+                          {draft.diff > 0 ? `+${draft.diff}` : draft.diff}
+                        </Box>
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.disabled">
+                      Select a course, choose topics and click Generate
+                    </Typography>
+                  ))}
+              </Stack>
+
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                {isControlsCollapsed && (
+                  <>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="contained"
+                        startIcon={<RefreshIcon />}
+                        onClick={generateDraft}
+                        disabled={
+                          !courseId ||
+                          selectedTopics.length === 0 ||
+                          Number(targetPoints) <= 0 ||
+                          generateM.isPending
+                        }
+                      >
+                        Generate
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="secondary"
+                        startIcon={<SaveIcon />}
+                        onClick={saveExam}
+                        disabled={
+                          !draft || saveM.isPending || updateM.isPending
+                        }
+                      >
+                        Save
+                      </Button>
+                    </Stack>
+                  </>
+                )}
+
+                <IconButton
+                  size="small"
+                  onClick={() => setIsControlsCollapsed((prev) => !prev)}
+                  aria-label={
+                    isControlsCollapsed
+                      ? "Expand controls"
+                      : "Collapse controls"
+                  }
+                >
+                  {isControlsCollapsed ? (
+                    <ExpandMoreIcon />
+                  ) : (
+                    <ExpandLessIcon />
+                  )}
+                </IconButton>
+              </Stack>
+            </Stack>
+
+            {!isControlsCollapsed && (
               <Box
                 sx={{
                   display: "grid",
@@ -347,6 +544,7 @@ export function GenerateExamPage() {
                   onChange={handleCourseChange}
                   fullWidth
                   size="small"
+                  disabled={isEditMode}
                 >
                   <MenuItem value="">Select course</MenuItem>
                   {courses.map((c) => (
@@ -354,13 +552,18 @@ export function GenerateExamPage() {
                       {c.title} ({c.shortName})
                     </MenuItem>
                   ))}
+                  {isEditMode &&
+                    courseId &&
+                    !courses.some((c) => c.id === courseId) && (
+                      <MenuItem value={courseId}>{courseLabel}</MenuItem>
+                    )}
                 </TextField>
 
                 <TextField
                   label="Total points"
                   type="number"
                   value={targetPoints}
-                  onChange={(e) => setTargetPoints(Number(e.target.value || 0))}
+                  onChange={handleTargetPointsChange}
                   fullWidth
                   size="small"
                 />
@@ -407,76 +610,84 @@ export function GenerateExamPage() {
                   )}
                 />
               </Box>
+            )}
 
-              <Divider sx={{ my: 2 }} />
+            {!isControlsCollapsed && (
+              <>
+                <Divider sx={{ my: 2 }} />
 
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                {draft ? (
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Typography variant="body2" color="text.secondary">
-                      Target:{" "}
-                      <Box
-                        component="span"
-                        fontWeight={700}
-                        color="text.primary"
-                      >
-                        {draft.targetPoints}
-                      </Box>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  {draft ? (
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Typography variant="body2" color="text.secondary">
+                        Target:{" "}
+                        <Box
+                          component="span"
+                          fontWeight={700}
+                          color="text.primary"
+                        >
+                          {draft.targetPoints}
+                        </Box>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Total:{" "}
+                        <Box
+                          component="span"
+                          fontWeight={700}
+                          color="text.primary"
+                        >
+                          {draft.totalPoints}
+                        </Box>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Diff:{" "}
+                        <Box
+                          component="span"
+                          fontWeight={700}
+                          color={diffColor}
+                        >
+                          {draft.diff > 0 ? `+${draft.diff}` : draft.diff}
+                        </Box>
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.disabled">
+                      Select a course, choose topics and click Generate
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total:{" "}
-                      <Box
-                        component="span"
-                        fontWeight={700}
-                        color="text.primary"
-                      >
-                        {draft.totalPoints}
-                      </Box>
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Diff:{" "}
-                      <Box component="span" fontWeight={700} color={diffColor}>
-                        {draft.diff > 0 ? `+${draft.diff}` : draft.diff}
-                      </Box>
-                    </Typography>
+                  )}
+
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="contained"
+                      startIcon={<RefreshIcon />}
+                      onClick={generateDraft}
+                      disabled={
+                        !courseId ||
+                        selectedTopics.length === 0 ||
+                        Number(targetPoints) <= 0 ||
+                        generateM.isPending
+                      }
+                    >
+                      Generate
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={<SaveIcon />}
+                      onClick={saveExam}
+                      disabled={!draft || saveM.isPending || updateM.isPending}
+                    >
+                      Save
+                    </Button>
                   </Stack>
-                ) : (
-                  <Typography variant="body2" color="text.disabled">
-                    Select a course, choose topics and click Generate
-                  </Typography>
-                )}
-
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="contained"
-                    startIcon={<RefreshIcon />}
-                    onClick={generateDraft}
-                    disabled={
-                      !courseId ||
-                      selectedTopics.length === 0 ||
-                      Number(targetPoints) <= 0 ||
-                      generateM.isPending
-                    }
-                  >
-                    Generate
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    startIcon={<SaveIcon />}
-                    onClick={saveExam}
-                    disabled={!draft || saveM.isPending}
-                  >
-                    Save
-                  </Button>
                 </Stack>
-              </Stack>
-            </Paper>
-          )}
+              </>
+            )}
+          </Paper>
 
           {/* ── Two-column panels row ── */}
           <Box
@@ -509,7 +720,7 @@ export function GenerateExamPage() {
               >
                 <Typography variant="h6">
                   Exam{" "}
-                  {draft && !isEditMode && (
+                  {draft && (
                     <Typography
                       component="span"
                       variant="body2"
@@ -579,6 +790,8 @@ export function GenerateExamPage() {
                         topicIndex={i}
                         onTopicField={updateTopicField}
                         onTaskField={updateTaskField}
+                        onAddTask={addTask}
+                        onRemoveTask={removeTask}
                         onRegenerate={regenerateTopic}
                         regenPending={regenM.isPending}
                       />
