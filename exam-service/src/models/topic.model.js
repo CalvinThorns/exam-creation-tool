@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+const SOLUTION_SPACE_OPTIONS = [
+  "1/4 Page",
+  "1/2 Page",
+  "3/4 Page",
+  "1 Page",
+  "2 Pages",
+];
+const DEFAULT_SOLUTION_SPACE = "1 Page";
+
 const imageSchema = new mongoose.Schema(
   {
     data: { type: Buffer, default: null },
@@ -17,6 +26,12 @@ const taskSchema = new mongoose.Schema(
     points: { type: Number, required: true, min: 0 },
     question_img: { type: imageSchema, default: () => ({}) }, // stored in DB
     solution: { type: String, default: "", trim: true }, // LaTeX
+    solutionSpace: {
+      type: String,
+      enum: SOLUTION_SPACE_OPTIONS,
+      default: DEFAULT_SOLUTION_SPACE,
+      trim: true,
+    },
     isRelatedToTopic: { type: Boolean, default: true },
   },
   {
@@ -87,4 +102,9 @@ const topicSchema = new mongoose.Schema(
 
 const Topic = mongoose.model("Topic", topicSchema);
 
-module.exports = { Topic, topicSchema };
+module.exports = {
+  Topic,
+  topicSchema,
+  SOLUTION_SPACE_OPTIONS,
+  DEFAULT_SOLUTION_SPACE,
+};

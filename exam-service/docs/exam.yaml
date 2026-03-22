@@ -290,6 +290,24 @@ components:
                   properties:
                     id:
                       type: string
+                    question:
+                      type: string
+                    points:
+                      type: number
+                      minimum: 0
+                    solution:
+                      type: string
+                    solutionSpace:
+                      type: string
+                      enum:
+                        [
+                          "1/4 Page",
+                          "1/2 Page",
+                          "3/4 Page",
+                          "1 Page",
+                          "2 Pages",
+                        ]
+                      default: "1 Page"
             required:
               - courseId
               - topic
@@ -345,6 +363,19 @@ components:
                     points:
                       type: number
                       minimum: 0
+                    solution:
+                      type: string
+                    solutionSpace:
+                      type: string
+                      enum:
+                        [
+                          "1/4 Page",
+                          "1/2 Page",
+                          "3/4 Page",
+                          "1 Page",
+                          "2 Pages",
+                        ]
+                      default: "1 Page"
           default: []
       example:
         courseId: "62f0c1a5bde8f72f9e4d3a10"

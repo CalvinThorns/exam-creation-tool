@@ -21,12 +21,12 @@ paths:
       tags: [Courses]
       operationId: getCourses
       responses:
-        '200':
+        "200":
           description: A paginated list of all courses
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedCoursesDto'
+                $ref: "#/components/schemas/PaginatedCoursesDto"
     post:
       summary: Create a new course
       tags: [Courses]
@@ -36,14 +36,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateCourseDto'
+              $ref: "#/components/schemas/CreateCourseDto"
       responses:
-        '201':
+        "201":
           description: Course successfully created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseDto'
+                $ref: "#/components/schemas/CourseDto"
 
   /api/courses/{id}:
     get:
@@ -58,13 +58,13 @@ paths:
             type: string
           description: The unique course ID
       responses:
-        '200':
+        "200":
           description: Course details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseDto'
-        '404':
+                $ref: "#/components/schemas/CourseDto"
+        "404":
           description: Course not found
     put:
       summary: Update a course by ID
@@ -81,14 +81,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateCourseDto'
+              $ref: "#/components/schemas/UpdateCourseDto"
       responses:
-        '200':
+        "200":
           description: Course successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseDto'
+                $ref: "#/components/schemas/CourseDto"
     delete:
       summary: Delete a course by ID
       tags: [Courses]
@@ -100,7 +100,7 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        "204":
           description: Course successfully deleted
 
   # ==========================================
@@ -111,12 +111,12 @@ paths:
       tags: [Exams]
       operationId: getExams
       responses:
-        '200':
+        "200":
           description: A paginated list of all exams
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedExamsDto'
+                $ref: "#/components/schemas/PaginatedExamsDto"
     post:
       summary: Create a new exam
       tags: [Exams]
@@ -126,14 +126,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateExamDto'
+              $ref: "#/components/schemas/CreateExamDto"
       responses:
-        '201':
+        "201":
           description: Exam successfully created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExamDto'
+                $ref: "#/components/schemas/ExamDto"
 
   /api/exams/{id}:
     get:
@@ -147,13 +147,13 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Exam details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExamDto'
-        '404':
+                $ref: "#/components/schemas/ExamDto"
+        "404":
           description: Exam not found
     put:
       summary: Update an exam by ID
@@ -170,14 +170,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateExamDto'
+              $ref: "#/components/schemas/UpdateExamDto"
       responses:
-        '200':
+        "200":
           description: Exam successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExamDto'
+                $ref: "#/components/schemas/ExamDto"
     delete:
       summary: Delete an exam by ID
       tags: [Exams]
@@ -189,7 +189,7 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        "204":
           description: Exam successfully deleted
 
   /api/exams/generate:
@@ -203,9 +203,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerateExamRequestDto'
+              $ref: "#/components/schemas/GenerateExamRequestDto"
       responses:
-        '200':
+        "200":
           description: Exam generated successfully
 
   # ==========================================
@@ -222,12 +222,12 @@ paths:
             type: string
           description: Filter topics by a specific course ID
       responses:
-        '200':
+        "200":
           description: A paginated list of all topics
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedTopicsDto'
+                $ref: "#/components/schemas/PaginatedTopicsDto"
     post:
       summary: Create a new topic
       tags: [Topics]
@@ -237,14 +237,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateTopicDto'
+              $ref: "#/components/schemas/CreateTopicDto"
       responses:
-        '201':
+        "201":
           description: Topic successfully created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopicDto'
+                $ref: "#/components/schemas/TopicDto"
 
   /api/topics/{id}:
     get:
@@ -258,13 +258,13 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Topic details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopicDto'
-        '404':
+                $ref: "#/components/schemas/TopicDto"
+        "404":
           description: Topic not found
     put:
       summary: Update a topic by ID
@@ -281,14 +281,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateTopicDto'
+              $ref: "#/components/schemas/UpdateTopicDto"
       responses:
-        '200':
+        "200":
           description: Topic successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopicDto'
+                $ref: "#/components/schemas/TopicDto"
     delete:
       summary: Delete a topic by ID
       tags: [Topics]
@@ -300,7 +300,7 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        "204":
           description: Topic successfully deleted
 
   /api/topics/{id}/images:
@@ -324,7 +324,7 @@ paths:
                   type: string
                   format: binary
       responses:
-        '200':
+        "200":
           description: Image uploaded successfully
 
 # ==========================================
@@ -352,9 +352,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/CourseDto'
+            $ref: "#/components/schemas/CourseDto"
         meta:
-          $ref: '#/components/schemas/MetaDto'
+          $ref: "#/components/schemas/MetaDto"
 
     PaginatedExamsDto:
       type: object
@@ -362,9 +362,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/ExamDto'
+            $ref: "#/components/schemas/ExamDto"
         meta:
-          $ref: '#/components/schemas/MetaDto'
+          $ref: "#/components/schemas/MetaDto"
 
     PaginatedTopicsDto:
       type: object
@@ -372,9 +372,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/TopicDto'
+            $ref: "#/components/schemas/TopicDto"
         meta:
-          $ref: '#/components/schemas/MetaDto'
+          $ref: "#/components/schemas/MetaDto"
 
     # ----------------------------------------
     # --- Course DTOs
@@ -443,7 +443,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-            
+
     CreateExamDto:
       type: object
       required:
@@ -502,9 +502,13 @@ components:
         points:
           type: number
         question_img:
-          $ref: '#/components/schemas/ImageMetaDto'
+          $ref: "#/components/schemas/ImageMetaDto"
         solution:
           type: string
+        solutionSpace:
+          type: string
+          enum: ["1/4 Page", "1/2 Page", "3/4 Page", "1 Page", "2 Pages"]
+          default: "1 Page"
         isRelatedToTopic:
           type: boolean
 
@@ -521,6 +525,10 @@ components:
           minimum: 0
         solution:
           type: string
+        solutionSpace:
+          type: string
+          enum: ["1/4 Page", "1/2 Page", "3/4 Page", "1 Page", "2 Pages"]
+          default: "1 Page"
         isRelatedToTopic:
           type: boolean
           default: true
@@ -535,6 +543,9 @@ components:
           minimum: 0
         solution:
           type: string
+        solutionSpace:
+          type: string
+          enum: ["1/4 Page", "1/2 Page", "3/4 Page", "1 Page", "2 Pages"]
         isRelatedToTopic:
           type: boolean
 
@@ -552,11 +563,11 @@ components:
         points:
           type: number
         description_img:
-          $ref: '#/components/schemas/ImageMetaDto'
+          $ref: "#/components/schemas/ImageMetaDto"
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/TaskDto'
+            $ref: "#/components/schemas/TaskDto"
         createdAt:
           type: string
           format: date-time
@@ -583,7 +594,7 @@ components:
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/CreateTaskDto'
+            $ref: "#/components/schemas/CreateTaskDto"
 
     UpdateTopicDto:
       type: object
@@ -598,4 +609,4 @@ components:
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/UpdateTaskDto'
+            $ref: "#/components/schemas/UpdateTaskDto"
