@@ -1,10 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { examsApi } from "../../api/exams.api";
 
 export function useExams(params) {
   return useQuery({
     queryKey: ["exams", params],
     queryFn: () => examsApi.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -12,6 +18,14 @@ export function useCreateExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: examsApi.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["exams"] }),
+  });
+}
+
+export function useUpdateExam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }) => examsApi.update(id, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["exams"] }),
   });
 }

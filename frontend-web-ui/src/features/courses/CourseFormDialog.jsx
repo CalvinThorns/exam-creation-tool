@@ -7,11 +7,12 @@ import {
   Button,
   TextField,
   Box,
+  Typography,
 } from "@mui/material";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { courseSchema } from "../../utils/validators";
-import { resizableTextAreaSx } from "../../components/ui/fieldStyles";
+import { LatexEditor } from "../../components/ui/LatexEditor";
 
 export function CourseFormDialog({
   open,
@@ -34,7 +35,8 @@ export function CourseFormDialog({
     });
   }, [open, initialValues, form]);
 
-  const { register, handleSubmit, formState } = form;
+  const { register, handleSubmit, formState, setValue, control } = form;
+  const coverPageValue = useWatch({ control, name: "coverPage" }) || "";
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
@@ -62,16 +64,35 @@ export function CourseFormDialog({
           </Box>
 
           {/* Row 2 */}
-          <TextField
-            label="Cover page LaTeX"
-            fullWidth
-            multiline
-            minRows={5}
-            {...register("coverPage")}
-            error={!!formState.errors.coverPage}
-            helperText={formState.errors.coverPage?.message}
-            sx={resizableTextAreaSx}
-          />
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 0.5, display: "block" }}
+            >
+              Cover page LaTeX
+            </Typography>
+            <LatexEditor
+              value={coverPageValue}
+              onChange={(value) =>
+                setValue("coverPage", value, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              height={480}
+              placeholder="Cover page LaTeX"
+            />
+            {formState.errors.coverPage?.message ? (
+              <Typography
+                variant="caption"
+                color="error.main"
+                sx={{ mt: 0.75, display: "block" }}
+              >
+                {formState.errors.coverPage.message}
+              </Typography>
+            ) : null}
+          </Box>
         </Box>
       </DialogContent>
 

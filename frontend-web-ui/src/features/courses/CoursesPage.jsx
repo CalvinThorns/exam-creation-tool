@@ -4,8 +4,6 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Loader } from "../../components/ui/Loader";
-import { EmptyState } from "../../components/ui/EmptyState";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
@@ -91,24 +89,21 @@ export function CoursesPage() {
         }
       />
 
-      {isLoading ? <Loader /> : null}
       {error ? (
         <ErrorState message={error.message || "Failed to load courses"} />
       ) : null}
 
-      {!isLoading && !error && rows.length === 0 ? (
-        <EmptyState
-          title="No courses"
-          hint="Click Add New to create your first course."
-        />
-      ) : null}
-
-      {!isLoading && !error && rows.length > 0 ? (
+      {!error ? (
         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
           <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
             <DataTable
               columnDefs={columns}
               rowData={rows}
+              loading={isLoading}
+              noRowsTitle="No courses"
+              noRowsHint="Click Add New to create your first course."
+              noFilteredRowsTitle="No matching courses"
+              noFilteredRowsHint="Try adjusting or clearing filters."
               actions={actions}
               actionsHeaderName="Actions"
               pageSize={10}

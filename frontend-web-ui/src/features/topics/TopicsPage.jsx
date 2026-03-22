@@ -4,9 +4,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Loader } from "../../components/ui/Loader";
 import { ErrorState } from "../../components/ui/ErrorState";
-import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
 import { TopicFormDialog } from "./TopicFormDialog";
@@ -130,22 +128,19 @@ export function TopicsPage() {
         </TextField>
       </Paper> */}
 
-      {isLoading ? <Loader /> : null}
       {error ? <ErrorState message={error.userMessage} /> : null}
 
-      {!isLoading && !error && rows.length === 0 ? (
-        <EmptyState
-          title="No tasks"
-          hint="Add a task set for a course topic."
-        />
-      ) : null}
-
-      {!isLoading && !error && rows.length > 0 ? (
+      {!error ? (
         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
           <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
             <DataTable
               columnDefs={columns}
               rowData={rows}
+              loading={isLoading}
+              noRowsTitle="No tasks"
+              noRowsHint="Add a task set for a course topic."
+              noFilteredRowsTitle="No matching tasks"
+              noFilteredRowsHint="Try adjusting or clearing filters."
               actions={actions}
               actionsHeaderName="Actions"
               pageSize={10}
