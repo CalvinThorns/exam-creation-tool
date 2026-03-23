@@ -32,11 +32,13 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import EditIcon from "@mui/icons-material/Edit";
 
 import { PageHeader } from "../../components/ui/PageHeader";
 import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { TopicCard } from "./components/TopicCard";
+import { CoverPagePreviewDialog } from "./components/CoverPagePreviewDialog";
 import { useCourses } from "../courses/courses.hooks";
 import { useTopics } from "../topics/topics.hooks";
 import {
@@ -52,7 +54,7 @@ const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages"];
 
 const DEFAULT_SOLUTION_SPACE = "1 Page";
 const DEFAULT_SPLIT_PERCENT = 66.6667;
-const COLLAPSE_THRESHOLD_PERCENT = 5;
+const COLLAPSE_THRESHOLD_PERCENT = 10;
 
 function sumPoints(topics) {
   return (topics || []).reduce((acc, topic) => {
@@ -167,12 +169,21 @@ export function GenerateExamPage() {
   );
 
   const [courseId, setCourseId] = useState("");
-  const [targetPoints, setTargetPoints] = useState(0);
+  const [targetPoints, setTargetPoints] = useState(null);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
     usePdfPreview("exam.pdf");
+  const {
+    pdfUrl: coverPdfUrl,
+    setPdfFromBase64: setCoverPdfFromBase64,
+    clearPdf: clearCoverPdf,
+  } = usePdfPreview("cover-page.pdf");
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledVersion, setCompiledVersion] = useState(null);
+  const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
+  const [coverPageDraft, setCoverPageDraft] = useState("");
+  const [isCoverCompiling, setIsCoverCompiling] = useState(false);
+  const [coverCompileDiagnostics, setCoverCompileDiagnostics] = useState(null);
   const [draft, setDraft] = useState(null);
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const [compileDiagnostics, setCompileDiagnostics] = useState(null);
@@ -314,6 +325,77 @@ export function GenerateExamPage() {
     } finally {
       setIsCompiling(false);
     }
+  };
+
+  const openCoverPageDialog = () => {
+    setCoverPageDraft(draft?.course?.coverPage || "");
+    clearCoverPdf();
+    setCoverCompileDiagnostics(null);
+    setIsCoverDialogOpen(true);
+  };
+
+  const closeCoverPageDialog = () => {
+    setIsCoverDialogOpen(false);
+  };
+
+  const compileCoverPage = async () => {
+    if (!draft?.course) return;
+
+    clearCoverPdf();
+    setCoverCompileDiagnostics(null);
+    setIsCoverCompiling(true);
+
+    try {
+      const res = await examsApi.compileDraft({
+        course: {
+          ...draft.course,
+          coverPage: coverPageDraft,
+        },
+        coverPage: coverPageDraft,
+        topics: [],
+        version: "STUDENT",
+      });
+
+      const compileData = res?.data || {};
+      const { pdfBase64, filename, contentType, errors } = compileData;
+
+      setCoverPdfFromBase64({
+        base64: pdfBase64,
+        filename,
+        mimeType: contentType || "application/pdf",
+      });
+
+      setCoverCompileDiagnostics({
+        clsiStatus: errors?.clsiStatus || null,
+        buildId: errors?.buildId || null,
+        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
+        warningCount: Number(
+          errors?.warningCount ?? errors?.warnings?.length ?? 0,
+        ),
+        errors: errors?.errors || [],
+        warnings: errors?.warnings || [],
+        timings: errors?.timings || null,
+        stats: errors?.stats || null,
+        log: errors?.log || "",
+      });
+    } finally {
+      setIsCoverCompiling(false);
+    }
+  };
+
+  const saveCoverPage = async () => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        course: {
+          ...(prev.course || {}),
+          coverPage: coverPageDraft,
+        },
+      };
+    });
+
+    setIsCoverDialogOpen(false);
   };
 
   const recalcDraftTotals = (nextDraft) => {
@@ -893,24 +975,36 @@ export function GenerateExamPage() {
                     </Typography>
 
                     {/* Compile dropdown button */}
-                    {isCompiling ? (
+                    <Stack direction="row" spacing={1}>
                       <Button
-                        variant="contained"
-                        color="secondary"
+                        variant="outlined"
                         size="small"
-                        disabled
-                        startIcon={
-                          <CircularProgress size={14} color="inherit" />
-                        }
-                      >
-                        Compiling…
-                      </Button>
-                    ) : (
-                      <CompileButton
+                        startIcon={<EditIcon />}
+                        onClick={openCoverPageDialog}
                         disabled={!draft}
-                        onCompile={compileDraft}
-                      />
-                    )}
+                      >
+                        Edit Cover Page
+                      </Button>
+
+                      {isCompiling ? (
+                        <Button
+                          variant="contained"
+                          color="secondary"
+                          size="small"
+                          disabled
+                          startIcon={
+                            <CircularProgress size={14} color="inherit" />
+                          }
+                        >
+                          Compiling…
+                        </Button>
+                      ) : (
+                        <CompileButton
+                          disabled={!draft}
+                          onCompile={compileDraft}
+                        />
+                      )}
+                    </Stack>
                   </Stack>
 
                   <Divider sx={{ flexShrink: 0, mb: 2 }} />
@@ -1127,6 +1221,21 @@ export function GenerateExamPage() {
             )}
           </Box>
         </> // end of isEditMode && examLoading conditional
+      )}
+
+      {isCoverDialogOpen && (
+        <CoverPagePreviewDialog
+          open={isCoverDialogOpen}
+          onClose={closeCoverPageDialog}
+          coverPageValue={coverPageDraft}
+          onCoverPageChange={setCoverPageDraft}
+          onCompile={compileCoverPage}
+          isCompiling={isCoverCompiling}
+          pdfUrl={coverPdfUrl}
+          compilerMessages={coverCompileDiagnostics}
+          onSave={saveCoverPage}
+          disableActions={!draft}
+        />
       )}
     </Box>
   );
