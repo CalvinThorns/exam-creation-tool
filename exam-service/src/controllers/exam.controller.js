@@ -114,6 +114,24 @@ function createExamController({ examService }) {
       }
     },
 
+    getBaseLatexTemplate: async (_req, res, next) => {
+      try {
+        const result = await examService.getBaseLatexTemplate();
+        return sendSuccess(res, { data: result });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    updateBaseLatexTemplate: async (req, res, next) => {
+      try {
+        const result = await examService.updateBaseLatexTemplate(req.body);
+        return sendSuccess(res, { data: result });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     getDraftAsset: async (req, res, next) => {
       try {
         const token = String(req.params.token || "");

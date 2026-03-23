@@ -9,6 +9,8 @@ function createExamRoutes({ examController }) {
   router.post("/draft/regenerate-topic", examController.regenerateDraftTopic);
   router.post("/draft", examController.generateDraft);
   router.post("/compile-latex", examController.compileLatexOnly);
+  router.get("/latex-template/base", examController.getBaseLatexTemplate);
+  router.put("/latex-template/base", examController.updateBaseLatexTemplate);
 
   router.post("/", examController.create);
   router.get("/", examController.list);

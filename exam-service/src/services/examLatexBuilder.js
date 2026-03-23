@@ -9,6 +9,8 @@ const SOLUTION_SPACE_TO_PAGES = {
   "3/4 Page": 0.75,
   "1 Page": 1,
   "2 Pages": 2,
+  "3 Pages": 3,
+  "4 Pages": 4,
 };
 const DEFAULT_SOLUTION_SPACE = "1 Page";
 
@@ -29,14 +31,18 @@ function normalizeSolutionSpace(space) {
 function buildStudentAnswerSpaceLatex(space) {
   const normalized = normalizeSolutionSpace(space);
   const pages = SOLUTION_SPACE_TO_PAGES[normalized];
+
   if (pages === 1) {
     return String.raw`\vspace*{\fill}`;
   }
 
-  if (pages === 2) {
-    return String.raw`\vspace*{\fill}
-\newpage
-\null`;
+  if (Number.isInteger(pages) && pages >= 2) {
+    const blocks = [String.raw`\vspace*{\fill}`];
+    for (let i = 1; i < pages; i++) {
+      blocks.push(String.raw`\newpage
+\null`);
+    }
+    return blocks.join("\n");
   }
 
   return `\\vspace*{${pages}\\textheight}`;
@@ -53,70 +59,26 @@ function unwrapSolutionEnv(s) {
   return m ? m[1].trim() : str;
 }
 
-function buildDocumentPreamble({ showSolutions }) {
-  const flag = showSolutions ? "\\showsolutionstrue" : "\\showsolutionsfalse";
+const BASE_TEMPLATE_PLACEHOLDER = "{{EXAM_CONTENT}}";
 
-  return String.raw`\documentclass[a4paper,12pt]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[ngerman]{babel}
-\usepackage{amsmath, amssymb}
-\usepackage{graphicx}
-\usepackage{subcaption}
-\usepackage{hyperref}
-\usepackage{geometry}
-\usepackage{array}
-\usepackage{enumitem}
-\usepackage{titlesec}
-\usepackage{listings}
-\usepackage{tikz}
-\usetikzlibrary{decorations.pathreplacing,arrows.meta,positioning}
-\usepackage{tabularx}
-\usepackage[most]{tcolorbox}
-\usepackage{comment}
-\usepackage{fancyhdr}
+function withShowSolutionsFlag(template, showSolutions) {
+  const src = String(template || "");
+  const desired = showSolutions
+    ? "\\showsolutionstrue"
+    : "\\showsolutionsfalse";
 
-% Column helpers (needed for your marks table)
-\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
-\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-
-\geometry{a4paper, left=2cm, right=2cm, top=2cm, bottom=2cm}
-\def \runninghead {Exam}
-
-\renewcommand{\headrulewidth}{0.4pt}
-\renewcommand{\footrulewidth}{0.4pt}
-\pagestyle{fancy}
-\lhead{Matrikelnr.:}
-\chead{}
-\rhead{}
-\lfoot{\runninghead}
-\cfoot{}
-\rfoot{Seite \thepage}
-
-\renewcommand{\thesubsection}{\alph{subsection})}
-\titleformat{\subsection}[runin]{\normalfont\bfseries}{\thesubsection}{1em}{}
-\setlength{\parindent}{0pt}
-
-\newif\ifshowsolutions
-${flag}
-
-\ifshowsolutions
-  \newtcolorbox{solution}{
-    colback=red!80,
-    colframe=red!90!black,
-    fontupper=\color{white}\footnotesize,
-    title=Solution,
-    boxrule=0.8pt,
-    arc=4pt,
-    top=6pt,
-    bottom=6pt,
-    left=6pt,
-    right=6pt
+  if (/\\showsolutions(?:true|false)/.test(src)) {
+    return src.replace(/\\showsolutions(?:true|false)/, desired);
   }
-\else
-  \excludecomment{solution}
-\fi
-`;
+
+  if (/\\newif\\ifshowsolutions/.test(src)) {
+    return src.replace(
+      /\\newif\\ifshowsolutions/,
+      `\\newif\\ifshowsolutions\n${desired}`,
+    );
+  }
+
+  return src;
 }
 
 /**
@@ -198,14 +160,24 @@ function injectMarksTableAuto(coverPageLatex, topics) {
   return src.replace(re, replacement);
 }
 
-function buildLatexFromDraft({ coverPageLatex, topics, version }) {
+function buildLatexFromDraft({
+  coverPageLatex,
+  topics,
+  version,
+  baseTemplate,
+}) {
   const v = String(version || "TEACHER").toUpperCase();
   const showSolutions = v !== "STUDENT";
   const isStudentVersion = v === "STUDENT";
+  const template = String(baseTemplate || "");
+
+  if (!template.includes(BASE_TEMPLATE_PLACEHOLDER)) {
+    throw new Error(
+      `Base LaTeX template must contain placeholder ${BASE_TEMPLATE_PLACEHOLDER}`,
+    );
+  }
 
   const parts = [];
-  parts.push(buildDocumentPreamble({ showSolutions }));
-  parts.push(String.raw`\begin{document}`);
 
   // cover page (and table injection) stays as you already have it
   if (coverPageLatex && String(coverPageLatex).trim()) {
@@ -280,10 +252,9 @@ ${sanitizeTexInput(solBody)}
     }
   }
 
-  parts.push(String.raw`\end{document}`);
-  return parts.join("\n\n");
+  const body = parts.join("\n\n");
+  const templateWithFlag = withShowSolutionsFlag(template, showSolutions);
+  return templateWithFlag.replace(BASE_TEMPLATE_PLACEHOLDER, body);
 }
-
-module.exports = { buildLatexFromDraft };
 
 module.exports = { buildLatexFromDraft };
