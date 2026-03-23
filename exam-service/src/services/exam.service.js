@@ -32,16 +32,13 @@ const {
 const { normalizePagination, buildMeta } = require("../utils/pagination");
 const { parseFilters, parseSort } = require("../utils/query");
 
-function createExamService({ examRepo, courseRepo }) {
-  function wrapRawLatexIfNeeded(latexContent) {
-    const src = String(latexContent || "").trim();
-    if (!src) throw badRequest("latexContent is required");
+const BASE_TEMPLATE_PLACEHOLDER = "{{EXAM_CONTENT}}";
+const BASE_TEMPLATE_PATH = String(
+  process.env.EXAM_BASE_LATEX_TEMPLATE_PATH ||
+    path.resolve(__dirname, "..", "templates", "base-exam-wrapper.tex"),
+).trim();
 
-    if (/\\begin\{document\}/i.test(src)) {
-      return src;
-    }
-
-    return String.raw`\documentclass[a4paper,12pt]{article}
+const DEFAULT_BASE_TEMPLATE = String.raw`\documentclass[a4paper,12pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[ngerman]{babel}
@@ -78,7 +75,7 @@ function createExamService({ examRepo, courseRepo }) {
 \rfoot{Seite \thepage}
 
 \renewcommand{\thesubsection}{\alph{subsection})}
-	itleformat{\subsection}[runin]{\normalfont\bfseries}{\thesubsection}{1em}{}
+  itleformat{\subsection}[runin]{\normalfont\bfseries}{\thesubsection}{1em}{}
 \setlength{\parindent}{0pt}
 
 \newif\ifshowsolutions
@@ -102,8 +99,55 @@ function createExamService({ examRepo, courseRepo }) {
 \fi
 
 \begin{document}
-${src}
+${BASE_TEMPLATE_PLACEHOLDER}
 \end{document}`;
+
+function createExamService({ examRepo, courseRepo }) {
+  async function ensureBaseTemplateFileExists() {
+    try {
+      await fs.access(BASE_TEMPLATE_PATH);
+    } catch (err) {
+      if (err && err.code !== "ENOENT") throw err;
+      await fs.mkdir(path.dirname(BASE_TEMPLATE_PATH), { recursive: true });
+      await fs.writeFile(BASE_TEMPLATE_PATH, DEFAULT_BASE_TEMPLATE, "utf8");
+    }
+  }
+
+  function validateBaseTemplateContent(content, { fromUser = false } = {}) {
+    const value = String(content || "");
+    if (!value.trim()) {
+      throw fromUser
+        ? badRequest("template cannot be empty")
+        : new Error("Base LaTeX template is empty");
+    }
+    if (!value.includes(BASE_TEMPLATE_PLACEHOLDER)) {
+      throw fromUser
+        ? badRequest(
+            `template must contain placeholder ${BASE_TEMPLATE_PLACEHOLDER}`,
+          )
+        : new Error(
+            `Base LaTeX template must contain placeholder ${BASE_TEMPLATE_PLACEHOLDER}`,
+          );
+    }
+    return value;
+  }
+
+  async function loadBaseTemplateContent() {
+    await ensureBaseTemplateFileExists();
+    const content = await fs.readFile(BASE_TEMPLATE_PATH, "utf8");
+    return validateBaseTemplateContent(content);
+  }
+
+  function wrapRawLatexIfNeeded(latexContent, baseTemplateContent) {
+    const src = String(latexContent || "").trim();
+    if (!src) throw badRequest("latexContent is required");
+
+    if (/\\begin\{document\}/i.test(src)) {
+      return src;
+    }
+
+    const template = validateBaseTemplateContent(baseTemplateContent);
+    return template.replace(BASE_TEMPLATE_PLACEHOLDER, src);
   }
 
   async function compileLatexOnlyImpl(body, reqId) {
@@ -116,7 +160,8 @@ ${src}
 
     const latexContent = String(body?.latexContent || "").trim();
     if (!latexContent) throw badRequest("latexContent is required");
-    const mainTex = wrapRawLatexIfNeeded(latexContent);
+    const baseTemplateContent = await loadBaseTemplateContent();
+    const mainTex = wrapRawLatexIfNeeded(latexContent, baseTemplateContent);
 
     const projectId = randomProjectId();
     const compileBody = {
@@ -304,10 +349,13 @@ ${src}
       throw e;
     }
 
+    const baseTemplateContent = await loadBaseTemplateContent();
+
     const mainTex = buildLatexFromDraft({
       coverPageLatex: coverPage,
       topics: nextTopics,
       version,
+      baseTemplate: baseTemplateContent,
     });
 
     const projectId = randomProjectId();
@@ -677,6 +725,24 @@ ${src}
 
     compileDraft: async (body, reqId) => compileDraftImpl(body, reqId),
     compileLatexOnly: async (body, reqId) => compileLatexOnlyImpl(body, reqId),
+    getBaseLatexTemplate: async () => {
+      const template = await loadBaseTemplateContent();
+      return {
+        template,
+        placeholder: BASE_TEMPLATE_PLACEHOLDER,
+      };
+    },
+    updateBaseLatexTemplate: async (data) => {
+      const nextTemplate = validateBaseTemplateContent(data?.template, {
+        fromUser: true,
+      });
+      await fs.mkdir(path.dirname(BASE_TEMPLATE_PATH), { recursive: true });
+      await fs.writeFile(BASE_TEMPLATE_PATH, nextTemplate, "utf8");
+      return {
+        template: nextTemplate,
+        placeholder: BASE_TEMPLATE_PLACEHOLDER,
+      };
+    },
   };
 }
 
