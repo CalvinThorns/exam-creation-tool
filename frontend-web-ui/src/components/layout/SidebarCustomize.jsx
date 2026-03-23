@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  alpha,
   Box,
   CircularProgress,
   List,
@@ -7,6 +8,7 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
+  useTheme,
 } from "@mui/material";
 import { SettingsOutlined } from "@mui/icons-material";
 import { examsApi } from "../../api/exams.api";
@@ -15,6 +17,13 @@ import { BaseLatexTemplateDialog } from "./BaseLatexTemplateDialog";
 import { CustomizeDialog } from "./CustomizeDialog";
 
 export function SidebarCustomize({ isCollapsed }) {
+  const theme = useTheme();
+  const sidebarBackground =
+    theme.palette.mode === "dark"
+      ? alpha(theme.palette.background.paper, 0.92)
+      : theme.palette.primary.main;
+  const sidebarText = theme.palette.getContrastText(sidebarBackground);
+
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [isBaseTemplateDialogOpen, setIsBaseTemplateDialogOpen] =
     useState(false);
@@ -160,9 +169,9 @@ export function SidebarCustomize({ isCollapsed }) {
                 minHeight: 48,
                 px: isCollapsed ? 1.5 : 2,
                 justifyContent: isCollapsed ? "center" : "flex-start",
-                color: "#e8efff",
+                color: sidebarText,
                 "&:hover": {
-                  bgcolor: "rgba(255,255,255,0.1)",
+                  bgcolor: alpha(sidebarText, 0.12),
                 },
               }}
             >
@@ -178,7 +187,7 @@ export function SidebarCustomize({ isCollapsed }) {
               </ListItemIcon>
               {!isCollapsed && <ListItemText primary="Customize" />}
               {!isCollapsed && isLoadingBaseTemplate ? (
-                <CircularProgress size={14} sx={{ color: "#e8efff" }} />
+                <CircularProgress size={14} sx={{ color: "inherit" }} />
               ) : null}
             </ListItemButton>
           </Tooltip>

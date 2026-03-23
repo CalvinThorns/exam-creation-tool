@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import {
+  alpha,
   Box,
   IconButton,
   List,
@@ -7,6 +8,7 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
+  useTheme,
 } from "@mui/material";
 import {
   AssignmentOutlined,
@@ -24,13 +26,20 @@ const items = [
 ];
 
 export function Sidebar({ isCollapsed, onToggle }) {
+  const theme = useTheme();
+  const sidebarBackground =
+    theme.palette.mode === "dark"
+      ? alpha(theme.palette.background.paper, 0.92)
+      : theme.palette.primary.main;
+  const sidebarText = theme.palette.getContrastText(sidebarBackground);
+
   return (
     <Box
       sx={{
         height: "100%",
-        bgcolor: "#102542",
-        color: "#e8efff",
-        borderRight: "1px solid rgba(232,239,255,0.12)",
+        bgcolor: sidebarBackground,
+        color: sidebarText,
+        borderRight: `1px solid ${alpha(sidebarText, 0.12)}`,
         display: "flex",
         flexDirection: "column",
       }}
@@ -48,7 +57,7 @@ export function Sidebar({ isCollapsed, onToggle }) {
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           onClick={onToggle}
           size="small"
-          sx={{ color: "#e8efff" }}
+          sx={{ color: "inherit" }}
         >
           {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
         </IconButton>
@@ -69,15 +78,15 @@ export function Sidebar({ isCollapsed, onToggle }) {
                     minHeight: 48,
                     px: isCollapsed ? 1.5 : 2,
                     justifyContent: isCollapsed ? "center" : "flex-start",
-                    color: "#e8efff",
+                    color: "inherit",
                     "&.Mui-selected": {
-                      bgcolor: "rgba(255,255,255,0.14)",
+                      bgcolor: alpha(sidebarText, 0.16),
                     },
                     "&.Mui-selected:hover": {
-                      bgcolor: "rgba(255,255,255,0.2)",
+                      bgcolor: alpha(sidebarText, 0.22),
                     },
                     "&:hover": {
-                      bgcolor: "rgba(255,255,255,0.1)",
+                      bgcolor: alpha(sidebarText, 0.12),
                     },
                   }}
                 >

@@ -7,6 +7,7 @@ import {
   TablePagination,
   Typography,
   Tooltip,
+  useTheme,
 } from "@mui/material";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
@@ -80,10 +81,13 @@ export function DataTable({
   gridOptions,
   ...rest
 }) {
+  const theme = useTheme();
   const gridRef = useRef(null);
   const apiRef = useRef(null);
   const isApplyingServerStateRef = useRef(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
+  const gridClassName =
+    theme.palette.mode === "dark" ? "ag-theme-quartz-dark" : "ag-theme-quartz";
 
   const isEqual = useCallback((a, b) => {
     if (a === b) return true;
@@ -328,7 +332,7 @@ export function DataTable({
       }}
     >
       <div
-        className="ag-theme-quartz"
+        className={gridClassName}
         style={{
           width: "100%",
           flex: 1,

@@ -115,7 +115,7 @@ export function TopicFormDialog({
         </Box>
       </DialogTitle>
 
-      <DialogContent className="bg-white" sx={{ p: 0 }}>
+      <DialogContent sx={{ p: 0, bgcolor: "background.paper" }}>
         <Box className="px-10 py-8">
           {/* Row 1: Course + Topic */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -1,5 +1,6 @@
 import Editor from "@monaco-editor/react";
 import { Box } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 
 function registerLatex(monaco) {
   // Register LaTeX language
@@ -46,13 +47,17 @@ export function LatexEditor({
   placeholder = "Write LaTeX here...",
   className,
 }) {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === "dark";
+
   return (
     <Box
       className={className}
       sx={{
         borderRadius: 1,
         overflow: "auto",
-        border: "1px solid #d0d0d0",
+        border: `1px solid ${theme.palette.divider}`,
+        backgroundColor: theme.palette.background.paper,
         resize: "vertical",
         height,
         minHeight: 120,
@@ -63,7 +68,33 @@ export function LatexEditor({
         defaultLanguage="latex"
         value={value || ""}
         onChange={(v) => onChange?.(v ?? "")}
-        beforeMount={(monaco) => registerLatex(monaco)}
+        beforeMount={(monaco) => {
+          registerLatex(monaco);
+
+          monaco.editor.defineTheme("exam-light", {
+            base: "vs",
+            inherit: true,
+            rules: [],
+            colors: {
+              "editor.background": "#ffffff",
+              "editorLineNumber.foreground": "#94a3b8",
+            },
+          });
+
+          monaco.editor.defineTheme("exam-dark", {
+            base: "vs-dark",
+            inherit: true,
+            rules: [],
+            colors: {
+              "editor.background": "#111827",
+              "editor.foreground": "#e2e8f0",
+              "editorLineNumber.foreground": "#64748b",
+              "editorCursor.foreground": "#93c5fd",
+              "editor.selectionBackground": alpha("#93c5fd", 0.28),
+              "editor.inactiveSelectionBackground": alpha("#93c5fd", 0.16),
+            },
+          });
+        }}
         placeholder={placeholder}
         options={{
           minimap: { enabled: false },
@@ -77,9 +108,10 @@ export function LatexEditor({
           formatOnPaste: false,
           formatOnType: false,
           automaticLayout: true,
+          cursorBlinking: "smooth",
           padding: { top: 10, bottom: 10 },
         }}
-        theme="vs"
+        theme={isDarkMode ? "exam-dark" : "exam-light"}
       />
     </Box>
   );

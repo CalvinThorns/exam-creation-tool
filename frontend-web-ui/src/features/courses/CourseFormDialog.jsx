@@ -193,7 +193,7 @@ export function CourseFormDialog({
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>{initialValues ? "Edit Course" : "Add Course"}</DialogTitle>
 
-      <DialogContent dividers sx={{ bgcolor: "#fff" }}>
+      <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
         <Box className="flex flex-col gap-6">
           <Box className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <TextField
