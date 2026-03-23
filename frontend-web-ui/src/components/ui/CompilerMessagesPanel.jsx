@@ -70,7 +70,7 @@ export function CompilerMessagesPanel({
   title = "Compiler",
 }) {
   const theme = useTheme();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [activeMessageKey, setActiveMessageKey] = useState(null);
   const [showFullLog, setShowFullLog] = useState(false);
   const [filter, setFilter] = useState("all");

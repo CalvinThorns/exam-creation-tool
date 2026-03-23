@@ -124,14 +124,6 @@ export function TopicCard({
               >
                 Tasks ({topic.tasks.length})
               </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={() => onAddTask(topicIndex)}
-              >
-                Add task
-              </Button>
             </Stack>
             <Stack spacing={1.5}>
               {(topic.tasks || []).map((task, taskIndex) => (
@@ -241,6 +233,16 @@ export function TopicCard({
                 </Card>
               ))}
             </Stack>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => onAddTask(topicIndex)}
+              >
+                Add task
+              </Button>
+            </Box>
           </Box>
         )}
 
