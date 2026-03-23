@@ -44,6 +44,10 @@ import {
 } from "./exams.hooks";
 import { examsApi } from "../../api/exams.api";
 
+const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages"];
+
+const DEFAULT_SOLUTION_SPACE = "1 Page";
+
 function sumPoints(topics) {
   return (topics || []).reduce((acc, topic) => {
     const tasks = topic?.tasks || [];
@@ -56,6 +60,18 @@ function sumPoints(topics) {
     }
     return acc + Number(topic?.points || 0);
   }, 0);
+}
+
+function withSolutionSpace(topics = []) {
+  return (topics || []).map((topic) => ({
+    ...topic,
+    tasks: (topic?.tasks || []).map((task) => ({
+      ...task,
+      solutionSpace: SOLUTION_SPACE_OPTIONS.includes(task?.solutionSpace)
+        ? task.solutionSpace
+        : DEFAULT_SOLUTION_SPACE,
+    })),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +346,7 @@ export function GenerateExamPage() {
       next.topics[topicIndex].tasks.push({
         question: "",
         solution: "",
+        solutionSpace: DEFAULT_SOLUTION_SPACE,
         points: 0,
       });
       syncTopicPointsFromTasks(next, topicIndex);
@@ -371,7 +388,7 @@ export function GenerateExamPage() {
     const body = {
       courseId: draft.course?.id || courseId,
       targetPoints: Number(draft.targetPoints),
-      topics: draft.topics,
+      topics: withSolutionSpace(draft.topics),
     };
 
     if (isEditMode) {
@@ -788,6 +805,7 @@ export function GenerateExamPage() {
                         key={`${topic.topic}-${i}`}
                         topic={topic}
                         topicIndex={i}
+                        solutionSpaceOptions={SOLUTION_SPACE_OPTIONS}
                         onTopicField={updateTopicField}
                         onTaskField={updateTaskField}
                         onAddTask={addTask}

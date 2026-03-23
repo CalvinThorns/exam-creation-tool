@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
   Chip,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -18,6 +19,7 @@ import { LatexEditor } from "../../../components/ui/LatexEditor";
 export function TopicCard({
   topic,
   topicIndex,
+  solutionSpaceOptions,
   onTopicField,
   onTaskField,
   onAddTask,
@@ -213,6 +215,28 @@ export function TopicCard({
                       }
                       height={120}
                     />
+
+                    <TextField
+                      select
+                      label="Solution Space"
+                      value={task.solutionSpace || "1 Page"}
+                      onChange={(e) =>
+                        onTaskField(
+                          topicIndex,
+                          taskIndex,
+                          "solutionSpace",
+                          e.target.value,
+                        )
+                      }
+                      size="small"
+                      sx={{ mt: 1.5, width: "50%" }}
+                    >
+                      {solutionSpaceOptions.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   </CardContent>
                 </Card>
               ))}
