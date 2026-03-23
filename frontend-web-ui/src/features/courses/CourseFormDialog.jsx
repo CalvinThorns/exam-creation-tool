@@ -134,25 +134,17 @@ export function CourseFormDialog({
     collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
 
   const compileCoverPage = async () => {
-    const values = getValues();
-    const coverPage = values.coverPage || "";
+    const coverPage = getValues("coverPage") || "";
 
     clearPdf();
     setCompilerMessages(null);
     setIsCompiling(true);
 
     try {
-      const compileData =
-        (await examsApi.compileDraft({
-          course: {
-            title: values.title || "",
-            shortName: values.shortName || "",
-            coverPage,
-          },
-          coverPage,
-          topics: [],
-          version: "STUDENT",
-        })) || {};
+      const response = await examsApi.compileLatexOnly({
+        latexContent: coverPage,
+      });
+      const compileData = response?.data || response || {};
 
       const { pdfBase64, filename, contentType, errors } = compileData;
 
