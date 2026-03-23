@@ -208,6 +208,27 @@ paths:
         "200":
           description: Exam generated successfully
 
+  /api/exams/compile-latex:
+    post:
+      summary: Compile raw LaTeX into PDF
+      tags: [Exams]
+      operationId: compileLatexOnly
+      description: Compiles provided LaTeX content without requiring course or draft payload.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [latexContent]
+              properties:
+                latexContent:
+                  type: string
+                  description: Raw LaTeX content to compile.
+      responses:
+        "200":
+          description: LaTeX compiled successfully
+
   # ==========================================
   # TOPICS
   /api/topics:

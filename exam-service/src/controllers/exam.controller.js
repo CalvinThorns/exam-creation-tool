@@ -96,6 +96,24 @@ function createExamController({ examService }) {
       }
     },
 
+    compileLatexOnly: async (req, res, next) => {
+      try {
+        const { pdfBuffer, filename, errors } =
+          await examService.compileLatexOnly(req.body, req.id);
+
+        return sendSuccess(res, {
+          data: {
+            filename,
+            contentType: "application/pdf",
+            pdfBase64: pdfBuffer.toString("base64"),
+            errors: errors || null,
+          },
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     getDraftAsset: async (req, res, next) => {
       try {
         const token = String(req.params.token || "");
