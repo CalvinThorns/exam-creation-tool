@@ -169,6 +169,7 @@ export function GenerateExamPage() {
   const [compiledVersion, setCompiledVersion] = useState(null);
   const [draft, setDraft] = useState(null);
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
+  const [compileDiagnostics, setCompileDiagnostics] = useState(null);
 
   // Fetch existing exam when in edit mode
   const { data: examData, isLoading: examLoading } = useExam(examId, {
@@ -266,6 +267,7 @@ export function GenerateExamPage() {
   const compileDraft = async (version) => {
     if (!draft) return;
     clearPdf();
+    setCompileDiagnostics(null);
 
     setIsCompiling(true);
     setCompiledVersion(version);
@@ -277,8 +279,28 @@ export function GenerateExamPage() {
         version,
       });
 
-      const { pdfBase64, filename } = res.data;
-      setPdfFromBase64({ base64: pdfBase64, filename });
+      const compileData = res?.data || {};
+      const { pdfBase64, filename, contentType, errors } = compileData;
+
+      setPdfFromBase64({
+        base64: pdfBase64,
+        filename,
+        mimeType: contentType || "application/pdf",
+      });
+
+      setCompileDiagnostics({
+        clsiStatus: errors?.clsiStatus || null,
+        buildId: errors?.buildId || null,
+        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
+        warningCount: Number(
+          errors?.warningCount ?? errors?.warnings?.length ?? 0,
+        ),
+        errors: errors?.errors || [],
+        warnings: errors?.warnings || [],
+        timings: errors?.timings || null,
+        stats: errors?.stats || null,
+        log: errors?.log || "",
+      });
     } finally {
       setIsCompiling(false);
     }
@@ -824,6 +846,7 @@ export function GenerateExamPage() {
               pdfUrl={pdfUrl}
               onDownload={downloadPdf}
               isLoading={isCompiling}
+              compilerMessages={compileDiagnostics}
               loadingText={`Compiling ${compiledVersion === "STUDENT" ? "Student" : "Teacher"} version…`}
               statusContent={
                 pdfUrl &&

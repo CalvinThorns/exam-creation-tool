@@ -16,6 +16,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import { CompilerMessagesPanel } from "./CompilerMessagesPanel";
 
 export function PdfPreviewPanel({
   title = "Preview",
@@ -27,6 +28,7 @@ export function PdfPreviewPanel({
   downloadLabel = "Download",
   statusContent = null,
   iframeTitle = "PDF Preview",
+  compilerMessages = null,
 }) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -94,6 +96,8 @@ export function PdfPreviewPanel({
       </Stack>
 
       <Divider sx={{ my: 1.5, flexShrink: 0 }} />
+
+      <CompilerMessagesPanel compilerMessages={compilerMessages} />
 
       <Box
         sx={{
