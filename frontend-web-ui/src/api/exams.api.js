@@ -21,4 +21,9 @@ export const examsApi = {
     examsHttp
       .post("/draft/compile", body, { timeout: 600000 })
       .then((r) => r.data),
+
+  compileLatexOnly: (body) =>
+    examsHttp
+      .post("/compile-latex", body, { timeout: 600000 })
+      .then((r) => r.data),
 };
