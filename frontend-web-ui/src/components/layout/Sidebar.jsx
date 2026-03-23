@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import {
+  alpha,
   Box,
   IconButton,
   List,
@@ -7,6 +8,7 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
+  useTheme,
 } from "@mui/material";
 import {
   AssignmentOutlined,
@@ -15,21 +17,34 @@ import {
   SchoolOutlined,
   TaskOutlined,
 } from "@mui/icons-material";
-
-const items = [
-  { label: "Exams", to: "/exams", icon: AssignmentOutlined },
-  { label: "Courses", to: "/courses", icon: SchoolOutlined },
-  { label: "Tasks", to: "/tasks", icon: TaskOutlined },
-];
+import { useTranslation } from "react-i18next";
+import { SidebarCustomize } from "./SidebarCustomize";
 
 export function Sidebar({ isCollapsed, onToggle }) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const sidebarBackground =
+    theme.palette.mode === "dark"
+      ? alpha(theme.palette.background.paper, 0.92)
+      : theme.palette.primary.main;
+  const sidebarText = theme.palette.getContrastText(sidebarBackground);
+  const items = [
+    { label: t("sidebar.exams"), to: "/exams", icon: AssignmentOutlined },
+    {
+      label: t("sidebar.courses"),
+      to: "/courses",
+      icon: SchoolOutlined,
+    },
+    { label: t("sidebar.tasks"), to: "/tasks", icon: TaskOutlined },
+  ];
+
   return (
     <Box
       sx={{
         height: "100%",
-        bgcolor: "#102542",
-        color: "#e8efff",
-        borderRight: "1px solid rgba(232,239,255,0.12)",
+        bgcolor: sidebarBackground,
+        color: sidebarText,
+        borderRight: `1px solid ${alpha(sidebarText, 0.12)}`,
         display: "flex",
         flexDirection: "column",
       }}
@@ -44,10 +59,10 @@ export function Sidebar({ isCollapsed, onToggle }) {
         }}
       >
         <IconButton
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={isCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           onClick={onToggle}
           size="small"
-          sx={{ color: "#e8efff" }}
+          sx={{ color: "inherit" }}
         >
           {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
         </IconButton>
@@ -68,15 +83,15 @@ export function Sidebar({ isCollapsed, onToggle }) {
                     minHeight: 48,
                     px: isCollapsed ? 1.5 : 2,
                     justifyContent: isCollapsed ? "center" : "flex-start",
-                    color: "#e8efff",
+                    color: "inherit",
                     "&.Mui-selected": {
-                      bgcolor: "rgba(255,255,255,0.14)",
+                      bgcolor: alpha(sidebarText, 0.16),
                     },
                     "&.Mui-selected:hover": {
-                      bgcolor: "rgba(255,255,255,0.2)",
+                      bgcolor: alpha(sidebarText, 0.22),
                     },
                     "&:hover": {
-                      bgcolor: "rgba(255,255,255,0.1)",
+                      bgcolor: alpha(sidebarText, 0.12),
                     },
                   }}
                 >
@@ -97,6 +112,8 @@ export function Sidebar({ isCollapsed, onToggle }) {
           </NavLink>
         ))}
       </List>
+
+      <SidebarCustomize isCollapsed={isCollapsed} />
     </Box>
   );
 }

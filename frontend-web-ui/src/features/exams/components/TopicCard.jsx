@@ -15,6 +15,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { LatexEditor } from "../../../components/ui/LatexEditor";
+import { useTranslation } from "react-i18next";
 
 export function TopicCard({
   topic,
@@ -27,6 +28,7 @@ export function TopicCard({
   onRegenerate,
   regenPending,
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -50,7 +52,7 @@ export function TopicCard({
             {topic.topic}
           </Typography>
           <Chip
-            label={`${topic.points} pts`}
+            label={`${topic.points} ${t("exams.pts")}`}
             size="small"
             color="primary"
             variant="outlined"
@@ -64,7 +66,7 @@ export function TopicCard({
             onClick={() => onRegenerate(topic.topic)}
             disabled={regenPending}
           >
-            Regenerate
+            {t("exams.regenerate")}
           </Button>
         </Stack>
 
@@ -78,14 +80,14 @@ export function TopicCard({
           }}
         >
           <TextField
-            label="Topic"
+            label={t("common.topic")}
             value={topic.topic || ""}
             onChange={(e) => onTopicField(topicIndex, "topic", e.target.value)}
             fullWidth
             size="small"
           />
           <TextField
-            label="Points"
+            label={t("common.points")}
             type="number"
             value={topic.points ?? 0}
             onChange={(e) =>
@@ -101,7 +103,7 @@ export function TopicCard({
           color="text.secondary"
           sx={{ display: "block", mb: 0.5 }}
         >
-          Description
+          {t("common.description")}
         </Typography>
         <LatexEditor
           value={topic.description || ""}
@@ -122,7 +124,7 @@ export function TopicCard({
                 fontWeight={700}
                 color="text.secondary"
               >
-                Tasks ({topic.tasks.length})
+                {t("exams.tasksCount", { count: topic.tasks.length })}
               </Typography>
             </Stack>
             <Stack spacing={1.5}>
@@ -148,11 +150,11 @@ export function TopicCard({
                         fontWeight={700}
                         color="text.secondary"
                       >
-                        Task {taskIndex + 1}
+                        {t("topics.taskLabel", { index: taskIndex + 1 })}
                       </Typography>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <TextField
-                          label="Points"
+                          label={t("common.points")}
                           type="number"
                           value={task.points ?? 0}
                           onChange={(e) =>
@@ -173,7 +175,7 @@ export function TopicCard({
                           startIcon={<DeleteOutlineIcon />}
                           onClick={() => onRemoveTask(topicIndex, taskIndex)}
                         >
-                          Remove
+                          {t("topics.remove")}
                         </Button>
                       </Stack>
                     </Stack>
@@ -183,7 +185,7 @@ export function TopicCard({
                       color="text.secondary"
                       sx={{ display: "block", mb: 0.5 }}
                     >
-                      Question
+                      {t("common.question")}
                     </Typography>
                     <LatexEditor
                       value={task.question || ""}
@@ -198,7 +200,7 @@ export function TopicCard({
                       color="text.secondary"
                       sx={{ display: "block", mt: 1.5, mb: 0.5 }}
                     >
-                      Solution
+                      {t("common.solution")}
                     </Typography>
                     <LatexEditor
                       value={task.solution || ""}
@@ -210,7 +212,7 @@ export function TopicCard({
 
                     <TextField
                       select
-                      label="Solution Space"
+                      label={t("exams.solutionSpace")}
                       value={task.solutionSpace || "1 Page"}
                       onChange={(e) =>
                         onTaskField(
@@ -240,7 +242,7 @@ export function TopicCard({
                 startIcon={<AddIcon />}
                 onClick={() => onAddTask(topicIndex)}
               >
-                Add task
+                {t("exams.addTask")}
               </Button>
             </Box>
           </Box>
@@ -258,7 +260,7 @@ export function TopicCard({
                 fontWeight={700}
                 color="text.secondary"
               >
-                Tasks (0)
+                {t("exams.tasksCount", { count: 0 })}
               </Typography>
               <Button
                 size="small"
@@ -266,7 +268,7 @@ export function TopicCard({
                 startIcon={<AddIcon />}
                 onClick={() => onAddTask(topicIndex)}
               >
-                Add task
+                {t("exams.addTask")}
               </Button>
             </Stack>
           </Box>

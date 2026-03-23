@@ -15,8 +15,10 @@ import {
   useDeleteTopic,
 } from "./topics.hooks";
 import { useCourses } from "../courses/courses.hooks";
+import { useTranslation } from "react-i18next";
 
 export function TopicsPage() {
+  const { t } = useTranslation();
   // const [courseFilter, setCourseFilter] = useState("");
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
   const courses = coursesData?.data || [];
@@ -52,18 +54,18 @@ export function TopicsPage() {
 
   const columns = useMemo(
     () => [
-      { headerName: "Topic", field: "topic" },
-      { headerName: "Course", field: "courseTitle" },
-      { headerName: "Points", field: "points" },
+      { headerName: t("topics.topicColumn"), field: "topic" },
+      { headerName: t("common.course"), field: "courseTitle" },
+      { headerName: t("common.points"), field: "points" },
     ],
-    [],
+    [t],
   );
 
   const actions = useMemo(
     () => [
       {
         id: "edit",
-        label: "Edit",
+        label: t("common.edit"),
         icon: EditIcon,
         onClick: (row) => {
           setEditing(row);
@@ -72,14 +74,14 @@ export function TopicsPage() {
       },
       {
         id: "delete",
-        label: "Delete",
+        label: t("common.delete"),
         icon: DeleteIcon,
         onClick: (row) => {
           setConfirm({ open: true, id: row.id });
         },
       },
     ],
-    [],
+    [t],
   );
 
   const openAdd = () => {
@@ -103,10 +105,10 @@ export function TopicsPage() {
       sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
     >
       <PageHeader
-        title="Tasks"
+        title={t("topics.pageTitle")}
         right={
           <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
-            Add New
+            {t("common.addNew")}
           </Button>
         }
       />
@@ -137,12 +139,12 @@ export function TopicsPage() {
               columnDefs={columns}
               rowData={rows}
               loading={isLoading}
-              noRowsTitle="No tasks"
-              noRowsHint="Add a task set for a course topic."
-              noFilteredRowsTitle="No matching tasks"
-              noFilteredRowsHint="Try adjusting or clearing filters."
+              noRowsTitle={t("topics.noRows")}
+              noRowsHint={t("topics.noRowsHint")}
+              noFilteredRowsTitle={t("topics.noFilteredRows")}
+              noFilteredRowsHint={t("datatable.noFilteredHint")}
               actions={actions}
-              actionsHeaderName="Actions"
+              actionsHeaderName={t("common.actions")}
               pageSize={10}
               height="100%"
             />
@@ -161,8 +163,8 @@ export function TopicsPage() {
 
       <ConfirmDialog
         open={confirm.open}
-        title="Delete task set"
-        message="Are you sure you want to delete this topic and its tasks?"
+        title={t("topics.deleteTitle")}
+        message={t("topics.deleteMessage")}
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />

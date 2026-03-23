@@ -1,70 +1,63 @@
 import { useEffect, useRef, useState } from "react";
 import {
   alpha,
+  Box,
+  Button,
   CircularProgress,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  Button,
-  TextField,
-  Box,
-  Typography,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Stack,
   Tooltip,
+  Typography,
   useTheme,
 } from "@mui/material";
 import BuildIcon from "@mui/icons-material/Build";
+import SaveIcon from "@mui/icons-material/Save";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { courseSchema } from "../../utils/validators";
-import { examsApi } from "../../api/exams.api";
-import { LatexEditor } from "../../components/ui/LatexEditor";
-import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
-import { usePdfPreview } from "../../hooks/usePdfPreview";
+import { LatexEditor } from "../ui/LatexEditor";
+import { PdfPreviewPanel } from "../ui/PdfPreviewPanel";
 import { useTranslation } from "react-i18next";
 
 const DEFAULT_SPLIT_PERCENT = 50;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
 
-export function CourseFormDialog({
+export function BaseLatexTemplateDialog({
   open,
   onClose,
-  initialValues,
-  onSubmit,
-  submitting,
+  templateValue,
+  onTemplateChange,
+  onCompile,
+  isCompiling,
+  pdfUrl,
+  compilerMessages,
+  onSave,
+  isLoadingTemplate,
+  isSavingTemplate,
+  errorMessage,
+  disableActions,
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const form = useForm({
-    resolver: zodResolver(courseSchema(t)),
-    defaultValues: { title: "", shortName: "", coverPage: "" },
-  });
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
   const [collapsedPane, setCollapsedPane] = useState(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
-  const [isCompiling, setIsCompiling] = useState(false);
-  const [compilerMessages, setCompilerMessages] = useState(null);
   const splitContainerRef = useRef(null);
-  const { pdfUrl, setPdfFromBase64, clearPdf } =
-    usePdfPreview("cover-page.pdf");
 
-  useEffect(() => {
-    if (!open) return;
-    form.reset({
-      title: initialValues?.title || "",
-      shortName: initialValues?.shortName || "",
-      coverPage: initialValues?.coverPage || "",
-    });
+  const resetSplitLayout = () => {
     setCollapsedPane(null);
     setSplitPercent(DEFAULT_SPLIT_PERCENT);
-    setCompilerMessages(null);
-    clearPdf();
-  }, [open, initialValues, form, clearPdf]);
+  };
+
+  const startSplitDrag = (event) => {
+    if (collapsedPane || isLoadingTemplate) return;
+    event.preventDefault();
+    setIsDraggingSplit(true);
+  };
 
   useEffect(() => {
     if (!isDraggingSplit) return;
@@ -115,115 +108,43 @@ export function CourseFormDialog({
     };
   }, [isDraggingSplit]);
 
-  const { register, handleSubmit, formState, setValue, control, getValues } =
-    form;
-  const coverPageValue = useWatch({ control, name: "coverPage" }) || "";
-
-  const resetSplitLayout = () => {
-    setCollapsedPane(null);
-    setSplitPercent(DEFAULT_SPLIT_PERCENT);
-  };
-
-  const startSplitDrag = (event) => {
-    if (collapsedPane) return;
-    event.preventDefault();
-    setIsDraggingSplit(true);
-  };
-
   const leftPanelWidth =
     collapsedPane === "right" ? "100%" : `${splitPercent}%`;
   const rightPanelWidth =
     collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
 
-  const compileCoverPage = async () => {
-    const coverPage = getValues("coverPage") || "";
-
-    clearPdf();
-    setCompilerMessages(null);
-    setIsCompiling(true);
-
-    try {
-      const response = await examsApi.compileLatexOnly({
-        latexContent: coverPage,
-      });
-      const compileData = response?.data || response || {};
-
-      const { pdfBase64, filename, contentType, errors } = compileData;
-
-      setPdfFromBase64({
-        base64: pdfBase64,
-        filename,
-        mimeType: contentType || "application/pdf",
-      });
-
-      setCompilerMessages({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
-    } catch (error) {
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        t("courses.compileFailed");
-
-      setCompilerMessages({
-        clsiStatus: null,
-        buildId: null,
-        errorCount: 1,
-        warningCount: 0,
-        errors: [{ message }],
-        warnings: [],
-        timings: null,
-        stats: null,
-        log: message,
-      });
-    } finally {
-      setIsCompiling(false);
-    }
-  };
+  const contentDisabled = disableActions || isLoadingTemplate;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>
-        {initialValues ? t("courses.editTitle") : t("courses.addTitle")}
-      </DialogTitle>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
+      <DialogTitle>{t("baseTemplate.title")}</DialogTitle>
 
-      <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
-        <Box className="flex flex-col gap-6">
-          <Box className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <TextField
-              label={t("common.title")}
-              fullWidth
-              {...register("title")}
-              error={!!formState.errors.title}
-              helperText={formState.errors.title?.message}
-            />
-
-            <TextField
-              label={t("common.shortName")}
-              fullWidth
-              {...register("shortName")}
-              error={!!formState.errors.shortName}
-              helperText={formState.errors.shortName?.message}
-            />
+      <DialogContent dividers>
+        {isLoadingTemplate ? (
+          <Box
+            sx={{
+              height: "70vh",
+              minHeight: 520,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1.5,
+            }}
+          >
+            <CircularProgress size={30} />
+            <Typography variant="body2" color="text.secondary">
+              {t("baseTemplate.loading")}
+            </Typography>
           </Box>
-
+        ) : (
           <Box
             ref={splitContainerRef}
             sx={{
               display: "flex",
               gap: 0,
-              height: "56vh",
-              minHeight: 460,
+              height: "70vh",
+              minHeight: 520,
               overflow: "hidden",
             }}
           >
@@ -254,7 +175,7 @@ export function CourseFormDialog({
                     paddingInline: 2,
                   }}
                 >
-                  {t("courses.coverPage")}
+                  {t("baseTemplate.name")}
                 </Typography>
                 <Tooltip title={t("baseTemplate.expandEditor")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
@@ -285,8 +206,9 @@ export function CourseFormDialog({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    {t("courses.coverPageLatex")}
+                    {t("baseTemplate.label")}
                   </Typography>
+
                   <Button
                     variant="contained"
                     color="secondary"
@@ -298,8 +220,8 @@ export function CourseFormDialog({
                         <BuildIcon />
                       )
                     }
-                    onClick={compileCoverPage}
-                    disabled={isCompiling}
+                    onClick={onCompile}
+                    disabled={contentDisabled || isCompiling}
                   >
                     {isCompiling
                       ? t("common.compiling")
@@ -309,21 +231,16 @@ export function CourseFormDialog({
 
                 <Box sx={{ flex: 1, minHeight: 0 }}>
                   <LatexEditor
-                    value={coverPageValue}
-                    onChange={(value) =>
-                      setValue("coverPage", value, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
+                    value={templateValue}
+                    onChange={onTemplateChange}
                     height="100%"
-                    placeholder={t("courses.coverPageLatex")}
+                    placeholder={t("baseTemplate.label")}
                   />
                 </Box>
 
-                {formState.errors.coverPage?.message ? (
+                {errorMessage ? (
                   <Typography variant="caption" color="error.main">
-                    {formState.errors.coverPage.message}
+                    {errorMessage}
                   </Typography>
                 ) : null}
               </Box>
@@ -334,7 +251,7 @@ export function CourseFormDialog({
                 onMouseDown={startSplitDrag}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label={t("courses.resizeAria")}
+                aria-label={t("baseTemplate.resizeAria")}
                 sx={{
                   width: 10,
                   flexShrink: 0,
@@ -355,7 +272,7 @@ export function CourseFormDialog({
                   }}
                 />
                 <Stack spacing={0.5} sx={{ ml: 0.5 }}>
-                  <Tooltip title={t("courses.closeCoverPanel")}>
+                  <Tooltip title={t("baseTemplate.closeTemplate")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -384,7 +301,7 @@ export function CourseFormDialog({
                       <DragIndicatorIcon fontSize="small" />
                     </Box>
                   </Tooltip>
-                  <Tooltip title={t("courses.closePreviewPanel")}>
+                  <Tooltip title={t("baseTemplate.closePreview")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -449,25 +366,30 @@ export function CourseFormDialog({
                   hideDownload
                   isLoading={isCompiling}
                   compilerMessages={compilerMessages}
-                  loadingText={t("courses.compilingPreview")}
-                  emptyText={t("courses.emptyPreview")}
+                  loadingText={t("baseTemplate.compilingPreview")}
+                  emptyText={t("baseTemplate.emptyPreview")}
                 />
               </Box>
             )}
           </Box>
-        </Box>
+        )}
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2, gap: 1.5 }}>
-        <Button variant="contained" color="secondary" onClick={onClose}>
-          {t("topics.cancelUpper")}
-        </Button>
+      <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+        <Button onClick={onClose}>{t("common.close")}</Button>
         <Button
           variant="contained"
-          onClick={handleSubmit(onSubmit)}
-          disabled={submitting}
+          startIcon={
+            isSavingTemplate ? (
+              <CircularProgress size={14} color="inherit" />
+            ) : (
+              <SaveIcon />
+            )
+          }
+          onClick={onSave}
+          disabled={contentDisabled || isSavingTemplate}
         >
-          {t("topics.saveUpper")}
+          {isSavingTemplate ? t("baseTemplate.saving") : t("baseTemplate.save")}
         </Button>
       </DialogActions>
     </Dialog>

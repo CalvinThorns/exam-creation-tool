@@ -10,8 +10,10 @@ import {
 import UploadIcon from "@mui/icons-material/Upload";
 import { fileToBase64 } from "../../utils/fileToBase64";
 import { LatexEditor } from "../../components/ui/LatexEditor";
+import { useTranslation } from "react-i18next";
 
 export function TaskEditor({ control, register, setValue, errors }) {
+  const { t } = useTranslation();
   const { fields, remove } = useFieldArray({ control, name: "tasks" });
   const watchedTasks = useWatch({ control, name: "tasks" }) || [];
 
@@ -33,10 +35,12 @@ export function TaskEditor({ control, register, setValue, errors }) {
       {fields.map((f, idx) => (
         <Box key={f.id} className="rounded-2xl border p-5">
           <div className="flex items-center justify-between mb-3">
-            <Typography className="font-semibold">Task {idx + 1}</Typography>
+            <Typography className="font-semibold">
+              {t("topics.taskLabel", { index: idx + 1 })}
+            </Typography>
             {fields.length > 1 ? (
               <Button color="error" variant="text" onClick={() => remove(idx)}>
-                Remove
+                {t("topics.remove")}
               </Button>
             ) : null}
           </div>
@@ -46,7 +50,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
             color="text.secondary"
             sx={{ mb: 0.5, display: "block" }}
           >
-            Task
+            {t("topics.taskBlockTitle")}
           </Typography>
           <LatexEditor
             value={watchedTasks[idx]?.question || ""}
@@ -57,7 +61,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
               })
             }
             height={300}
-            placeholder="Task LaTeX"
+            placeholder={t("topics.taskLatex")}
           />
           {errors?.tasks?.[idx]?.question?.message ? (
             <Typography
@@ -75,7 +79,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
               color="text.secondary"
               sx={{ mb: 0.5, display: "block" }}
             >
-              Solution
+              {t("common.solution")}
             </Typography>
             <LatexEditor
               value={watchedTasks[idx]?.solution || ""}
@@ -86,7 +90,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
                 })
               }
               height={300}
-              placeholder="Solution LaTeX"
+              placeholder={t("topics.solutionLatex")}
             />
             {errors?.tasks?.[idx]?.solution?.message ? (
               <Typography
@@ -106,7 +110,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
               startIcon={<UploadIcon />}
               fullWidth
             >
-              Upload task image
+              {t("topics.uploadTaskImage")}
               <input
                 hidden
                 type="file"
@@ -116,8 +120,8 @@ export function TaskEditor({ control, register, setValue, errors }) {
             </Button>
 
             <TextField
-              label="Points"
-              placeholder="Points"
+              label={t("common.points")}
+              placeholder={t("common.points")}
               type="number"
               fullWidth
               {...register(`tasks.${idx}.points`)}
@@ -134,7 +138,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
                   {...register(`tasks.${idx}.isRelatedToTopic`)}
                 />
               }
-              label="Related to topic"
+              label={t("topics.relatedToTopic")}
             />
           </div>
         </Box>

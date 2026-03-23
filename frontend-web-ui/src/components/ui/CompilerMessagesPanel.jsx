@@ -22,8 +22,9 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import { useTranslation } from "react-i18next";
 
-function buildGroupedMessages(compilerMessages) {
+function buildGroupedMessages(compilerMessages, t) {
   const errors = compilerMessages?.errors || [];
   const warnings = compilerMessages?.warnings || [];
 
@@ -31,15 +32,17 @@ function buildGroupedMessages(compilerMessages) {
     ...errors.map((item, index) => ({
       key: `error-${index}`,
       severity: "error",
-      title: item?.message || "Compiler error",
+      title: item?.message || t("compiler.errorTitleFallback"),
       subtitle:
-        typeof item?.line === "number" ? `Line ${item.line}` : "Compile step",
+        typeof item?.line === "number"
+          ? t("compiler.line", { line: item.line })
+          : t("compiler.compileStep"),
       details: item?.snippet || null,
     })),
     ...warnings.map((item, index) => ({
       key: `warning-${index}`,
       severity: "warning",
-      title: item?.message || "Compiler warning",
+      title: item?.message || t("compiler.warningTitleFallback"),
       subtitle: [item?.where, item?.source].filter(Boolean).join(" • "),
       details: item?.snippet || null,
     })),
@@ -65,10 +68,8 @@ function buildGroupedMessages(compilerMessages) {
   );
 }
 
-export function CompilerMessagesPanel({
-  compilerMessages,
-  title = "Compiler",
-}) {
+export function CompilerMessagesPanel({ compilerMessages, title }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [activeMessageKey, setActiveMessageKey] = useState(null);
@@ -88,9 +89,10 @@ export function CompilerMessagesPanel({
     (errorCount > 0 || warningCount > 0 || Boolean(compilerMessages?.log));
 
   const groupedMessages = useMemo(
-    () => buildGroupedMessages(compilerMessages),
-    [compilerMessages],
+    () => buildGroupedMessages(compilerMessages, t),
+    [compilerMessages, t],
   );
+  const resolvedTitle = title || t("compiler.title");
 
   const filteredMessages = groupedMessages.filter((message) => {
     if (filter === "all") return true;
@@ -114,7 +116,7 @@ export function CompilerMessagesPanel({
       >
         <Chip
           clickable
-          label="All"
+          label={t("compiler.all")}
           color={filter === "all" ? "primary" : "default"}
           variant={filter === "all" ? "filled" : "outlined"}
           onClick={() => setFilter("all")}
@@ -122,7 +124,7 @@ export function CompilerMessagesPanel({
         />
         <Chip
           clickable
-          label="Errors"
+          label={t("compiler.errors")}
           color={filter === "error" ? "error" : "default"}
           variant={filter === "error" ? "filled" : "outlined"}
           onClick={() => setFilter("error")}
@@ -130,7 +132,7 @@ export function CompilerMessagesPanel({
         />
         <Chip
           clickable
-          label="Warnings"
+          label={t("compiler.warnings")}
           color={filter === "warning" ? "warning" : "default"}
           variant={filter === "warning" ? "filled" : "outlined"}
           onClick={() => setFilter("warning")}
@@ -151,7 +153,7 @@ export function CompilerMessagesPanel({
       >
         {filteredMessages.length === 0 ? (
           <Alert severity="info" sx={{ mt: 0.5 }}>
-            No messages for this filter.
+            {t("compiler.noMessagesForFilter")}
           </Alert>
         ) : (
           filteredMessages.map((message) => {
@@ -189,14 +191,18 @@ export function CompilerMessagesPanel({
                     >
                       <Chip
                         size="small"
-                        label={isError ? "Error" : "Warning"}
+                        label={
+                          isError ? t("compiler.error") : t("compiler.warning")
+                        }
                         color={isError ? "error" : "warning"}
                         sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
                       />
                       {message.count > 1 ? (
                         <Chip
                           size="small"
-                          label={`Repeated ×${message.count}`}
+                          label={t("compiler.repeated", {
+                            count: message.count,
+                          })}
                           variant="outlined"
                           sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
                         />
@@ -209,7 +215,9 @@ export function CompilerMessagesPanel({
                         onClick={() => toggleMessage(message.key)}
                         sx={{ textTransform: "none", minWidth: 0, px: 0.75 }}
                       >
-                        {isActive ? "Hide details" : "Show details"}
+                        {isActive
+                          ? t("compiler.hideDetails")
+                          : t("compiler.showDetails")}
                       </Button>
                     ) : null}
                   </Stack>
@@ -273,8 +281,8 @@ export function CompilerMessagesPanel({
               sx={{ textTransform: "none" }}
             >
               {showFullLog
-                ? "Hide full compiler log"
-                : "Show full compiler log"}
+                ? t("compiler.hideFullLog")
+                : t("compiler.showFullLog")}
             </Button>
             <Collapse in={showFullLog} timeout="auto" unmountOnExit>
               <Alert severity="info" sx={{ mt: 0.75 }}>
@@ -333,20 +341,20 @@ export function CompilerMessagesPanel({
               sx={{ color: "text.secondary" }}
             />
             <Typography variant="body2" fontWeight={700} color="text.primary">
-              {title}
+              {resolvedTitle}
             </Typography>
             <Chip
               size="small"
               color={errorCount > 0 ? "error" : "default"}
               icon={<ErrorOutlineIcon style={{ fontSize: 14 }} />}
-              label={`${errorCount} error${errorCount === 1 ? "" : "s"}`}
+              label={t("compiler.errorCount", { count: errorCount })}
               sx={{ fontWeight: 700 }}
             />
             <Chip
               size="small"
               color={warningCount > 0 ? "warning" : "default"}
               icon={<WarningAmberIcon style={{ fontSize: 14 }} />}
-              label={`${warningCount} warning${warningCount === 1 ? "" : "s"}`}
+              label={t("compiler.warningCount", { count: warningCount })}
               sx={{ fontWeight: 700 }}
             />
           </Stack>
@@ -360,7 +368,7 @@ export function CompilerMessagesPanel({
         <IconButton
           size="small"
           onClick={() => setDialogOpen(true)}
-          aria-label="Open compiler messages dialog"
+          aria-label={t("compiler.openDialog")}
           sx={{
             width: 32,
             height: 32,
@@ -403,21 +411,23 @@ export function CompilerMessagesPanel({
                 sx={{ color: "text.secondary" }}
               />
               <Typography variant="h6" component="span">
-                {title}
+                {resolvedTitle}
               </Typography>
               <Chip
                 size="small"
                 color={errorCount > 0 ? "error" : "default"}
-                label={`${errorCount} error${errorCount === 1 ? "" : "s"}`}
+                label={t("compiler.errorCount", { count: errorCount })}
               />
               <Chip
                 size="small"
                 color={warningCount > 0 ? "warning" : "default"}
-                label={`${warningCount} warning${warningCount === 1 ? "" : "s"}`}
+                label={t("compiler.warningCount", { count: warningCount })}
               />
             </Stack>
 
-            <Button onClick={() => setDialogOpen(false)}>Close</Button>
+            <Button onClick={() => setDialogOpen(false)}>
+              {t("common.close")}
+            </Button>
           </Stack>
         </DialogTitle>
 
@@ -444,7 +454,7 @@ export function CompilerMessagesPanel({
                 variant="subtitle2"
                 sx={{ px: 1.25, py: 1, fontWeight: 700 }}
               >
-                Errors & warnings
+                {t("compiler.errorsAndWarnings")}
               </Typography>
               <Divider />
               <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -469,7 +479,7 @@ export function CompilerMessagesPanel({
                 variant="subtitle2"
                 sx={{ px: 1.25, py: 1, fontWeight: 700 }}
               >
-                Full output log
+                {t("compiler.fullOutputLog")}
               </Typography>
               <Divider />
               <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 1 }}>
@@ -483,7 +493,7 @@ export function CompilerMessagesPanel({
                     fontFamily: "monospace",
                   }}
                 >
-                  {compilerMessages?.log || "No compiler log available."}
+                  {compilerMessages?.log || t("compiler.noLog")}
                 </Typography>
               </Box>
             </Paper>

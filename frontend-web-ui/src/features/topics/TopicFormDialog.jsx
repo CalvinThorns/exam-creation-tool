@@ -19,6 +19,7 @@ import { topicSchema } from "../../utils/validators";
 import { fileToBase64 } from "../../utils/fileToBase64";
 import { TaskEditor } from "./TaskEditor";
 import { LatexEditor } from "../../components/ui/LatexEditor";
+import { useTranslation } from "react-i18next";
 
 export function TopicFormDialog({
   open,
@@ -28,8 +29,9 @@ export function TopicFormDialog({
   submitting,
   courses,
 }) {
+  const { t } = useTranslation();
   const form = useForm({
-    resolver: zodResolver(topicSchema),
+    resolver: zodResolver(topicSchema(t)),
     defaultValues: {
       courseId: "",
       topic: "",
@@ -111,23 +113,25 @@ export function TopicFormDialog({
       {/* Header bar like mock */}
       <DialogTitle sx={{ p: 0 }}>
         <Box className="px-6 py-3">
-          <Typography className="font-semibold text-lg">Add Task</Typography>
+          <Typography className="font-semibold text-lg">
+            {t("topics.dialogTitle")}
+          </Typography>
         </Box>
       </DialogTitle>
 
-      <DialogContent className="bg-white" sx={{ p: 0 }}>
+      <DialogContent sx={{ p: 0, bgcolor: "background.paper" }}>
         <Box className="px-10 py-8">
           {/* Row 1: Course + Topic */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <TextField
               select
-              label="Course"
+              label={t("common.course")}
               fullWidth
               {...register("courseId")}
               error={!!formState.errors.courseId}
               helperText={formState.errors.courseId?.message}
             >
-              <MenuItem value="">Select course</MenuItem>
+              <MenuItem value="">{t("common.selectCourse")}</MenuItem>
               {(courses || []).map((c) => (
                 <MenuItem key={c.id} value={c.id}>
                   {c.title} ({c.shortName})
@@ -136,7 +140,7 @@ export function TopicFormDialog({
             </TextField>
 
             <TextField
-              label="Topic"
+              label={t("common.topic")}
               fullWidth
               {...register("topic")}
               error={!!formState.errors.topic}
@@ -151,7 +155,7 @@ export function TopicFormDialog({
               color="text.secondary"
               sx={{ mb: 0.5, display: "block" }}
             >
-              Description
+              {t("common.description")}
             </Typography>
             <LatexEditor
               value={descriptionValue}
@@ -162,7 +166,7 @@ export function TopicFormDialog({
                 })
               }
               height={300}
-              placeholder="Description LaTeX"
+              placeholder={t("topics.descriptionLatex")}
             />
             {formState.errors.description?.message ? (
               <Typography
@@ -184,7 +188,7 @@ export function TopicFormDialog({
               className="justify-between"
               fullWidth
             >
-              Upload image
+              {t("topics.uploadImage")}
               <input
                 hidden
                 type="file"
@@ -196,8 +200,8 @@ export function TopicFormDialog({
             </Button>
 
             <TextField
-              label="Points"
-              placeholder="Points"
+              label={t("common.points")}
+              placeholder={t("common.points")}
               type="number"
               fullWidth
               {...register("points")}
@@ -209,7 +213,9 @@ export function TopicFormDialog({
           {/* Task block */}
           <div className="mt-10 rounded-2xl border p-5">
             <div className="flex items-center mb-4">
-              <Typography className="font-semibold">Task</Typography>
+              <Typography className="font-semibold">
+                {t("topics.taskBlockTitle")}
+              </Typography>
             </div>
 
             <TaskEditor
@@ -230,7 +236,7 @@ export function TopicFormDialog({
 
       <DialogActions sx={{ px: 10, py: 4, gap: 2 }}>
         <Button variant="contained" color="secondary" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
 
         <Button
@@ -238,7 +244,7 @@ export function TopicFormDialog({
           onClick={handleSubmit(onSubmit)}
           disabled={submitting}
         >
-          Save
+          {t("common.save")}
         </Button>
       </DialogActions>
     </Dialog>

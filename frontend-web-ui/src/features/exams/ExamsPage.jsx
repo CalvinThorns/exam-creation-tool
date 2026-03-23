@@ -11,10 +11,12 @@ import { DataTable } from "../../components/ui/DataTable";
 import { useExams, useDeleteExam } from "./exams.hooks";
 import { formatDate } from "../../utils/format";
 import { agGridFilterToApiFilters } from "../../utils/listQuery";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_PAGE_SIZE = 10;
 
 export function ExamsPage() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -64,30 +66,34 @@ export function ExamsPage() {
 
   const columns = useMemo(
     () => [
-      { headerName: "Course", field: "courseTitle", colId: "courseId" },
-      { headerName: "Points", field: "points", colId: "points" },
-      { headerName: "Date", field: "date", colId: "createdAt" },
+      {
+        headerName: t("common.course"),
+        field: "courseTitle",
+        colId: "courseId",
+      },
+      { headerName: t("common.points"), field: "points", colId: "points" },
+      { headerName: t("exams.date"), field: "date", colId: "createdAt" },
     ],
-    [],
+    [t],
   );
 
   const actions = useMemo(
     () => [
       {
         id: "edit",
-        label: "Edit",
+        label: t("common.edit"),
         icon: EditIcon,
         onClick: (row) => nav(`/exams/${row.id}/edit`),
       },
       {
         id: "delete",
-        label: "Delete",
+        label: t("common.delete"),
         icon: DeleteIcon,
         maxWidth: 100,
         onClick: (row) => setConfirm({ open: true, id: row.id }),
       },
     ],
-    [nav],
+    [nav, t],
   );
 
   const handlePageChange = useCallback((newPage, newPageSize) => {
@@ -115,14 +121,14 @@ export function ExamsPage() {
       sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
     >
       <PageHeader
-        title="Exams"
+        title={t("exams.pageTitle")}
         right={
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => nav("/exams/generate")}
           >
-            Add New
+            {t("common.addNew")}
           </Button>
         }
       />
@@ -136,12 +142,12 @@ export function ExamsPage() {
               columnDefs={columns}
               rowData={rows}
               loading={isLoading || isFetching}
-              noRowsTitle="No exams"
-              noRowsHint="Click Add New to generate and save an exam."
-              noFilteredRowsTitle="No matching exams"
-              noFilteredRowsHint="Try adjusting or clearing filters."
+              noRowsTitle={t("exams.noRows")}
+              noRowsHint={t("exams.noRowsHint")}
+              noFilteredRowsTitle={t("exams.noFilteredRows")}
+              noFilteredRowsHint={t("datatable.noFilteredHint")}
               actions={actions}
-              actionsHeaderName="Actions"
+              actionsHeaderName={t("common.actions")}
               height="100%"
               serverSide
               rowCount={rowCount}
@@ -159,8 +165,8 @@ export function ExamsPage() {
 
       <ConfirmDialog
         open={confirm.open}
-        title="Delete exam"
-        message="Are you sure you want to delete this exam?"
+        title={t("exams.deleteTitle")}
+        message={t("exams.deleteMessage")}
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />

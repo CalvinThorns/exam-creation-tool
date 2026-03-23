@@ -14,8 +14,10 @@ import {
   useDeleteCourse,
   useUpdateCourse,
 } from "./courses.hooks";
+import { useTranslation } from "react-i18next";
 
 export function CoursesPage() {
+  const { t } = useTranslation();
   const { data, isLoading, error } = useCourses();
   const createM = useCreateCourse();
   const updateM = useUpdateCourse();
@@ -28,17 +30,17 @@ export function CoursesPage() {
 
   const columns = useMemo(
     () => [
-      { headerName: "Name", field: "title" },
-      { headerName: "Short Name", field: "shortName" },
+      { headerName: t("common.name"), field: "title" },
+      { headerName: t("common.shortName"), field: "shortName" },
     ],
-    [],
+    [t],
   );
 
   const actions = useMemo(
     () => [
       {
         id: "edit",
-        label: "Edit",
+        label: t("common.edit"),
         icon: EditIcon,
         onClick: (row) => {
           setEditing(row);
@@ -47,14 +49,14 @@ export function CoursesPage() {
       },
       {
         id: "delete",
-        label: "Delete",
+        label: t("common.delete"),
         icon: DeleteIcon,
         onClick: (row) => {
           setConfirm({ open: true, id: row.id });
         },
       },
     ],
-    [],
+    [t],
   );
 
   const openAdd = () => {
@@ -81,16 +83,16 @@ export function CoursesPage() {
       sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
     >
       <PageHeader
-        title="Courses"
+        title={t("courses.pageTitle")}
         right={
           <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
-            Add New
+            {t("common.addNew")}
           </Button>
         }
       />
 
       {error ? (
-        <ErrorState message={error.message || "Failed to load courses"} />
+        <ErrorState message={error.message || t("courses.failedLoad")} />
       ) : null}
 
       {!error ? (
@@ -100,12 +102,12 @@ export function CoursesPage() {
               columnDefs={columns}
               rowData={rows}
               loading={isLoading}
-              noRowsTitle="No courses"
-              noRowsHint="Click Add New to create your first course."
-              noFilteredRowsTitle="No matching courses"
-              noFilteredRowsHint="Try adjusting or clearing filters."
+              noRowsTitle={t("courses.noRows")}
+              noRowsHint={t("courses.noRowsHint")}
+              noFilteredRowsTitle={t("courses.noFilteredRows")}
+              noFilteredRowsHint={t("datatable.noFilteredHint")}
               actions={actions}
-              actionsHeaderName="Actions"
+              actionsHeaderName={t("common.actions")}
               pageSize={10}
               height="100%"
             />
@@ -123,8 +125,8 @@ export function CoursesPage() {
 
       <ConfirmDialog
         open={confirm.open}
-        title="Delete course"
-        message="Are you sure you want to delete this course?"
+        title={t("courses.deleteTitle")}
+        message={t("courses.deleteMessage")}
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />
