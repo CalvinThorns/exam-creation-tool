@@ -16,17 +16,20 @@ import DownloadIcon from "@mui/icons-material/Download";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import { CompilerMessagesPanel } from "./CompilerMessagesPanel";
 
 export function PdfPreviewPanel({
   title = "Preview",
   pdfUrl,
   onDownload,
+  hideDownload = false,
   isLoading = false,
   loadingText = "Compiling PDF…",
   emptyText = "Compile to see the PDF preview",
   downloadLabel = "Download",
   statusContent = null,
   iframeTitle = "PDF Preview",
+  compilerMessages = null,
 }) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -68,16 +71,18 @@ export function PdfPreviewPanel({
         </Stack>
 
         <Stack direction="row" spacing={1}>
-          <Button
-            variant="contained"
-            color="secondary"
-            size="small"
-            startIcon={<DownloadIcon />}
-            disabled={!pdfUrl || isLoading}
-            onClick={onDownload}
-          >
-            {downloadLabel}
-          </Button>
+          {!hideDownload && (
+            <Button
+              variant="contained"
+              color="secondary"
+              size="small"
+              startIcon={<DownloadIcon />}
+              disabled={!pdfUrl || isLoading}
+              onClick={onDownload}
+            >
+              {downloadLabel}
+            </Button>
+          )}
           <Tooltip title={expanded ? "Collapse" : "Expand"}>
             <IconButton
               size="small"
@@ -94,6 +99,8 @@ export function PdfPreviewPanel({
       </Stack>
 
       <Divider sx={{ my: 1.5, flexShrink: 0 }} />
+
+      <CompilerMessagesPanel compilerMessages={compilerMessages} />
 
       <Box
         sx={{

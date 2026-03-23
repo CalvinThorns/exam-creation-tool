@@ -1,5 +1,5 @@
 // GenerateExamPage.jsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import {
   Autocomplete,
@@ -19,6 +19,7 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
+  Tooltip,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
@@ -28,11 +29,16 @@ import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import EditIcon from "@mui/icons-material/Edit";
 
 import { PageHeader } from "../../components/ui/PageHeader";
 import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { TopicCard } from "./components/TopicCard";
+import { CoverPagePreviewDialog } from "./components/CoverPagePreviewDialog";
 import { useCourses } from "../courses/courses.hooks";
 import { useTopics } from "../topics/topics.hooks";
 import {
@@ -43,6 +49,12 @@ import {
   useUpdateExam,
 } from "./exams.hooks";
 import { examsApi } from "../../api/exams.api";
+
+const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages"];
+
+const DEFAULT_SOLUTION_SPACE = "1 Page";
+const DEFAULT_SPLIT_PERCENT = 66.6667;
+const COLLAPSE_THRESHOLD_PERCENT = 10;
 
 function sumPoints(topics) {
   return (topics || []).reduce((acc, topic) => {
@@ -56,6 +68,18 @@ function sumPoints(topics) {
     }
     return acc + Number(topic?.points || 0);
   }, 0);
+}
+
+function withSolutionSpace(topics = []) {
+  return (topics || []).map((topic) => ({
+    ...topic,
+    tasks: (topic?.tasks || []).map((task) => ({
+      ...task,
+      solutionSpace: SOLUTION_SPACE_OPTIONS.includes(task?.solutionSpace)
+        ? task.solutionSpace
+        : DEFAULT_SOLUTION_SPACE,
+    })),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -145,14 +169,28 @@ export function GenerateExamPage() {
   );
 
   const [courseId, setCourseId] = useState("");
-  const [targetPoints, setTargetPoints] = useState(0);
+  const [targetPoints, setTargetPoints] = useState(null);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
     usePdfPreview("exam.pdf");
+  const {
+    pdfUrl: coverPdfUrl,
+    setPdfFromBase64: setCoverPdfFromBase64,
+    clearPdf: clearCoverPdf,
+  } = usePdfPreview("cover-page.pdf");
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledVersion, setCompiledVersion] = useState(null);
+  const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
+  const [coverPageDraft, setCoverPageDraft] = useState("");
+  const [isCoverCompiling, setIsCoverCompiling] = useState(false);
+  const [coverCompileDiagnostics, setCoverCompileDiagnostics] = useState(null);
   const [draft, setDraft] = useState(null);
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
+  const [compileDiagnostics, setCompileDiagnostics] = useState(null);
+  const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
+  const [collapsedPane, setCollapsedPane] = useState(null);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const splitContainerRef = useRef(null);
 
   // Fetch existing exam when in edit mode
   const { data: examData, isLoading: examLoading } = useExam(examId, {
@@ -250,6 +288,7 @@ export function GenerateExamPage() {
   const compileDraft = async (version) => {
     if (!draft) return;
     clearPdf();
+    setCompileDiagnostics(null);
 
     setIsCompiling(true);
     setCompiledVersion(version);
@@ -261,11 +300,102 @@ export function GenerateExamPage() {
         version,
       });
 
-      const { pdfBase64, filename } = res.data;
-      setPdfFromBase64({ base64: pdfBase64, filename });
+      const compileData = res?.data || {};
+      const { pdfBase64, filename, contentType, errors } = compileData;
+
+      setPdfFromBase64({
+        base64: pdfBase64,
+        filename,
+        mimeType: contentType || "application/pdf",
+      });
+
+      setCompileDiagnostics({
+        clsiStatus: errors?.clsiStatus || null,
+        buildId: errors?.buildId || null,
+        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
+        warningCount: Number(
+          errors?.warningCount ?? errors?.warnings?.length ?? 0,
+        ),
+        errors: errors?.errors || [],
+        warnings: errors?.warnings || [],
+        timings: errors?.timings || null,
+        stats: errors?.stats || null,
+        log: errors?.log || "",
+      });
     } finally {
       setIsCompiling(false);
     }
+  };
+
+  const openCoverPageDialog = () => {
+    setCoverPageDraft(draft?.course?.coverPage || "");
+    clearCoverPdf();
+    setCoverCompileDiagnostics(null);
+    setIsCoverDialogOpen(true);
+  };
+
+  const closeCoverPageDialog = () => {
+    setIsCoverDialogOpen(false);
+  };
+
+  const compileCoverPage = async () => {
+    if (!draft?.course) return;
+
+    clearCoverPdf();
+    setCoverCompileDiagnostics(null);
+    setIsCoverCompiling(true);
+
+    try {
+      const res = await examsApi.compileDraft({
+        course: {
+          ...draft.course,
+          coverPage: coverPageDraft,
+        },
+        coverPage: coverPageDraft,
+        topics: [],
+        version: "STUDENT",
+      });
+
+      const compileData = res?.data || {};
+      const { pdfBase64, filename, contentType, errors } = compileData;
+
+      setCoverPdfFromBase64({
+        base64: pdfBase64,
+        filename,
+        mimeType: contentType || "application/pdf",
+      });
+
+      setCoverCompileDiagnostics({
+        clsiStatus: errors?.clsiStatus || null,
+        buildId: errors?.buildId || null,
+        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
+        warningCount: Number(
+          errors?.warningCount ?? errors?.warnings?.length ?? 0,
+        ),
+        errors: errors?.errors || [],
+        warnings: errors?.warnings || [],
+        timings: errors?.timings || null,
+        stats: errors?.stats || null,
+        log: errors?.log || "",
+      });
+    } finally {
+      setIsCoverCompiling(false);
+    }
+  };
+
+  const saveCoverPage = async () => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        course: {
+          ...(prev.course || {}),
+          coverPage: coverPageDraft,
+        },
+      };
+    });
+
+    setIsCoverDialogOpen(false);
   };
 
   const recalcDraftTotals = (nextDraft) => {
@@ -295,6 +425,7 @@ export function GenerateExamPage() {
     setDraft(null);
     clearPdf();
     setCompiledVersion(null);
+    setCompileDiagnostics(null);
     const res = await generateM.mutateAsync({
       courseId,
       topics: selectedTopics,
@@ -330,6 +461,7 @@ export function GenerateExamPage() {
       next.topics[topicIndex].tasks.push({
         question: "",
         solution: "",
+        solutionSpace: DEFAULT_SOLUTION_SPACE,
         points: 0,
       });
       syncTopicPointsFromTasks(next, topicIndex);
@@ -350,6 +482,7 @@ export function GenerateExamPage() {
 
   const regenerateTopic = async (topicName) => {
     if (!draft) return;
+    setCompileDiagnostics(null);
     const res = await regenM.mutateAsync({
       courseId,
       topicName,
@@ -371,7 +504,7 @@ export function GenerateExamPage() {
     const body = {
       courseId: draft.course?.id || courseId,
       targetPoints: Number(draft.targetPoints),
-      topics: draft.topics,
+      topics: withSolutionSpace(draft.topics),
     };
 
     if (isEditMode) {
@@ -382,6 +515,66 @@ export function GenerateExamPage() {
     await saveM.mutateAsync(body);
   };
 
+  const resetSplitLayout = () => {
+    setCollapsedPane(null);
+    setSplitPercent(DEFAULT_SPLIT_PERCENT);
+  };
+
+  const startSplitDrag = (event) => {
+    if (collapsedPane) return;
+    event.preventDefault();
+    setIsDraggingSplit(true);
+  };
+
+  useEffect(() => {
+    if (!isDraggingSplit) return;
+
+    const handleMouseMove = (event) => {
+      const container = splitContainerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const nextPercent = ((event.clientX - rect.left) / rect.width) * 100;
+
+      if (nextPercent <= COLLAPSE_THRESHOLD_PERCENT) {
+        setCollapsedPane("left");
+        setSplitPercent(DEFAULT_SPLIT_PERCENT);
+        setIsDraggingSplit(false);
+        return;
+      }
+
+      if (nextPercent >= 100 - COLLAPSE_THRESHOLD_PERCENT) {
+        setCollapsedPane("right");
+        setSplitPercent(DEFAULT_SPLIT_PERCENT);
+        setIsDraggingSplit(false);
+        return;
+      }
+
+      const clampedPercent = Math.max(
+        COLLAPSE_THRESHOLD_PERCENT,
+        Math.min(100 - COLLAPSE_THRESHOLD_PERCENT, nextPercent),
+      );
+      setCollapsedPane(null);
+      setSplitPercent(clampedPercent);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSplit(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+  }, [isDraggingSplit]);
+
   const diffColor = !draft
     ? "text.secondary"
     : draft.diff === 0
@@ -389,6 +582,11 @@ export function GenerateExamPage() {
       : draft.diff > 0
         ? "warning.main"
         : "error.main";
+
+  const leftPanelWidth =
+    collapsedPane === "right" ? "100%" : `${splitPercent}%`;
+  const rightPanelWidth =
+    collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
 
   return (
     <Box
@@ -691,149 +889,353 @@ export function GenerateExamPage() {
 
           {/* ── Two-column panels row ── */}
           <Box
+            ref={splitContainerRef}
             sx={{
               flex: 1,
               minHeight: 0,
-              display: "grid",
-              gridTemplateColumns: "2fr 1fr",
-              gap: 2,
+              display: "flex",
+              gap: 0,
               overflow: "hidden",
             }}
           >
             {/* Left: Exam panel */}
-            <Paper
-              sx={{
-                p: 2.5,
-                height: "100%",
-                boxSizing: "border-box",
-                border: `1px solid ${theme.palette.divider}`,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-              }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ flexShrink: 0, mb: 2 }}
-              >
-                <Typography variant="h6">
-                  Exam{" "}
-                  {draft && (
-                    <Typography
-                      component="span"
-                      variant="body2"
-                      color="text.secondary"
-                    >
-                      ({draft.totalPoints} / {draft.targetPoints} pts)
-                    </Typography>
-                  )}
-                </Typography>
-
-                {/* Compile dropdown button */}
-                {isCompiling ? (
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    size="small"
-                    disabled
-                    startIcon={<CircularProgress size={14} color="inherit" />}
-                  >
-                    Compiling…
-                  </Button>
-                ) : (
-                  <CompileButton disabled={!draft} onCompile={compileDraft} />
-                )}
-              </Stack>
-
-              <Divider sx={{ flexShrink: 0, mb: 2 }} />
-
+            {collapsedPane === "left" ? (
               <Box
                 sx={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                  "&::-webkit-scrollbar": { width: 6 },
-                  "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-                  "&::-webkit-scrollbar-thumb": {
-                    bgcolor: alpha(theme.palette.primary.main, 0.2),
-                    borderRadius: 3,
-                  },
-                  "&::-webkit-scrollbar-thumb:hover": {
-                    bgcolor: alpha(theme.palette.primary.main, 0.4),
-                  },
+                  width: 34,
+                  flexShrink: 0,
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 1,
+                  mr: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexDirection: "column",
+                  py: 1,
+                  bgcolor: "background.paper",
                 }}
               >
-                {!draft ? (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    writingMode: "vertical-rl",
+                    transform: "rotate(180deg)",
+                    fontWeight: 600,
+                    letterSpacing: 0.4,
+                    paddingInline: 2,
+                  }}
+                >
+                  Exam
+                </Typography>
+                <Tooltip title="Expand exam panel">
+                  <IconButton size="small" onClick={resetSplitLayout}>
+                    <ChevronRightIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  width: leftPanelWidth,
+                  minWidth: 0,
+                  height: "100%",
+                  pr: collapsedPane === "right" ? 0 : 1,
+                  boxSizing: "border-box",
+                }}
+              >
+                <Paper
+                  sx={{
+                    p: 2.5,
+                    height: "100%",
+                    boxSizing: "border-box",
+                    border: `1px solid ${theme.palette.divider}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ flexShrink: 0, mb: 2 }}
+                  >
+                    <Typography variant="h6">
+                      Exam{" "}
+                      {draft && (
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          ({draft.totalPoints} / {draft.targetPoints} pts)
+                        </Typography>
+                      )}
+                    </Typography>
+
+                    {/* Compile dropdown button */}
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={openCoverPageDialog}
+                        disabled={!draft}
+                      >
+                        Edit Cover Page
+                      </Button>
+
+                      {isCompiling ? (
+                        <Button
+                          variant="contained"
+                          color="secondary"
+                          size="small"
+                          disabled
+                          startIcon={
+                            <CircularProgress size={14} color="inherit" />
+                          }
+                        >
+                          Compiling…
+                        </Button>
+                      ) : (
+                        <CompileButton
+                          disabled={!draft}
+                          onCompile={compileDraft}
+                        />
+                      )}
+                    </Stack>
+                  </Stack>
+
+                  <Divider sx={{ flexShrink: 0, mb: 2 }} />
+
                   <Box
                     sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: "100%",
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.primary.main, 0.03),
-                      border: `1px dashed ${theme.palette.divider}`,
+                      flex: 1,
+                      minHeight: 0,
+                      overflowY: "auto",
+                      "&::-webkit-scrollbar": { width: 6 },
+                      "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+                      "&::-webkit-scrollbar-thumb": {
+                        bgcolor: alpha(theme.palette.primary.main, 0.2),
+                        borderRadius: 3,
+                      },
+                      "&::-webkit-scrollbar-thumb:hover": {
+                        bgcolor: alpha(theme.palette.primary.main, 0.4),
+                      },
                     }}
                   >
-                    <Typography color="text.disabled" variant="body2">
-                      No exam generated yet
-                    </Typography>
+                    {!draft ? (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          borderRadius: 2,
+                          bgcolor: alpha(theme.palette.primary.main, 0.03),
+                          border: `1px dashed ${theme.palette.divider}`,
+                        }}
+                      >
+                        <Typography color="text.disabled" variant="body2">
+                          No exam generated yet
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Stack spacing={2} sx={{ pr: 0.5 }}>
+                        {draft.topics.map((topic, i) => (
+                          <TopicCard
+                            key={`${topic.topic}-${i}`}
+                            topic={topic}
+                            topicIndex={i}
+                            solutionSpaceOptions={SOLUTION_SPACE_OPTIONS}
+                            onTopicField={updateTopicField}
+                            onTaskField={updateTaskField}
+                            onAddTask={addTask}
+                            onRemoveTask={removeTask}
+                            onRegenerate={regenerateTopic}
+                            regenPending={regenM.isPending}
+                          />
+                        ))}
+                      </Stack>
+                    )}
                   </Box>
-                ) : (
-                  <Stack spacing={2} sx={{ pr: 0.5 }}>
-                    {draft.topics.map((topic, i) => (
-                      <TopicCard
-                        key={`${topic.topic}-${i}`}
-                        topic={topic}
-                        topicIndex={i}
-                        onTopicField={updateTopicField}
-                        onTaskField={updateTaskField}
-                        onAddTask={addTask}
-                        onRemoveTask={removeTask}
-                        onRegenerate={regenerateTopic}
-                        regenPending={regenM.isPending}
-                      />
-                    ))}
-                  </Stack>
-                )}
+                </Paper>
               </Box>
-            </Paper>
+            )}
+
+            {collapsedPane === null && (
+              <Box
+                onMouseDown={startSplitDrag}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize exam and preview panels"
+                sx={{
+                  width: 10,
+                  flexShrink: 0,
+                  cursor: "col-resize",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 3,
+                    height: 64,
+                    borderRadius: 999,
+                    bgcolor: isDraggingSplit
+                      ? "primary.main"
+                      : alpha(theme.palette.text.primary, 0.2),
+                  }}
+                />
+                <Stack spacing={0.5} sx={{ ml: 0.5 }}>
+                  <Tooltip title="Close Tasks panel">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setCollapsedPane("left");
+                        setSplitPercent(DEFAULT_SPLIT_PERCENT);
+                      }}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ChevronLeftIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Drag to resize">
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        px: 0.25,
+                        py: 0.2,
+                        borderRadius: 1,
+                        color: isDraggingSplit
+                          ? "primary.main"
+                          : "text.secondary",
+                      }}
+                    >
+                      <DragIndicatorIcon fontSize="small" />
+                    </Box>
+                  </Tooltip>
+                  <Tooltip title="Close Preview panel">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setCollapsedPane("right");
+                        setSplitPercent(DEFAULT_SPLIT_PERCENT);
+                      }}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ChevronRightIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Box>
+            )}
 
             {/* Right: PDF Preview */}
-            <PdfPreviewPanel
-              pdfUrl={pdfUrl}
-              onDownload={downloadPdf}
-              isLoading={isCompiling}
-              loadingText={`Compiling ${compiledVersion === "STUDENT" ? "Student" : "Teacher"} version…`}
-              statusContent={
-                pdfUrl &&
-                !isCompiling &&
-                compiledVersion && (
-                  <Chip
-                    label={
-                      compiledVersion === "STUDENT" ? "Student" : "Teacher"
-                    }
-                    size="small"
-                    color={
-                      compiledVersion === "STUDENT" ? "primary" : "secondary"
-                    }
-                    variant="outlined"
-                    icon={
-                      compiledVersion === "STUDENT" ? (
-                        <SchoolIcon style={{ fontSize: 13 }} />
-                      ) : (
-                        <MenuBookIcon style={{ fontSize: 13 }} />
-                      )
-                    }
-                    sx={{ fontWeight: 600, fontSize: 11, paddingInline: "6px" }}
-                  />
-                )
-              }
-            />
+            {collapsedPane === "right" ? (
+              <Box
+                sx={{
+                  width: 34,
+                  flexShrink: 0,
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 1,
+                  ml: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexDirection: "column",
+                  py: 1,
+                  bgcolor: "background.paper",
+                }}
+              >
+                <Tooltip title="Expand preview panel">
+                  <IconButton size="small" onClick={resetSplitLayout}>
+                    <ChevronLeftIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    writingMode: "vertical-rl",
+                    fontWeight: 600,
+                    letterSpacing: 0.4,
+                    paddingInline: 2,
+                  }}
+                >
+                  Preview
+                </Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  width: rightPanelWidth,
+                  minWidth: 0,
+                  height: "100%",
+                  pl: collapsedPane === "left" ? 0 : 1,
+                  boxSizing: "border-box",
+                }}
+              >
+                <PdfPreviewPanel
+                  pdfUrl={pdfUrl}
+                  onDownload={downloadPdf}
+                  isLoading={isCompiling}
+                  compilerMessages={compileDiagnostics}
+                  loadingText={`Compiling ${compiledVersion === "STUDENT" ? "Student" : "Teacher"} version…`}
+                  statusContent={
+                    pdfUrl &&
+                    !isCompiling &&
+                    compiledVersion && (
+                      <Chip
+                        label={
+                          compiledVersion === "STUDENT" ? "Student" : "Teacher"
+                        }
+                        size="small"
+                        color={
+                          compiledVersion === "STUDENT"
+                            ? "primary"
+                            : "secondary"
+                        }
+                        variant="outlined"
+                        icon={
+                          compiledVersion === "STUDENT" ? (
+                            <SchoolIcon style={{ fontSize: 13 }} />
+                          ) : (
+                            <MenuBookIcon style={{ fontSize: 13 }} />
+                          )
+                        }
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: 11,
+                          paddingInline: "6px",
+                        }}
+                      />
+                    )
+                  }
+                />
+              </Box>
+            )}
           </Box>
         </> // end of isEditMode && examLoading conditional
+      )}
+
+      {isCoverDialogOpen && (
+        <CoverPagePreviewDialog
+          open={isCoverDialogOpen}
+          onClose={closeCoverPageDialog}
+          coverPageValue={coverPageDraft}
+          onCoverPageChange={setCoverPageDraft}
+          onCompile={compileCoverPage}
+          isCompiling={isCoverCompiling}
+          pdfUrl={coverPdfUrl}
+          compilerMessages={coverCompileDiagnostics}
+          onSave={saveCoverPage}
+          disableActions={!draft}
+        />
       )}
     </Box>
   );
