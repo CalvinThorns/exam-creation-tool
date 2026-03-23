@@ -6,6 +6,7 @@ import {
   Button,
   Typography,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 export function ConfirmDialog({
   open,
@@ -13,20 +14,23 @@ export function ConfirmDialog({
   message,
   onCancel,
   onConfirm,
-  confirmText = "Delete",
+  confirmText,
 }) {
+  const { t } = useTranslation();
+  const resolvedConfirmText = confirmText || t("common.delete");
+
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
-      <DialogTitle>{title || "Confirm"}</DialogTitle>
+      <DialogTitle>{title || t("confirmDialog.confirm")}</DialogTitle>
       <DialogContent>
         <Typography>{message}</Typography>
       </DialogContent>
       <DialogActions>
         <Button color="secondary" variant="contained" onClick={onCancel}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button color="error" variant="contained" onClick={onConfirm}>
-          {confirmText}
+          {resolvedConfirmText}
         </Button>
       </DialogActions>
     </Dialog>

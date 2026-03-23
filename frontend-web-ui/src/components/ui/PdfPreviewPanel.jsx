@@ -17,23 +17,30 @@ import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { CompilerMessagesPanel } from "./CompilerMessagesPanel";
+import { useTranslation } from "react-i18next";
 
 export function PdfPreviewPanel({
-  title = "Preview",
+  title,
   pdfUrl,
   onDownload,
   hideDownload = false,
   isLoading = false,
-  loadingText = "Compiling PDF…",
-  emptyText = "Compile to see the PDF preview",
-  downloadLabel = "Download",
+  loadingText,
+  emptyText,
+  downloadLabel,
   statusContent = null,
-  iframeTitle = "PDF Preview",
+  iframeTitle,
   compilerMessages = null,
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
   const panelRef = useRef(null);
+  const resolvedTitle = title || t("common.preview");
+  const resolvedLoadingText = loadingText || t("common.compiling");
+  const resolvedEmptyText = emptyText || t("pdf.emptyPreview");
+  const resolvedDownloadLabel = downloadLabel || t("common.download");
+  const resolvedIframeTitle = iframeTitle || t("common.preview");
 
   return (
     <Paper
@@ -65,7 +72,7 @@ export function PdfPreviewPanel({
       >
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="h6" color="text.primary">
-            {title}
+            {resolvedTitle}
           </Typography>
           {statusContent}
         </Stack>
@@ -80,10 +87,10 @@ export function PdfPreviewPanel({
               disabled={!pdfUrl || isLoading}
               onClick={onDownload}
             >
-              {downloadLabel}
+              {resolvedDownloadLabel}
             </Button>
           )}
-          <Tooltip title={expanded ? "Collapse" : "Expand"}>
+          <Tooltip title={expanded ? t("common.collapse") : t("common.expand")}>
             <IconButton
               size="small"
               onClick={() => setExpanded((prev) => !prev)}
@@ -123,12 +130,12 @@ export function PdfPreviewPanel({
               sx={{ color: "primary.main" }}
             />
             <Typography variant="body2" color="text.secondary" fontWeight={500}>
-              {loadingText}
+              {resolvedLoadingText}
             </Typography>
           </Stack>
         ) : pdfUrl ? (
           <iframe
-            title={iframeTitle}
+            title={resolvedIframeTitle}
             src={pdfUrl}
             style={{ width: "100%", height: "100%", border: "none" }}
           />
@@ -136,7 +143,7 @@ export function PdfPreviewPanel({
           <Stack alignItems="center" spacing={1} sx={{ opacity: 0.45 }}>
             <PictureAsPdfIcon sx={{ fontSize: 40, color: "text.secondary" }} />
             <Typography variant="body2" color="text.secondary">
-              {emptyText}
+              {resolvedEmptyText}
             </Typography>
           </Stack>
         )}

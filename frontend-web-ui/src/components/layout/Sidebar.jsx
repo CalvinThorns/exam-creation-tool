@@ -17,21 +17,26 @@ import {
   SchoolOutlined,
   TaskOutlined,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { SidebarCustomize } from "./SidebarCustomize";
 
-const items = [
-  { label: "Exams", to: "/exams", icon: AssignmentOutlined },
-  { label: "Courses", to: "/courses", icon: SchoolOutlined },
-  { label: "Tasks", to: "/tasks", icon: TaskOutlined },
-];
-
 export function Sidebar({ isCollapsed, onToggle }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const sidebarBackground =
     theme.palette.mode === "dark"
       ? alpha(theme.palette.background.paper, 0.92)
       : theme.palette.primary.main;
   const sidebarText = theme.palette.getContrastText(sidebarBackground);
+  const items = [
+    { label: t("sidebar.exams"), to: "/exams", icon: AssignmentOutlined },
+    {
+      label: t("sidebar.courses"),
+      to: "/courses",
+      icon: SchoolOutlined,
+    },
+    { label: t("sidebar.tasks"), to: "/tasks", icon: TaskOutlined },
+  ];
 
   return (
     <Box
@@ -54,7 +59,7 @@ export function Sidebar({ isCollapsed, onToggle }) {
         }}
       >
         <IconButton
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={isCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           onClick={onToggle}
           size="small"
           sx={{ color: "inherit" }}

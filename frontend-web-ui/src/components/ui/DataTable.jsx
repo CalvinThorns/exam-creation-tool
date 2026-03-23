@@ -13,11 +13,14 @@ import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
+import { useTranslation } from "react-i18next";
 
 // Register all community features so AG Grid v33 works out-of-the-box
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 function GridLoadingOverlay() {
+  const { t } = useTranslation();
+
   return (
     <Box
       sx={{
@@ -31,7 +34,7 @@ function GridLoadingOverlay() {
       <Stack direction="column" spacing={1.5} alignItems="center">
         <CircularProgress size={28} />
         <Typography variant="body2" color="text.secondary">
-          Loading...
+          {t("common.loading")}
         </Typography>
       </Stack>
     </Box>
@@ -59,7 +62,7 @@ export function DataTable({
   columnDefs,
   rowData,
   actions = [],
-  actionsHeaderName = "Actions",
+  actionsHeaderName,
   actionsWidth = 220,
   // client-side
   pageSize = 10,
@@ -74,20 +77,27 @@ export function DataTable({
   sortModel,
   filterModel,
   loading = false,
-  noRowsTitle = "No rows",
+  noRowsTitle,
   noRowsHint,
-  noFilteredRowsTitle = "No matching results",
-  noFilteredRowsHint = "Try adjusting or clearing filters.",
+  noFilteredRowsTitle,
+  noFilteredRowsHint,
   gridOptions,
   ...rest
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const gridRef = useRef(null);
   const apiRef = useRef(null);
   const isApplyingServerStateRef = useRef(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const gridClassName =
     theme.palette.mode === "dark" ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+  const resolvedNoRowsTitle = noRowsTitle || t("datatable.noRows");
+  const resolvedNoFilteredRowsTitle =
+    noFilteredRowsTitle || t("datatable.noMatchingResults");
+  const resolvedNoFilteredRowsHint =
+    noFilteredRowsHint || t("datatable.noFilteredHint");
+  const resolvedActionsHeaderName = actionsHeaderName || t("common.actions");
 
   const isEqual = useCallback((a, b) => {
     if (a === b) return true;
@@ -97,8 +107,10 @@ export function DataTable({
   const GridNoRowsOverlay = useMemo(
     () =>
       function NoRowsOverlay() {
-        const title = isFilterActive ? noFilteredRowsTitle : noRowsTitle;
-        const hint = isFilterActive ? noFilteredRowsHint : noRowsHint;
+        const title = isFilterActive
+          ? resolvedNoFilteredRowsTitle
+          : resolvedNoRowsTitle;
+        const hint = isFilterActive ? resolvedNoFilteredRowsHint : noRowsHint;
 
         return (
           <Box
@@ -125,10 +137,10 @@ export function DataTable({
       },
     [
       isFilterActive,
-      noFilteredRowsHint,
-      noFilteredRowsTitle,
+      resolvedNoFilteredRowsHint,
+      resolvedNoFilteredRowsTitle,
       noRowsHint,
-      noRowsTitle,
+      resolvedNoRowsTitle,
     ],
   );
 
@@ -222,7 +234,7 @@ export function DataTable({
     return [
       ...columnDefs,
       {
-        headerName: actionsHeaderName,
+        headerName: resolvedActionsHeaderName,
         field: "__actions__",
         sortable: false,
         filter: false,
@@ -281,7 +293,7 @@ export function DataTable({
         },
       },
     ];
-  }, [actions, actionsHeaderName, actionsWidth, columnDefs]);
+  }, [actions, resolvedActionsHeaderName, actionsWidth, columnDefs]);
 
   const handlePageChange = useCallback(
     (_, newPage) => {

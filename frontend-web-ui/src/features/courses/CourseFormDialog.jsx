@@ -26,6 +26,7 @@ import { examsApi } from "../../api/exams.api";
 import { LatexEditor } from "../../components/ui/LatexEditor";
 import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_SPLIT_PERCENT = 50;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
@@ -37,9 +38,10 @@ export function CourseFormDialog({
   onSubmit,
   submitting,
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const form = useForm({
-    resolver: zodResolver(courseSchema),
+    resolver: zodResolver(courseSchema(t)),
     defaultValues: { title: "", shortName: "", coverPage: "" },
   });
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
@@ -171,7 +173,7 @@ export function CourseFormDialog({
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to compile cover page preview.";
+        t("courses.compileFailed");
 
       setCompilerMessages({
         clsiStatus: null,
@@ -191,13 +193,15 @@ export function CourseFormDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>{initialValues ? "Edit Course" : "Add Course"}</DialogTitle>
+      <DialogTitle>
+        {initialValues ? t("courses.editTitle") : t("courses.addTitle")}
+      </DialogTitle>
 
       <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
         <Box className="flex flex-col gap-6">
           <Box className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <TextField
-              label="Title"
+              label={t("common.title")}
               fullWidth
               {...register("title")}
               error={!!formState.errors.title}
@@ -205,7 +209,7 @@ export function CourseFormDialog({
             />
 
             <TextField
-              label="Short name"
+              label={t("common.shortName")}
               fullWidth
               {...register("shortName")}
               error={!!formState.errors.shortName}
@@ -250,9 +254,9 @@ export function CourseFormDialog({
                     paddingInline: 2,
                   }}
                 >
-                  Cover Page
+                  {t("courses.coverPage")}
                 </Typography>
-                <Tooltip title="Expand editor panel">
+                <Tooltip title={t("baseTemplate.expandEditor")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
                     <ChevronRightIcon fontSize="small" />
                   </IconButton>
@@ -281,7 +285,7 @@ export function CourseFormDialog({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    Cover page LaTeX
+                    {t("courses.coverPageLatex")}
                   </Typography>
                   <Button
                     variant="contained"
@@ -297,7 +301,9 @@ export function CourseFormDialog({
                     onClick={compileCoverPage}
                     disabled={isCompiling}
                   >
-                    {isCompiling ? "Compiling…" : "Compile Preview"}
+                    {isCompiling
+                      ? t("common.compiling")
+                      : t("common.compilePreview")}
                   </Button>
                 </Stack>
 
@@ -311,7 +317,7 @@ export function CourseFormDialog({
                       })
                     }
                     height="100%"
-                    placeholder="Cover page LaTeX"
+                    placeholder={t("courses.coverPageLatex")}
                   />
                 </Box>
 
@@ -328,7 +334,7 @@ export function CourseFormDialog({
                 onMouseDown={startSplitDrag}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize cover page editor and preview panels"
+                aria-label={t("courses.resizeAria")}
                 sx={{
                   width: 10,
                   flexShrink: 0,
@@ -349,7 +355,7 @@ export function CourseFormDialog({
                   }}
                 />
                 <Stack spacing={0.5} sx={{ ml: 0.5 }}>
-                  <Tooltip title="Close Cover panel">
+                  <Tooltip title={t("courses.closeCoverPanel")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -361,7 +367,7 @@ export function CourseFormDialog({
                       <ChevronLeftIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Drag to resize">
+                  <Tooltip title={t("common.dragToResize")}>
                     <Box
                       sx={{
                         display: "flex",
@@ -378,7 +384,7 @@ export function CourseFormDialog({
                       <DragIndicatorIcon fontSize="small" />
                     </Box>
                   </Tooltip>
-                  <Tooltip title="Close Preview panel">
+                  <Tooltip title={t("courses.closePreviewPanel")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -410,7 +416,7 @@ export function CourseFormDialog({
                   bgcolor: "background.paper",
                 }}
               >
-                <Tooltip title="Expand preview panel">
+                <Tooltip title={t("baseTemplate.expandPreview")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
                     <ChevronLeftIcon fontSize="small" />
                   </IconButton>
@@ -425,7 +431,7 @@ export function CourseFormDialog({
                     paddingInline: 2,
                   }}
                 >
-                  Preview
+                  {t("common.preview")}
                 </Typography>
               </Box>
             ) : (
@@ -443,8 +449,8 @@ export function CourseFormDialog({
                   hideDownload
                   isLoading={isCompiling}
                   compilerMessages={compilerMessages}
-                  loadingText="Compiling cover page preview…"
-                  emptyText="Compile to see cover page PDF preview"
+                  loadingText={t("courses.compilingPreview")}
+                  emptyText={t("courses.emptyPreview")}
                 />
               </Box>
             )}
@@ -454,14 +460,14 @@ export function CourseFormDialog({
 
       <DialogActions sx={{ px: 3, py: 2, gap: 1.5 }}>
         <Button variant="contained" color="secondary" onClick={onClose}>
-          CANCEL
+          {t("topics.cancelUpper")}
         </Button>
         <Button
           variant="contained"
           onClick={handleSubmit(onSubmit)}
           disabled={submitting}
         >
-          SAVE
+          {t("topics.saveUpper")}
         </Button>
       </DialogActions>
     </Dialog>

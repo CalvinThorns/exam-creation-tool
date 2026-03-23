@@ -49,6 +49,7 @@ import {
   useUpdateExam,
 } from "./exams.hooks";
 import { examsApi } from "../../api/exams.api";
+import { useTranslation } from "react-i18next";
 
 const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages"];
 
@@ -86,6 +87,7 @@ function withSolutionSpace(topics = []) {
 // Compile Split Button  (Build ▾  →  dropdown with Student / Teacher)
 // ---------------------------------------------------------------------------
 function CompileButton({ disabled, onCompile }) {
+  const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -110,7 +112,7 @@ function CompileButton({ disabled, onCompile }) {
         aria-haspopup="true"
         aria-expanded={open}
       >
-        Compile
+        {t("common.compile")}
       </Button>
 
       <Menu
@@ -131,8 +133,8 @@ function CompileButton({ disabled, onCompile }) {
             <SchoolIcon fontSize="small" color="primary" />
           </ListItemIcon>
           <ListItemText
-            primary="Student Version"
-            secondary="No solutions"
+            primary={t("exams.studentVersion")}
+            secondary={t("exams.studentVersionHint")}
             primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
             secondaryTypographyProps={{ fontSize: 12 }}
           />
@@ -143,8 +145,8 @@ function CompileButton({ disabled, onCompile }) {
             <MenuBookIcon fontSize="small" color="secondary" />
           </ListItemIcon>
           <ListItemText
-            primary="Teacher Version"
-            secondary="Includes solutions"
+            primary={t("exams.teacherVersion")}
+            secondary={t("exams.teacherVersionHint")}
             primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
             secondaryTypographyProps={{ fontSize: 12 }}
           />
@@ -158,6 +160,7 @@ function CompileButton({ disabled, onCompile }) {
 // Main Page
 // ---------------------------------------------------------------------------
 export function GenerateExamPage() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { id: examId } = useParams(); // present only in edit mode (/exams/:id/edit)
   const isEditMode = Boolean(examId);
@@ -599,7 +602,9 @@ export function GenerateExamPage() {
       }}
     >
       {/* ── Page header ── */}
-      <PageHeader title={isEditMode ? "Edit Exam" : "Generate Exam"} />
+      <PageHeader
+        title={isEditMode ? t("exams.editTitle") : t("exams.generateTitle")}
+      />
 
       {/* Loading skeleton while fetching exam in edit mode */}
       {isEditMode && examLoading ? (
@@ -615,7 +620,7 @@ export function GenerateExamPage() {
         >
           <CircularProgress size={40} />
           <Typography variant="body2" color="text.secondary">
-            Loading exam…
+            {t("exams.loadingExam")}
           </Typography>
         </Box>
       ) : (
@@ -640,7 +645,7 @@ export function GenerateExamPage() {
                   (draft ? (
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Typography variant="body2" color="text.secondary">
-                        Target:{" "}
+                        {t("common.target")}:{" "}
                         <Box
                           component="span"
                           fontWeight={700}
@@ -650,7 +655,7 @@ export function GenerateExamPage() {
                         </Box>
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Total:{" "}
+                        {t("common.total")}:{" "}
                         <Box
                           component="span"
                           fontWeight={700}
@@ -660,7 +665,7 @@ export function GenerateExamPage() {
                         </Box>
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Diff:{" "}
+                        {t("common.diff")}:{" "}
                         <Box
                           component="span"
                           fontWeight={700}
@@ -672,7 +677,7 @@ export function GenerateExamPage() {
                     </Stack>
                   ) : (
                     <Typography variant="body2" color="text.disabled">
-                      Select a course, choose topics and click Generate
+                      {t("exams.selectAndGenerate")}
                     </Typography>
                   ))}
               </Stack>
@@ -692,7 +697,7 @@ export function GenerateExamPage() {
                           generateM.isPending
                         }
                       >
-                        Generate
+                        {t("exams.generate")}
                       </Button>
                       <Button
                         variant="outlined"
@@ -703,7 +708,7 @@ export function GenerateExamPage() {
                           !draft || saveM.isPending || updateM.isPending
                         }
                       >
-                        Save
+                        {t("common.save")}
                       </Button>
                     </Stack>
                   </>
@@ -714,8 +719,8 @@ export function GenerateExamPage() {
                   onClick={() => setIsControlsCollapsed((prev) => !prev)}
                   aria-label={
                     isControlsCollapsed
-                      ? "Expand controls"
-                      : "Collapse controls"
+                      ? t("exams.expandControls")
+                      : t("exams.collapseControls")
                   }
                 >
                   {isControlsCollapsed ? (
@@ -737,14 +742,14 @@ export function GenerateExamPage() {
               >
                 <TextField
                   select
-                  label="Course"
+                  label={t("common.course")}
                   value={courseId}
                   onChange={handleCourseChange}
                   fullWidth
                   size="small"
                   disabled={isEditMode}
                 >
-                  <MenuItem value="">Select course</MenuItem>
+                  <MenuItem value="">{t("common.selectCourse")}</MenuItem>
                   {courses.map((c) => (
                     <MenuItem key={c.id} value={c.id}>
                       {c.title} ({c.shortName})
@@ -758,7 +763,7 @@ export function GenerateExamPage() {
                 </TextField>
 
                 <TextField
-                  label="Total points"
+                  label={t("exams.totalPoints")}
                   type="number"
                   value={targetPoints}
                   onChange={handleTargetPointsChange}
@@ -800,9 +805,11 @@ export function GenerateExamPage() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="Topics"
+                      label={t("exams.topics")}
                       placeholder={
-                        courseId ? "Select topics" : "Select course first"
+                        courseId
+                          ? t("common.selectTopics")
+                          : t("common.selectCourseFirst")
                       }
                     />
                   )}
@@ -822,7 +829,7 @@ export function GenerateExamPage() {
                   {draft ? (
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Typography variant="body2" color="text.secondary">
-                        Target:{" "}
+                        {t("common.target")}:{" "}
                         <Box
                           component="span"
                           fontWeight={700}
@@ -832,7 +839,7 @@ export function GenerateExamPage() {
                         </Box>
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Total:{" "}
+                        {t("common.total")}:{" "}
                         <Box
                           component="span"
                           fontWeight={700}
@@ -842,7 +849,7 @@ export function GenerateExamPage() {
                         </Box>
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Diff:{" "}
+                        {t("common.diff")}:{" "}
                         <Box
                           component="span"
                           fontWeight={700}
@@ -854,7 +861,7 @@ export function GenerateExamPage() {
                     </Stack>
                   ) : (
                     <Typography variant="body2" color="text.disabled">
-                      Select a course, choose topics and click Generate
+                      {t("exams.selectAndGenerate")}
                     </Typography>
                   )}
 
@@ -870,7 +877,7 @@ export function GenerateExamPage() {
                         generateM.isPending
                       }
                     >
-                      Generate
+                      {t("exams.generate")}
                     </Button>
                     <Button
                       variant="outlined"
@@ -879,7 +886,7 @@ export function GenerateExamPage() {
                       onClick={saveExam}
                       disabled={!draft || saveM.isPending || updateM.isPending}
                     >
-                      Save
+                      {t("common.save")}
                     </Button>
                   </Stack>
                 </Stack>
@@ -926,9 +933,9 @@ export function GenerateExamPage() {
                     paddingInline: 2,
                   }}
                 >
-                  Exam
+                  {t("exams.exam")}
                 </Typography>
-                <Tooltip title="Expand exam panel">
+                <Tooltip title={t("exams.expandExamPanel")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
                     <ChevronRightIcon fontSize="small" />
                   </IconButton>
@@ -962,14 +969,15 @@ export function GenerateExamPage() {
                     sx={{ flexShrink: 0, mb: 2 }}
                   >
                     <Typography variant="h6">
-                      Exam{" "}
+                      {t("exams.exam")}{" "}
                       {draft && (
                         <Typography
                           component="span"
                           variant="body2"
                           color="text.secondary"
                         >
-                          ({draft.totalPoints} / {draft.targetPoints} pts)
+                          ({draft.totalPoints} / {draft.targetPoints}{" "}
+                          {t("exams.pts")})
                         </Typography>
                       )}
                     </Typography>
@@ -983,7 +991,7 @@ export function GenerateExamPage() {
                         onClick={openCoverPageDialog}
                         disabled={!draft}
                       >
-                        Edit Cover Page
+                        {t("exams.editCoverPage")}
                       </Button>
 
                       {isCompiling ? (
@@ -996,7 +1004,7 @@ export function GenerateExamPage() {
                             <CircularProgress size={14} color="inherit" />
                           }
                         >
-                          Compiling…
+                          {t("common.compiling")}
                         </Button>
                       ) : (
                         <CompileButton
@@ -1038,7 +1046,7 @@ export function GenerateExamPage() {
                         }}
                       >
                         <Typography color="text.disabled" variant="body2">
-                          No exam generated yet
+                          {t("exams.noExamYet")}
                         </Typography>
                       </Box>
                     ) : (
@@ -1069,7 +1077,7 @@ export function GenerateExamPage() {
                 onMouseDown={startSplitDrag}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize exam and preview panels"
+                aria-label={t("exams.resizeAria")}
                 sx={{
                   width: 10,
                   flexShrink: 0,
@@ -1090,7 +1098,7 @@ export function GenerateExamPage() {
                   }}
                 />
                 <Stack spacing={0.5} sx={{ ml: 0.5 }}>
-                  <Tooltip title="Close Tasks panel">
+                  <Tooltip title={t("exams.closeTasksPanel")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -1102,7 +1110,7 @@ export function GenerateExamPage() {
                       <ChevronLeftIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Drag to resize">
+                  <Tooltip title={t("common.dragToResize")}>
                     <Box
                       sx={{
                         display: "flex",
@@ -1119,7 +1127,7 @@ export function GenerateExamPage() {
                       <DragIndicatorIcon fontSize="small" />
                     </Box>
                   </Tooltip>
-                  <Tooltip title="Close Preview panel">
+                  <Tooltip title={t("coverPageDialog.closePreview")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -1152,7 +1160,7 @@ export function GenerateExamPage() {
                   bgcolor: "background.paper",
                 }}
               >
-                <Tooltip title="Expand preview panel">
+                <Tooltip title={t("coverPageDialog.expandPreview")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
                     <ChevronLeftIcon fontSize="small" />
                   </IconButton>
@@ -1167,7 +1175,7 @@ export function GenerateExamPage() {
                     paddingInline: 2,
                   }}
                 >
-                  Preview
+                  {t("common.preview")}
                 </Typography>
               </Box>
             ) : (
@@ -1185,14 +1193,21 @@ export function GenerateExamPage() {
                   onDownload={downloadPdf}
                   isLoading={isCompiling}
                   compilerMessages={compileDiagnostics}
-                  loadingText={`Compiling ${compiledVersion === "STUDENT" ? "Student" : "Teacher"} version…`}
+                  loadingText={t("exams.compilingVersion", {
+                    version:
+                      compiledVersion === "STUDENT"
+                        ? t("exams.student")
+                        : t("exams.teacher"),
+                  })}
                   statusContent={
                     pdfUrl &&
                     !isCompiling &&
                     compiledVersion && (
                       <Chip
                         label={
-                          compiledVersion === "STUDENT" ? "Student" : "Teacher"
+                          compiledVersion === "STUDENT"
+                            ? t("exams.student")
+                            : t("exams.teacher")
                         }
                         size="small"
                         color={

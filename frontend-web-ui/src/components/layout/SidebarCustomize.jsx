@@ -15,8 +15,10 @@ import { examsApi } from "../../api/exams.api";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { BaseLatexTemplateDialog } from "./BaseLatexTemplateDialog";
 import { CustomizeDialog } from "./CustomizeDialog";
+import { useTranslation } from "react-i18next";
 
 export function SidebarCustomize({ isCollapsed }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const sidebarBackground =
     theme.palette.mode === "dark"
@@ -63,7 +65,7 @@ export function SidebarCustomize({ isCollapsed }) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to load base template.";
+        t("baseTemplate.loadFailed");
       setBaseTemplateError(message);
     } finally {
       setIsLoadingBaseTemplate(false);
@@ -114,7 +116,7 @@ export function SidebarCustomize({ isCollapsed }) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to compile base template preview.";
+        t("baseTemplate.compileFailed");
 
       setBaseTemplateCompilerMessages({
         clsiStatus: null,
@@ -147,7 +149,7 @@ export function SidebarCustomize({ isCollapsed }) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to save base template.";
+        t("baseTemplate.saveFailed");
       setBaseTemplateError(message);
     } finally {
       setIsSavingBaseTemplate(false);
@@ -159,7 +161,7 @@ export function SidebarCustomize({ isCollapsed }) {
       <Box sx={{ mt: "auto" }}>
         <List disablePadding>
           <Tooltip
-            title="Customize"
+            title={t("sidebar.customize")}
             placement="right"
             disableHoverListener={!isCollapsed}
           >
@@ -185,7 +187,9 @@ export function SidebarCustomize({ isCollapsed }) {
               >
                 <SettingsOutlined fontSize="small" />
               </ListItemIcon>
-              {!isCollapsed && <ListItemText primary="Customize" />}
+              {!isCollapsed && (
+                <ListItemText primary={t("sidebar.customize")} />
+              )}
               {!isCollapsed && isLoadingBaseTemplate ? (
                 <CircularProgress size={14} sx={{ color: "inherit" }} />
               ) : null}

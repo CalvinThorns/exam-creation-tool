@@ -1,4 +1,5 @@
 import axios from "axios";
+import i18n from "../i18n";
 
 export function createHttp({ baseURL, headers } = {}) {
   const client = axios.create({
@@ -10,7 +11,9 @@ export function createHttp({ baseURL, headers } = {}) {
     (res) => res,
     (err) => {
       const msg =
-        err?.response?.data?.error?.message || err?.message || "Request failed";
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        i18n.t("errors.requestFailed");
       err.userMessage = msg;
       return Promise.reject(err);
     },

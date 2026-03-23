@@ -1,7 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import { useState } from "react";
-import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {

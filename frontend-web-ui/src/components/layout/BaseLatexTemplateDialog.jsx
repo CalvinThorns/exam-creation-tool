@@ -21,6 +21,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { LatexEditor } from "../ui/LatexEditor";
 import { PdfPreviewPanel } from "../ui/PdfPreviewPanel";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_SPLIT_PERCENT = 50;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
@@ -40,6 +41,7 @@ export function BaseLatexTemplateDialog({
   errorMessage,
   disableActions,
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
   const [collapsedPane, setCollapsedPane] = useState(null);
@@ -115,7 +117,7 @@ export function BaseLatexTemplateDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
-      <DialogTitle>Edit Base LaTeX File</DialogTitle>
+      <DialogTitle>{t("baseTemplate.title")}</DialogTitle>
 
       <DialogContent dividers>
         {isLoadingTemplate ? (
@@ -132,7 +134,7 @@ export function BaseLatexTemplateDialog({
           >
             <CircularProgress size={30} />
             <Typography variant="body2" color="text.secondary">
-              Loading base template...
+              {t("baseTemplate.loading")}
             </Typography>
           </Box>
         ) : (
@@ -173,9 +175,9 @@ export function BaseLatexTemplateDialog({
                     paddingInline: 2,
                   }}
                 >
-                  Base Template
+                  {t("baseTemplate.name")}
                 </Typography>
-                <Tooltip title="Expand editor panel">
+                <Tooltip title={t("baseTemplate.expandEditor")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
                     <ChevronRightIcon fontSize="small" />
                   </IconButton>
@@ -204,7 +206,7 @@ export function BaseLatexTemplateDialog({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    Base template LaTeX
+                    {t("baseTemplate.label")}
                   </Typography>
 
                   <Button
@@ -221,7 +223,9 @@ export function BaseLatexTemplateDialog({
                     onClick={onCompile}
                     disabled={contentDisabled || isCompiling}
                   >
-                    {isCompiling ? "Compiling…" : "Compile Preview"}
+                    {isCompiling
+                      ? t("common.compiling")
+                      : t("common.compilePreview")}
                   </Button>
                 </Stack>
 
@@ -230,7 +234,7 @@ export function BaseLatexTemplateDialog({
                     value={templateValue}
                     onChange={onTemplateChange}
                     height="100%"
-                    placeholder="Base template LaTeX"
+                    placeholder={t("baseTemplate.label")}
                   />
                 </Box>
 
@@ -247,7 +251,7 @@ export function BaseLatexTemplateDialog({
                 onMouseDown={startSplitDrag}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize template editor and preview panels"
+                aria-label={t("baseTemplate.resizeAria")}
                 sx={{
                   width: 10,
                   flexShrink: 0,
@@ -268,7 +272,7 @@ export function BaseLatexTemplateDialog({
                   }}
                 />
                 <Stack spacing={0.5} sx={{ ml: 0.5 }}>
-                  <Tooltip title="Close template panel">
+                  <Tooltip title={t("baseTemplate.closeTemplate")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -280,7 +284,7 @@ export function BaseLatexTemplateDialog({
                       <ChevronLeftIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Drag to resize">
+                  <Tooltip title={t("common.dragToResize")}>
                     <Box
                       sx={{
                         display: "flex",
@@ -297,7 +301,7 @@ export function BaseLatexTemplateDialog({
                       <DragIndicatorIcon fontSize="small" />
                     </Box>
                   </Tooltip>
-                  <Tooltip title="Close preview panel">
+                  <Tooltip title={t("baseTemplate.closePreview")}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -329,7 +333,7 @@ export function BaseLatexTemplateDialog({
                   bgcolor: "background.paper",
                 }}
               >
-                <Tooltip title="Expand preview panel">
+                <Tooltip title={t("baseTemplate.expandPreview")}>
                   <IconButton size="small" onClick={resetSplitLayout}>
                     <ChevronLeftIcon fontSize="small" />
                   </IconButton>
@@ -344,7 +348,7 @@ export function BaseLatexTemplateDialog({
                     paddingInline: 2,
                   }}
                 >
-                  Preview
+                  {t("common.preview")}
                 </Typography>
               </Box>
             ) : (
@@ -362,8 +366,8 @@ export function BaseLatexTemplateDialog({
                   hideDownload
                   isLoading={isCompiling}
                   compilerMessages={compilerMessages}
-                  loadingText="Compiling base template preview…"
-                  emptyText="Compile to see base template PDF preview"
+                  loadingText={t("baseTemplate.compilingPreview")}
+                  emptyText={t("baseTemplate.emptyPreview")}
                 />
               </Box>
             )}
@@ -372,7 +376,7 @@ export function BaseLatexTemplateDialog({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t("common.close")}</Button>
         <Button
           variant="contained"
           startIcon={
@@ -385,7 +389,7 @@ export function BaseLatexTemplateDialog({
           onClick={onSave}
           disabled={contentDisabled || isSavingTemplate}
         >
-          {isSavingTemplate ? "Saving..." : "Save Base Template"}
+          {isSavingTemplate ? t("baseTemplate.saving") : t("baseTemplate.save")}
         </Button>
       </DialogActions>
     </Dialog>

@@ -21,6 +21,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { LatexEditor } from "../../../components/ui/LatexEditor";
 import { PdfPreviewPanel } from "../../../components/ui/PdfPreviewPanel";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_SPLIT_PERCENT = 50;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
@@ -37,6 +38,7 @@ export function CoverPagePreviewDialog({
   onSave,
   disableActions,
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
   const [collapsedPane, setCollapsedPane] = useState(null);
@@ -110,7 +112,7 @@ export function CoverPagePreviewDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
-      <DialogTitle>Edit Cover Page</DialogTitle>
+      <DialogTitle>{t("coverPageDialog.title")}</DialogTitle>
 
       <DialogContent dividers>
         <Box
@@ -150,9 +152,9 @@ export function CoverPagePreviewDialog({
                   paddingInline: 2,
                 }}
               >
-                Cover Page
+                {t("courses.coverPage")}
               </Typography>
-              <Tooltip title="Expand editor panel">
+              <Tooltip title={t("coverPageDialog.expandEditor")}>
                 <IconButton size="small" onClick={resetSplitLayout}>
                   <ChevronRightIcon fontSize="small" />
                 </IconButton>
@@ -181,7 +183,7 @@ export function CoverPagePreviewDialog({
                   color="text.secondary"
                   sx={{ display: "block" }}
                 >
-                  Cover page LaTeX
+                  {t("courses.coverPageLatex")}
                 </Typography>
                 <Button
                   variant="contained"
@@ -197,7 +199,9 @@ export function CoverPagePreviewDialog({
                   onClick={onCompile}
                   disabled={isCompiling || disableActions}
                 >
-                  {isCompiling ? "Compiling…" : "Compile Preview"}
+                  {isCompiling
+                    ? t("common.compiling")
+                    : t("common.compilePreview")}
                 </Button>
               </Stack>
 
@@ -206,7 +210,7 @@ export function CoverPagePreviewDialog({
                   value={coverPageValue}
                   onChange={onCoverPageChange}
                   height="100%"
-                  placeholder="Write cover page LaTeX..."
+                  placeholder={t("coverPageDialog.placeholder")}
                 />
               </Box>
             </Box>
@@ -217,7 +221,7 @@ export function CoverPagePreviewDialog({
               onMouseDown={startSplitDrag}
               role="separator"
               aria-orientation="vertical"
-              aria-label="Resize cover page editor and preview panels"
+              aria-label={t("coverPageDialog.resizeAria")}
               sx={{
                 width: 10,
                 flexShrink: 0,
@@ -238,7 +242,7 @@ export function CoverPagePreviewDialog({
                 }}
               />
               <Stack spacing={0.5} sx={{ ml: 0.5 }}>
-                <Tooltip title="Close Cover panel">
+                <Tooltip title={t("coverPageDialog.closeCover")}>
                   <IconButton
                     size="small"
                     onClick={() => {
@@ -250,7 +254,7 @@ export function CoverPagePreviewDialog({
                     <ChevronLeftIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Drag to resize">
+                <Tooltip title={t("common.dragToResize")}>
                   <Box
                     sx={{
                       display: "flex",
@@ -267,7 +271,7 @@ export function CoverPagePreviewDialog({
                     <DragIndicatorIcon fontSize="small" />
                   </Box>
                 </Tooltip>
-                <Tooltip title="Close Preview panel">
+                <Tooltip title={t("coverPageDialog.closePreview")}>
                   <IconButton
                     size="small"
                     onClick={() => {
@@ -299,7 +303,7 @@ export function CoverPagePreviewDialog({
                 bgcolor: "background.paper",
               }}
             >
-              <Tooltip title="Expand preview panel">
+              <Tooltip title={t("coverPageDialog.expandPreview")}>
                 <IconButton size="small" onClick={resetSplitLayout}>
                   <ChevronLeftIcon fontSize="small" />
                 </IconButton>
@@ -314,7 +318,7 @@ export function CoverPagePreviewDialog({
                   paddingInline: 2,
                 }}
               >
-                Preview
+                {t("common.preview")}
               </Typography>
             </Box>
           ) : (
@@ -332,8 +336,8 @@ export function CoverPagePreviewDialog({
                 hideDownload
                 isLoading={isCompiling}
                 compilerMessages={compilerMessages}
-                loadingText="Compiling cover page preview…"
-                emptyText="Compile to see cover page PDF preview"
+                loadingText={t("coverPageDialog.compilingPreview")}
+                emptyText={t("coverPageDialog.emptyPreview")}
               />
             </Box>
           )}
@@ -341,14 +345,14 @@ export function CoverPagePreviewDialog({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t("common.close")}</Button>
         <Button
           variant="contained"
           startIcon={<SaveIcon />}
           onClick={onSave}
           disabled={disableActions}
         >
-          Save Cover Page
+          {t("coverPageDialog.save")}
         </Button>
       </DialogActions>
     </Dialog>
