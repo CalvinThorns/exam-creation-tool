@@ -33,6 +33,205 @@ const { normalizePagination, buildMeta } = require("../utils/pagination");
 const { parseFilters, parseSort } = require("../utils/query");
 
 function createExamService({ examRepo, courseRepo }) {
+  function wrapRawLatexIfNeeded(latexContent) {
+    const src = String(latexContent || "").trim();
+    if (!src) throw badRequest("latexContent is required");
+
+    if (/\\begin\{document\}/i.test(src)) {
+      return src;
+    }
+
+    return String.raw`\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathreplacing,arrows.meta,positioning}
+\usepackage{tabularx}
+\usepackage[most]{tcolorbox}
+\usepackage{comment}
+\usepackage{fancyhdr}
+
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\geometry{a4paper, left=2cm, right=2cm, top=2cm, bottom=2cm}
+\def \runninghead {Exam}
+
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\pagestyle{fancy}
+\lhead{Matrikelnr.:}
+\chead{}
+\rhead{}
+\lfoot{\runninghead}
+\cfoot{}
+\rfoot{Seite \thepage}
+
+\renewcommand{\thesubsection}{\alph{subsection})}
+	itleformat{\subsection}[runin]{\normalfont\bfseries}{\thesubsection}{1em}{}
+\setlength{\parindent}{0pt}
+
+\newif\ifshowsolutions
+\showsolutionsfalse
+
+\ifshowsolutions
+  \newtcolorbox{solution}{
+    colback=red!80,
+    colframe=red!90!black,
+    fontupper=\color{white}\footnotesize,
+    title=Solution,
+    boxrule=0.8pt,
+    arc=4pt,
+    top=6pt,
+    bottom=6pt,
+    left=6pt,
+    right=6pt
+  }
+\else
+  \excludecomment{solution}
+\fi
+
+\begin{document}
+${src}
+\end{document}`;
+  }
+
+  async function compileLatexOnlyImpl(body, reqId) {
+    const clsiUrl = String(process.env.CLSI_URL || "").trim();
+    if (!clsiUrl) {
+      const e = new Error("CLSI_URL is not configured");
+      e.status = 500;
+      throw e;
+    }
+
+    const latexContent = String(body?.latexContent || "").trim();
+    if (!latexContent) throw badRequest("latexContent is required");
+    const mainTex = wrapRawLatexIfNeeded(latexContent);
+
+    const projectId = randomProjectId();
+    const compileBody = {
+      compile: {
+        options: {
+          compiler: "pdflatex",
+          timeout: 300,
+        },
+        rootResourcePath: "main.tex",
+        resources: [{ path: "main.tex", content: mainTex }],
+      },
+    };
+
+    const client = createClsiClient({ clsiUrl, logger });
+    const result = await client.compile({ projectId, compileBody, reqId });
+
+    if (!result || !result.compile) {
+      logger.error({ reqId, clsiResult: result }, "Invalid CLSI response");
+      const e = new Error("Invalid CLSI response");
+      e.status = 502;
+      e.details = result
+        ? JSON.stringify(result).slice(0, 20000)
+        : "empty response";
+      throw e;
+    }
+
+    let errors = null;
+
+    if (hasLatexErrors(result.compile, numOrZero)) {
+      logger.warn(
+        { reqId, clsiResult: result },
+        "CLSI compile produced LaTeX errors",
+      );
+
+      const logFile = pickOutputFile(result.compile.outputFiles, "log", ".log");
+      const stdoutFile = pickOutputFile(
+        result.compile.outputFiles,
+        "stdout",
+        ".stdout",
+      );
+      const stderrFile = pickOutputFile(
+        result.compile.outputFiles,
+        "stderr",
+        ".stderr",
+      );
+
+      let logText = null;
+      let stdoutText = null;
+      let stderrText = null;
+
+      try {
+        logText = await downloadTextFileIfAny(client, logFile);
+      } catch {}
+      try {
+        stdoutText = await downloadTextFileIfAny(client, stdoutFile);
+      } catch {}
+      try {
+        stderrText = await downloadTextFileIfAny(client, stderrFile);
+      } catch {}
+
+      const parsedErrors = parseLatexErrorsFromLog(logText, {
+        maxErrors: 200,
+        maxSnippet: 800,
+      });
+
+      const parsedWarnings = extractWarningsFromLog(logText, {
+        maxWarnings: 200,
+      });
+
+      errors = {
+        clsiStatus: result.compile.status,
+        buildId: result.compile.buildId,
+        stats: result.compile.stats || {},
+        timings: result.compile.timings || {},
+        errorCount: parsedErrors.length,
+        warningCount: parsedWarnings.length,
+        errors: parsedErrors,
+        warnings: parsedWarnings,
+        log: logText ? logText.slice(0, 20000) : null,
+        stdout: stdoutText ? stdoutText.slice(0, 20000) : null,
+        stderr: stderrText ? stderrText.slice(0, 20000) : null,
+      };
+    }
+
+    const pdfFile =
+      (result.compile.outputFiles || []).find((f) => f.type === "pdf") ||
+      (result.compile.outputFiles || []).find(
+        (f) =>
+          typeof f.path === "string" &&
+          f.path.toLowerCase().endsWith(".pdf") &&
+          f.url,
+      );
+
+    if (!pdfFile?.url) {
+      logger.error({ reqId, clsiResult: result }, "No PDF output URL");
+      const e = new Error("CLSI did not return a PDF output URL");
+      e.status = 502;
+      e.details = {
+        clsiStatus: result.compile.status,
+        buildId: result.compile.buildId,
+        stats: result.compile.stats || {},
+        outputFiles: result.compile.outputFiles || [],
+        errors,
+      };
+      throw e;
+    }
+
+    const pdfBuffer = await client.downloadAsBuffer(pdfFile.url);
+
+    const filenameBase = "latex-preview";
+    const filename = safeFilename(filenameBase) + ".pdf";
+
+    return { pdfBuffer, filename, errors };
+  }
+
   async function validateCourseId(courseId) {
     const cid = String(courseId || "").trim();
     if (!cid) throw badRequest("courseId is required");
@@ -477,6 +676,7 @@ function createExamService({ examRepo, courseRepo }) {
     },
 
     compileDraft: async (body, reqId) => compileDraftImpl(body, reqId),
+    compileLatexOnly: async (body, reqId) => compileLatexOnlyImpl(body, reqId),
   };
 }
 
