@@ -26,4 +26,10 @@ export const examsApi = {
     examsHttp
       .post("/compile-latex", body, { timeout: 600000 })
       .then((r) => r.data),
+
+  getBaseLatexTemplate: () =>
+    examsHttp.get("/latex-template/base").then((r) => r.data),
+
+  updateBaseLatexTemplate: (body) =>
+    examsHttp.put("/latex-template/base", body).then((r) => r.data),
 };

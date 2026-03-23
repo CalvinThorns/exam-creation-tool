@@ -15,6 +15,7 @@ import {
   SchoolOutlined,
   TaskOutlined,
 } from "@mui/icons-material";
+import { SidebarCustomize } from "./SidebarCustomize";
 
 const items = [
   { label: "Exams", to: "/exams", icon: AssignmentOutlined },
@@ -97,6 +98,8 @@ export function Sidebar({ isCollapsed, onToggle }) {
           </NavLink>
         ))}
       </List>
+
+      <SidebarCustomize isCollapsed={isCollapsed} />
     </Box>
   );
 }
