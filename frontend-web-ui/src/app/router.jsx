@@ -1,9 +1,8 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
-import { CoursesPage } from "../features/courses/CoursesPage";
-import { TopicsPage } from "../features/topics/TopicsPage";
-import { ExamsPage } from "../features/exams/ExamsPage";
-import { GenerateExamPage } from "../features/exams/GenerateExamPage";
+import { CoursesPage } from "../features/courses";
+import { TopicsPage } from "../features/topics";
+import { ExamsPage, GenerateExamPage } from "../features/exams";
 
 export const router = createBrowserRouter([
   {

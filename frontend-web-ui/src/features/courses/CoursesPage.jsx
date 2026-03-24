@@ -1,20 +1,16 @@
-import { useMemo, useState } from "react";
-import { Box, Button, Paper } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import { useMemo } from "react";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { PageHeader } from "../../components/ui/PageHeader";
-import { ErrorState } from "../../components/ui/ErrorState";
-import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { DataTable } from "../../components/ui/DataTable";
+import { ConfirmDialog, EntityTablePage } from "../../components/ui";
 import { CourseFormDialog } from "./CourseFormDialog";
 import {
   useCourses,
   useCreateCourse,
   useDeleteCourse,
   useUpdateCourse,
-} from "./courses.hooks";
+} from "./hooks";
 import { useTranslation } from "react-i18next";
+import { useDialogState } from "../../hooks/useDialogState";
 
 export function CoursesPage() {
   const { t } = useTranslation();
@@ -23,9 +19,8 @@ export function CoursesPage() {
   const updateM = useUpdateCourse();
   const deleteM = useDeleteCourse();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [confirm, setConfirm] = useState({ open: false, id: null });
+  const formDialog = useDialogState(null);
+  const confirmDialog = useDialogState(null);
   const rows = useMemo(() => data?.data || [], [data]);
 
   const columns = useMemo(
@@ -42,94 +37,72 @@ export function CoursesPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => {
-          setEditing(row);
-          setFormOpen(true);
-        },
+        onClick: (row) => formDialog.openDialog(row),
       },
       {
         id: "delete",
         label: t("common.delete"),
         icon: DeleteIcon,
-        onClick: (row) => {
-          setConfirm({ open: true, id: row.id });
-        },
+        onClick: (row) => confirmDialog.openDialog(row.id),
       },
     ],
-    [t],
+    [confirmDialog, formDialog, t],
   );
 
   const openAdd = () => {
-    setEditing(null);
-    setFormOpen(true);
+    formDialog.openDialog(null);
   };
 
   const submit = async (values) => {
+    const editing = formDialog.data;
     if (editing) {
       await updateM.mutateAsync({ id: editing.id, body: values });
     } else {
       await createM.mutateAsync(values);
     }
-    setFormOpen(false);
+    formDialog.closeDialog();
   };
 
   const remove = async () => {
-    await deleteM.mutateAsync(confirm.id);
-    setConfirm({ open: false, id: null });
+    await deleteM.mutateAsync(confirmDialog.data);
+    confirmDialog.closeDialog();
   };
 
   return (
-    <Box
-      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+    <EntityTablePage
+      title={t("courses.pageTitle")}
+      addLabel={t("common.addNew")}
+      onAdd={openAdd}
+      error={error?.message || (error ? t("courses.failedLoad") : null)}
+      dataTableProps={{
+        columnDefs: columns,
+        rowData: rows,
+        loading: isLoading,
+        noRowsTitle: t("courses.noRows"),
+        noRowsHint: t("courses.noRowsHint"),
+        noFilteredRowsTitle: t("courses.noFilteredRows"),
+        noFilteredRowsHint: t("datatable.noFilteredHint"),
+        actions,
+        actionsHeaderName: t("common.actions"),
+        pageSize: 10,
+        height: "100%",
+      }}
     >
-      <PageHeader
-        title={t("courses.pageTitle")}
-        right={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
-            {t("common.addNew")}
-          </Button>
-        }
-      />
-
-      {error ? (
-        <ErrorState message={error.message || t("courses.failedLoad")} />
-      ) : null}
-
-      {!error ? (
-        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
-          <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
-            <DataTable
-              columnDefs={columns}
-              rowData={rows}
-              loading={isLoading}
-              noRowsTitle={t("courses.noRows")}
-              noRowsHint={t("courses.noRowsHint")}
-              noFilteredRowsTitle={t("courses.noFilteredRows")}
-              noFilteredRowsHint={t("datatable.noFilteredHint")}
-              actions={actions}
-              actionsHeaderName={t("common.actions")}
-              pageSize={10}
-              height="100%"
-            />
-          </Paper>
-        </Box>
-      ) : null}
-
       <CourseFormDialog
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        initialValues={editing}
+        open={formDialog.open}
+        onClose={formDialog.closeDialog}
+        initialValues={formDialog.data}
         onSubmit={submit}
         submitting={createM.isPending || updateM.isPending}
       />
 
       <ConfirmDialog
-        open={confirm.open}
+        open={confirmDialog.open}
         title={t("courses.deleteTitle")}
         message={t("courses.deleteMessage")}
-        onCancel={() => setConfirm({ open: false, id: null })}
+        onCancel={confirmDialog.closeDialog}
         onConfirm={remove}
       />
-    </Box>
+    </EntityTablePage>
   );
 }

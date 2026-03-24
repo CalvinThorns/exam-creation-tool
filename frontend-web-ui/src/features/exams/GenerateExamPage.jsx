@@ -34,20 +34,18 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditIcon from "@mui/icons-material/Edit";
 
-import { PageHeader } from "../../components/ui/PageHeader";
-import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
+import { PageHeader, PdfPreviewPanel } from "../../components/ui";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { TopicCard } from "./components/TopicCard";
-import { CoverPagePreviewDialog } from "./components/CoverPagePreviewDialog";
-import { useCourses } from "../courses/courses.hooks";
-import { useTopics } from "../topics/topics.hooks";
+import { TopicCard, CoverPagePreviewDialog } from "./components";
+import { useCourses } from "../courses";
+import { useTopics } from "../topics";
 import {
   useCreateExam,
   useExam,
   useGenerateDraft,
   useRegenerateDraftTopic,
   useUpdateExam,
-} from "./exams.hooks";
+} from "./hooks";
 import { examsApi } from "../../api/exams.api";
 import { useTranslation } from "react-i18next";
 
