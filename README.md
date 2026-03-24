@@ -10,6 +10,11 @@ Exam-Service: Manages Exam logic and PDF orchestration (/api/exams).
 
 CLSI: Local LaTeX compilation service.MongoDB: Database for all services.
 
+Docker image and container naming standard:
+
+- Images: autogenex/<service>:local
+- Containers: autogenex-<service>
+
 
 # Getting Started
 
@@ -29,24 +34,52 @@ Before the Frontend can talk to the Backends, you must generate the TypeScript/J
 
 Navigate to the frontend folder:Install local dependencies:Generate the API hooks and DTOs:
 
+```bash
 cd frontend-web-ui
 npm install
 npm run generate-api
 cd ..
+```
 
 **Start the Infrastructure**
 
 Navigate back to the project root directory (where the docker-compose.yml is located) and use the following commands:
 
-A. Build and Start (First-time or after code changes): docker compose up --build
+A. Build and Start (First-time or after code changes):
 
-B. Run in the background (Detached mode): docker compose up -d
+```bash
+docker compose up --build
+```
 
-C. Stop the system (keeps data): docker compose stop
+B. Run in the background (Detached mode):
 
-D. Remove containers and network:docker compose down
+```bash
+docker compose up -d
+```
 
-E. Reset everything (Warning: Deletes all Database data!):docker compose down -v
+C. Stop the system (keeps data):
+
+```bash
+docker compose stop
+```
+
+D. Remove containers and network:
+
+```bash
+docker compose down
+```
+
+E. Reset everything (Warning: Deletes all Database data!):
+
+```bash
+docker compose down -v
+```
+
+F. Validate Docker Compose before startup:
+
+```bash
+docker compose config
+```
 
 **Access Links**
 
@@ -56,15 +89,36 @@ API Gateway: http://localhost/api/
 
 CLSI Service: http://localhost:3013
 
-Task Service: http://localhost:3000
+Exam Service: http://localhost:3000
 
-Exam Service: http://localhost:3000 
+Task Service: http://localhost:3001
+
+
+## Docker Best Practices Implemented
+
+- Explicit project name, image names, and container names
+- Healthchecks on gateway, frontend, exam-service, task-service, and mongodb
+- Dependency ordering using health conditions
+- Non-root runtime user for Node.js API services
+- Log rotation policy for all services (10 MB x 3 files)
+- Optimized build contexts via .dockerignore files
+- Pinned base image versions for gateway and mongodb
+- Pinned frontend runtime nginx image version
+- `init: true` enabled for all services for better signal handling
+- `no-new-privileges` enabled for all services
+- Read-only root filesystem plus `tmpfs` for nginx-based services
 
 
 # Common Fixes
 **Container Name Conflict:**
 
 If you get an error that autogenex-clsi is already in use, run: docker rm -f autogenex-clsi
+
+If nginx config changes are not reflected, restart the gateway:
+
+```bash
+docker compose restart gateway
+```
 
 **Port 80 busy:**
 

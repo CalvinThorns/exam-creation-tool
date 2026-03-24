@@ -8,8 +8,7 @@ export const coreHttp = createHttp({
 export const examsHttp = createHttp({
   baseURL:
     import.meta.env.VITE_EXAMS_API_URL ||
-    import.meta.env.VITE_API_URL ||
-    "/api",
+    "/api/exams",
 });
 
 export const tasksHttp = createHttp({
