@@ -1,27 +1,22 @@
 import { useMemo, useState } from "react";
-import { Box, Button, Paper, TextField, MenuItem } from "@mui/material";
+import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
-import { TopicFormDialog } from "./TopicFormDialog";
-import {
-  useTopics,
-  useCreateTopic,
-  useUpdateTopic,
-  useDeleteTopic,
-} from "./topics.hooks";
+import { useTopics, useDeleteTopic } from "./topics.hooks";
 import { useCourses } from "../courses/courses.hooks";
 import { useTranslation } from "react-i18next";
 
 export function TopicsPage() {
   const { t } = useTranslation();
+  const nav = useNavigate();
   // const [courseFilter, setCourseFilter] = useState("");
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
-  const courses = coursesData?.data || [];
 
   const { data, isLoading, error } = useTopics({
     page: 1,
@@ -29,19 +24,16 @@ export function TopicsPage() {
     // courseId: courseFilter || undefined,
   });
 
-  const createM = useCreateTopic();
-  const updateM = useUpdateTopic();
   const deleteM = useDeleteTopic();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, id: null });
 
   const courseTitleById = useMemo(() => {
+    const sourceCourses = coursesData?.data ?? [];
     const m = new Map();
-    courses.forEach((c) => m.set(c.id, c.title));
+    sourceCourses.forEach((c) => m.set(c.id, c.title));
     return m;
-  }, [courses]);
+  }, [coursesData?.data]);
 
   const rows = useMemo(
     () =>
@@ -67,10 +59,7 @@ export function TopicsPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => {
-          setEditing(row);
-          setFormOpen(true);
-        },
+        onClick: (row) => nav(`/tasks/edit/${row.id}`),
       },
       {
         id: "delete",
@@ -81,19 +70,8 @@ export function TopicsPage() {
         },
       },
     ],
-    [t],
+    [nav, t],
   );
-
-  const openAdd = () => {
-    setEditing(null);
-    setFormOpen(true);
-  };
-
-  const submit = async (values) => {
-    if (editing) await updateM.mutateAsync({ id: editing.id, body: values });
-    else await createM.mutateAsync(values);
-    setFormOpen(false);
-  };
 
   const remove = async () => {
     await deleteM.mutateAsync(confirm.id);
@@ -107,7 +85,12 @@ export function TopicsPage() {
       <PageHeader
         title={t("topics.pageTitle")}
         right={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => nav("/tasks/create")}
+          >
             {t("common.addNew")}
           </Button>
         }
@@ -151,15 +134,6 @@ export function TopicsPage() {
           </Paper>
         </Box>
       ) : null}
-
-      <TopicFormDialog
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        initialValues={editing}
-        onSubmit={submit}
-        submitting={createM.isPending || updateM.isPending}
-        courses={courses}
-      />
 
       <ConfirmDialog
         open={confirm.open}

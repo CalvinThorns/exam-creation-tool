@@ -83,7 +83,7 @@ export function ExamsPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => nav(`/exams/${row.id}/edit`),
+        onClick: (row) => nav(`/exams/edit/${row.id}`),
       },
       {
         id: "delete",
@@ -125,8 +125,9 @@ export function ExamsPage() {
         right={
           <Button
             variant="contained"
+            size="small"
             startIcon={<AddIcon />}
-            onClick={() => nav("/exams/generate")}
+            onClick={() => nav("/exams/create")}
           >
             {t("common.addNew")}
           </Button>

@@ -3,28 +3,20 @@ import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
-import { CourseFormDialog } from "./CourseFormDialog";
-import {
-  useCourses,
-  useCreateCourse,
-  useDeleteCourse,
-  useUpdateCourse,
-} from "./courses.hooks";
+import { useCourses, useDeleteCourse } from "./courses.hooks";
 import { useTranslation } from "react-i18next";
 
 export function CoursesPage() {
   const { t } = useTranslation();
+  const nav = useNavigate();
   const { data, isLoading, error } = useCourses();
-  const createM = useCreateCourse();
-  const updateM = useUpdateCourse();
   const deleteM = useDeleteCourse();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, id: null });
   const rows = useMemo(() => data?.data || [], [data]);
 
@@ -42,10 +34,7 @@ export function CoursesPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => {
-          setEditing(row);
-          setFormOpen(true);
-        },
+        onClick: (row) => nav(`/courses/edit/${row.id}`),
       },
       {
         id: "delete",
@@ -56,22 +45,8 @@ export function CoursesPage() {
         },
       },
     ],
-    [t],
+    [nav, t],
   );
-
-  const openAdd = () => {
-    setEditing(null);
-    setFormOpen(true);
-  };
-
-  const submit = async (values) => {
-    if (editing) {
-      await updateM.mutateAsync({ id: editing.id, body: values });
-    } else {
-      await createM.mutateAsync(values);
-    }
-    setFormOpen(false);
-  };
 
   const remove = async () => {
     await deleteM.mutateAsync(confirm.id);
@@ -85,7 +60,12 @@ export function CoursesPage() {
       <PageHeader
         title={t("courses.pageTitle")}
         right={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => nav("/courses/create")}
+          >
             {t("common.addNew")}
           </Button>
         }
@@ -114,14 +94,6 @@ export function CoursesPage() {
           </Paper>
         </Box>
       ) : null}
-
-      <CourseFormDialog
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        initialValues={editing}
-        onSubmit={submit}
-        submitting={createM.isPending || updateM.isPending}
-      />
 
       <ConfirmDialog
         open={confirm.open}

@@ -8,6 +8,14 @@ export function useTopics(params) {
   });
 }
 
+export function useTopic(id, options) {
+  return useQuery({
+    queryKey: ["topic", id],
+    queryFn: () => topicsApi.getById(id),
+    enabled: Boolean(id) && (options?.enabled ?? true),
+  });
+}
+
 export function useCreateTopic() {
   const qc = useQueryClient();
   return useMutation({
