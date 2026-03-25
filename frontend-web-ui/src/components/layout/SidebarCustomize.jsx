@@ -16,6 +16,11 @@ import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { BaseLatexTemplateDialog } from "./BaseLatexTemplateDialog";
 import { CustomizeDialog } from "./CustomizeDialog";
 import { useTranslation } from "react-i18next";
+import {
+  getCompileResultPayload,
+  notifyCompileOutcome,
+  toCompilerMessages,
+} from "../../utils/compileDiagnostics";
 
 export function SidebarCustomize({ isCollapsed }) {
   const { t } = useTranslation();
@@ -63,7 +68,8 @@ export function SidebarCustomize({ isCollapsed }) {
       setBaseTemplateDraft(payload.template || "");
     } catch (error) {
       const message =
-        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.userMessage ||
         error?.message ||
         t("baseTemplate.loadFailed");
       setBaseTemplateError(message);
@@ -90,8 +96,8 @@ export function SidebarCustomize({ isCollapsed }) {
       const response = await examsApi.compileLatexOnly({
         latexContent: baseTemplateDraft,
       });
-      const compileData = response?.data || response || {};
-      const { pdfBase64, filename, contentType, errors } = compileData;
+      const { pdfBase64, filename, contentType, diagnostics } =
+        getCompileResultPayload(response);
 
       setPdfFromBase64({
         base64: pdfBase64,
@@ -99,22 +105,12 @@ export function SidebarCustomize({ isCollapsed }) {
         mimeType: contentType || "application/pdf",
       });
 
-      setBaseTemplateCompilerMessages({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
+      setBaseTemplateCompilerMessages(toCompilerMessages(diagnostics));
+      notifyCompileOutcome(diagnostics);
     } catch (error) {
       const message =
-        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.userMessage ||
         error?.message ||
         t("baseTemplate.compileFailed");
 
@@ -147,7 +143,8 @@ export function SidebarCustomize({ isCollapsed }) {
       clearPdf();
     } catch (error) {
       const message =
-        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.userMessage ||
         error?.message ||
         t("baseTemplate.saveFailed");
       setBaseTemplateError(message);

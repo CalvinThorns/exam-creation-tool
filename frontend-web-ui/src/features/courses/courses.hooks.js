@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 // import { coursesApi } from "../../api/client";
 import { coursesApi } from "../../api/courses.api";
+import i18n from "../../i18n";
+import { notifySuccess } from "../../app/notifications";
 
 const toCreateDto = (values) => {
   return {
@@ -46,7 +48,10 @@ export function useCreateCourse() {
       const dto = toCreateDto(values);
       return await coursesApi.create(dto);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.courseCreated"));
+      return queryClient.invalidateQueries({ queryKey: ["courses"] });
+    },
   });
 }
 
@@ -57,7 +62,10 @@ export function useUpdateCourse() {
       const dto = toUpdateDto(body);
       return await coursesApi.update(id, dto);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.courseUpdated"));
+      return queryClient.invalidateQueries({ queryKey: ["courses"] });
+    },
   });
 }
 
@@ -67,6 +75,9 @@ export function useDeleteCourse() {
     mutationFn: async (id) => {
       return await coursesApi.remove(id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.courseDeleted"));
+      return queryClient.invalidateQueries({ queryKey: ["courses"] });
+    },
   });
 }

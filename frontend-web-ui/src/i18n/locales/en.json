@@ -211,6 +211,23 @@
   "confirmDialog": {
     "confirm": "Confirm"
   },
+  "notifications": {
+    "courseCreated": "Course created successfully",
+    "courseUpdated": "Course updated successfully",
+    "courseDeleted": "Course deleted successfully",
+    "topicCreated": "Task created successfully",
+    "topicUpdated": "Task updated successfully",
+    "topicDeleted": "Task deleted successfully",
+    "examCreated": "Exam saved successfully",
+    "examUpdated": "Exam updated successfully",
+    "examDeleted": "Exam deleted successfully",
+    "examGenerated": "Exam generated successfully",
+    "draftGenerated": "Draft generated successfully",
+    "topicRegenerated": "Task regenerated successfully",
+    "compileSuccess": "Compiled successfully",
+    "compileWithWarnings": "Compiled with {{count}} warning(s)",
+    "compileWithErrors": "Compiled with {{count}} error(s)"
+  },
   "errors": {
     "requestFailed": "Request failed",
     "requiredTitle": "Title is required",

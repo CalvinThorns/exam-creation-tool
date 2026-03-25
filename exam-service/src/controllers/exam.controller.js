@@ -9,7 +9,7 @@ function createExamController({ examService }) {
     create: async (req, res, next) => {
       try {
         const exam = await examService.createExam(req.body);
-        return sendSuccess(res, { data: exam, status: 201 });
+        return sendSuccess(res, { req, data: exam, status: 201 });
       } catch (err) {
         next(err);
       }
@@ -20,6 +20,7 @@ function createExamController({ examService }) {
         const result = await examService.listExams(req.query);
         const { items, ...meta } = result;
         return sendSuccess(res, {
+          req,
           data: items,
           meta,
         });
@@ -31,7 +32,7 @@ function createExamController({ examService }) {
     getById: async (req, res, next) => {
       try {
         const exam = await examService.getExam(req.params.id);
-        return sendSuccess(res, { data: exam });
+        return sendSuccess(res, { req, data: exam });
       } catch (err) {
         next(err);
       }
@@ -40,7 +41,7 @@ function createExamController({ examService }) {
     updateById: async (req, res, next) => {
       try {
         const exam = await examService.updateExam(req.params.id, req.body);
-        return sendSuccess(res, { data: exam });
+        return sendSuccess(res, { req, data: exam });
       } catch (err) {
         next(err);
       }
@@ -60,7 +61,7 @@ function createExamController({ examService }) {
       try {
         ensureDraftFns(examService);
         const result = await examService.generateDraft(req.body);
-        return sendSuccess(res, { data: result });
+        return sendSuccess(res, { req, data: result });
       } catch (err) {
         next(err);
       }
@@ -70,7 +71,7 @@ function createExamController({ examService }) {
       try {
         ensureDraftFns(examService);
         const result = await examService.regenerateDraftTopic(req.body);
-        return sendSuccess(res, { data: result });
+        return sendSuccess(res, { req, data: result });
       } catch (err) {
         next(err);
       }
@@ -78,17 +79,17 @@ function createExamController({ examService }) {
 
     compileDraft: async (req, res, next) => {
       try {
-        const { pdfBuffer, filename, errors } = await examService.compileDraft(
-          req.body,
-          req.id,
-        );
+        const { pdfBuffer, filename, diagnostics, errors } =
+          await examService.compileDraft(req.body, req.id);
 
         return sendSuccess(res, {
+          req,
           data: {
             filename,
             contentType: "application/pdf",
             pdfBase64: pdfBuffer.toString("base64"),
-            errors: errors || null,
+            diagnostics: diagnostics || null,
+            errors: errors || diagnostics || null,
           },
         });
       } catch (err) {
@@ -98,15 +99,17 @@ function createExamController({ examService }) {
 
     compileLatexOnly: async (req, res, next) => {
       try {
-        const { pdfBuffer, filename, errors } =
+        const { pdfBuffer, filename, diagnostics, errors } =
           await examService.compileLatexOnly(req.body, req.id);
 
         return sendSuccess(res, {
+          req,
           data: {
             filename,
             contentType: "application/pdf",
             pdfBase64: pdfBuffer.toString("base64"),
-            errors: errors || null,
+            diagnostics: diagnostics || null,
+            errors: errors || diagnostics || null,
           },
         });
       } catch (err) {
@@ -114,10 +117,10 @@ function createExamController({ examService }) {
       }
     },
 
-    getBaseLatexTemplate: async (_req, res, next) => {
+    getBaseLatexTemplate: async (req, res, next) => {
       try {
         const result = await examService.getBaseLatexTemplate();
-        return sendSuccess(res, { data: result });
+        return sendSuccess(res, { req, data: result });
       } catch (err) {
         next(err);
       }
@@ -126,7 +129,7 @@ function createExamController({ examService }) {
     updateBaseLatexTemplate: async (req, res, next) => {
       try {
         const result = await examService.updateBaseLatexTemplate(req.body);
-        return sendSuccess(res, { data: result });
+        return sendSuccess(res, { req, data: result });
       } catch (err) {
         next(err);
       }
@@ -139,7 +142,11 @@ function createExamController({ examService }) {
 
         const filePath = resolveDraftAssetFilePath(token, filename);
         if (!filePath) {
-          return sendError(res, { status: 404, message: "Asset not found" });
+          return sendError(req, res, {
+            status: 404,
+            code: "ASSET_NOT_FOUND",
+            message: "Asset not found",
+          });
         }
 
         return res.sendFile(filePath);

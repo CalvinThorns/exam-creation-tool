@@ -104,10 +104,83 @@ function extractWarningsFromLog(logText, { maxWarnings = 200 } = {}) {
   return warnings;
 }
 
+async function buildCompileDiagnostics({
+  compile,
+  client,
+  numOrZero,
+  maxErrors = 200,
+  maxWarnings = 200,
+  maxSnippet = 800,
+} = {}) {
+  const logFile = pickOutputFile(compile?.outputFiles, "log", ".log");
+  const stdoutFile = pickOutputFile(compile?.outputFiles, "stdout", ".stdout");
+  const stderrFile = pickOutputFile(compile?.outputFiles, "stderr", ".stderr");
+
+  let logText = null;
+  let stdoutText = null;
+  let stderrText = null;
+
+  try {
+    logText = await downloadTextFileIfAny(client, logFile);
+  } catch {}
+  try {
+    stdoutText = await downloadTextFileIfAny(client, stdoutFile);
+  } catch {}
+  try {
+    stderrText = await downloadTextFileIfAny(client, stderrFile);
+  } catch {}
+
+  const parsedErrors = parseLatexErrorsFromLog(logText, {
+    maxErrors,
+    maxSnippet,
+  });
+
+  const parsedWarnings = extractWarningsFromLog(logText, {
+    maxWarnings,
+  });
+
+  const compileHasErrors = hasLatexErrors(compile, numOrZero);
+
+  const errors = [...parsedErrors];
+  if (compileHasErrors && errors.length === 0) {
+    errors.push({
+      message: "Compilation reported errors. Check compiler log for details.",
+      line: null,
+      snippet: null,
+    });
+  }
+
+  const errorCount = errors.length;
+  const warningCount = parsedWarnings.length;
+
+  const outcome =
+    errorCount > 0
+      ? "success_with_errors"
+      : warningCount > 0
+        ? "success_with_warnings"
+        : "success";
+
+  return {
+    outcome,
+    clsiStatus: compile?.status || null,
+    buildId: compile?.buildId || null,
+    stats: compile?.stats || {},
+    timings: compile?.timings || {},
+    errorCount,
+    warningCount,
+    errors,
+    warnings: parsedWarnings,
+    log: logText ? logText.slice(0, 20000) : null,
+    stdout: stdoutText ? stdoutText.slice(0, 20000) : null,
+    stderr: stderrText ? stderrText.slice(0, 20000) : null,
+  };
+}
+
 module.exports = {
   hasLatexErrors,
   pickOutputFile,
   downloadTextFileIfAny,
   parseLatexErrorsFromLog,
   extractWarningsFromLog,
+  buildCompileDiagnostics,
 };

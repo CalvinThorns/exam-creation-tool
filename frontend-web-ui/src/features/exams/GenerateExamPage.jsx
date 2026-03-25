@@ -50,11 +50,16 @@ import {
 } from "./hooks";
 import { examsApi } from "../../api/exams.api";
 import { useTranslation } from "react-i18next";
+import {
+  getCompileResultPayload,
+  notifyCompileOutcome,
+  toCompilerMessages,
+} from "../../utils/compileDiagnostics";
 
 const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages", "3 Pages", "4 Pages"];
 
 const DEFAULT_SOLUTION_SPACE = "1 Page";
-const DEFAULT_SPLIT_PERCENT = 70;
+const DEFAULT_SPLIT_PERCENT = 65;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
 
 function sumPoints(topics) {
@@ -346,8 +351,8 @@ export function GenerateExamPage() {
         version,
       });
 
-      const compileData = res?.data || {};
-      const { pdfBase64, filename, contentType, errors } = compileData;
+      const { pdfBase64, filename, contentType, diagnostics } =
+        getCompileResultPayload(res);
 
       setPdfFromBase64({
         base64: pdfBase64,
@@ -355,19 +360,8 @@ export function GenerateExamPage() {
         mimeType: contentType || "application/pdf",
       });
 
-      setCompileDiagnostics({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
+      setCompileDiagnostics(toCompilerMessages(diagnostics));
+      notifyCompileOutcome(diagnostics);
     } finally {
       setIsCompiling(false);
     }
@@ -402,8 +396,8 @@ export function GenerateExamPage() {
         version: "STUDENT",
       });
 
-      const compileData = res?.data || {};
-      const { pdfBase64, filename, contentType, errors } = compileData;
+      const { pdfBase64, filename, contentType, diagnostics } =
+        getCompileResultPayload(res);
 
       setCoverPdfFromBase64({
         base64: pdfBase64,
@@ -411,19 +405,8 @@ export function GenerateExamPage() {
         mimeType: contentType || "application/pdf",
       });
 
-      setCoverCompileDiagnostics({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
+      setCoverCompileDiagnostics(toCompilerMessages(diagnostics));
+      notifyCompileOutcome(diagnostics);
     } finally {
       setIsCoverCompiling(false);
     }
