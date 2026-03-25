@@ -39,8 +39,13 @@ import { Loader } from "../../components/ui/Loader";
 import { useCreateTopic, useTopic, useUpdateTopic } from "./topics.hooks";
 import { useCourses } from "../courses/courses.hooks";
 import { useTranslation } from "react-i18next";
+import {
+  getCompileResultPayload,
+  notifyCompileOutcome,
+  toCompilerMessages,
+} from "../../utils/compileDiagnostics";
 
-const DEFAULT_SPLIT_PERCENT = 70;
+const DEFAULT_SPLIT_PERCENT = 65;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
 
 function getDefaultTask() {
@@ -273,8 +278,8 @@ export function TopicFormPage() {
 
     try {
       const response = await examsApi.compileLatexOnly({ latexContent });
-      const compileData = response?.data || response || {};
-      const { pdfBase64, filename, contentType, errors } = compileData;
+      const { pdfBase64, filename, contentType, diagnostics } =
+        getCompileResultPayload(response);
 
       setPdfFromBase64({
         base64: pdfBase64,
@@ -282,22 +287,12 @@ export function TopicFormPage() {
         mimeType: contentType || "application/pdf",
       });
 
-      setCompilerMessages({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
+      setCompilerMessages(toCompilerMessages(diagnostics));
+      notifyCompileOutcome(diagnostics);
     } catch (compileError) {
       const message =
-        compileError?.response?.data?.message ||
+        compileError?.response?.data?.error?.message ||
+        compileError?.userMessage ||
         compileError?.message ||
         t("courses.compileFailed");
 

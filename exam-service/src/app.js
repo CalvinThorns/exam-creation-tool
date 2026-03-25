@@ -15,11 +15,25 @@ app.use(express.json({ limit: "5mb" }));
 
 app.use(morgan("combined"));
 
-const { sendSuccess } = require("./utils/response");
+const { sendSuccess, sendError } = require("./utils/response");
 
-app.get("/health", (_req, res) => sendSuccess(res, { data: { ok: true } }));
+app.get("/health", (req, res) =>
+  sendSuccess(res, {
+    req,
+    data: { ok: true },
+    meta: { service: "exam-service" },
+  }),
+);
 
 app.use("/api", routes);
+
+app.use("/api", (req, res) => {
+  return sendError(req, res, {
+    status: 404,
+    code: "NOT_FOUND",
+    message: "API route not found",
+  });
+});
 
 app.use(errorHandler);
 

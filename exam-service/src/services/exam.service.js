@@ -23,11 +23,8 @@ const {
   validateDraftTopicsShape,
 } = require("./helpers/examDraftHelpers");
 const {
-  hasLatexErrors,
   pickOutputFile,
-  downloadTextFileIfAny,
-  parseLatexErrorsFromLog,
-  extractWarningsFromLog,
+  buildCompileDiagnostics,
 } = require("./helpers/latexCompileHelpers");
 const { normalizePagination, buildMeta } = require("../utils/pagination");
 const { parseFilters, parseSort } = require("../utils/query");
@@ -188,63 +185,14 @@ function createExamService({ examRepo, courseRepo }) {
       throw e;
     }
 
-    let errors = null;
-
-    if (hasLatexErrors(result.compile, numOrZero)) {
-      logger.warn(
-        { reqId, clsiResult: result },
-        "CLSI compile produced LaTeX errors",
-      );
-
-      const logFile = pickOutputFile(result.compile.outputFiles, "log", ".log");
-      const stdoutFile = pickOutputFile(
-        result.compile.outputFiles,
-        "stdout",
-        ".stdout",
-      );
-      const stderrFile = pickOutputFile(
-        result.compile.outputFiles,
-        "stderr",
-        ".stderr",
-      );
-
-      let logText = null;
-      let stdoutText = null;
-      let stderrText = null;
-
-      try {
-        logText = await downloadTextFileIfAny(client, logFile);
-      } catch {}
-      try {
-        stdoutText = await downloadTextFileIfAny(client, stdoutFile);
-      } catch {}
-      try {
-        stderrText = await downloadTextFileIfAny(client, stderrFile);
-      } catch {}
-
-      const parsedErrors = parseLatexErrorsFromLog(logText, {
-        maxErrors: 200,
-        maxSnippet: 800,
-      });
-
-      const parsedWarnings = extractWarningsFromLog(logText, {
-        maxWarnings: 200,
-      });
-
-      errors = {
-        clsiStatus: result.compile.status,
-        buildId: result.compile.buildId,
-        stats: result.compile.stats || {},
-        timings: result.compile.timings || {},
-        errorCount: parsedErrors.length,
-        warningCount: parsedWarnings.length,
-        errors: parsedErrors,
-        warnings: parsedWarnings,
-        log: logText ? logText.slice(0, 20000) : null,
-        stdout: stdoutText ? stdoutText.slice(0, 20000) : null,
-        stderr: stderrText ? stderrText.slice(0, 20000) : null,
-      };
-    }
+    const diagnostics = await buildCompileDiagnostics({
+      compile: result.compile,
+      client,
+      numOrZero,
+      maxErrors: 200,
+      maxWarnings: 200,
+      maxSnippet: 800,
+    });
 
     const pdfFile =
       (result.compile.outputFiles || []).find((f) => f.type === "pdf") ||
@@ -264,7 +212,7 @@ function createExamService({ examRepo, courseRepo }) {
         buildId: result.compile.buildId,
         stats: result.compile.stats || {},
         outputFiles: result.compile.outputFiles || [],
-        errors,
+        diagnostics,
       };
       throw e;
     }
@@ -274,7 +222,12 @@ function createExamService({ examRepo, courseRepo }) {
     const filenameBase = "latex-preview";
     const filename = safeFilename(filenameBase) + ".pdf";
 
-    return { pdfBuffer, filename, errors };
+    return {
+      pdfBuffer,
+      filename,
+      diagnostics,
+      errors: diagnostics,
+    };
   }
 
   async function validateCourseId(courseId) {
@@ -384,64 +337,14 @@ function createExamService({ examRepo, courseRepo }) {
       throw e;
     }
 
-    let errors = null;
-
-    if (hasLatexErrors(result.compile, numOrZero)) {
-      logger.warn(
-        { reqId, clsiResult: result },
-        "CLSI compile produced LaTeX errors",
-      );
-
-      const logFile = pickOutputFile(result.compile.outputFiles, "log", ".log");
-      const stdoutFile = pickOutputFile(
-        result.compile.outputFiles,
-        "stdout",
-        ".stdout",
-      );
-      const stderrFile = pickOutputFile(
-        result.compile.outputFiles,
-        "stderr",
-        ".stderr",
-      );
-
-      let logText = null;
-      let stdoutText = null;
-      let stderrText = null;
-
-      try {
-        logText = await downloadTextFileIfAny(client, logFile);
-      } catch {}
-      try {
-        stdoutText = await downloadTextFileIfAny(client, stdoutFile);
-      } catch {}
-      try {
-        stderrText = await downloadTextFileIfAny(client, stderrFile);
-      } catch {}
-
-      const parsedErrors = parseLatexErrorsFromLog(logText, {
-        maxErrors: 200,
-        maxSnippet: 800,
-      });
-
-      const parsedWarnings = extractWarningsFromLog(logText, {
-        maxWarnings: 200,
-      });
-
-      errors = {
-        clsiStatus: result.compile.status,
-        buildId: result.compile.buildId,
-        stats: result.compile.stats || {},
-        timings: result.compile.timings || {},
-        errorCount: parsedErrors.length,
-        warningCount: parsedWarnings.length,
-        errors: parsedErrors, // ALL errors
-        warnings: parsedWarnings, // optional
-        // keep full log snippet if you want, but it can be large
-        log: logText ? logText.slice(0, 20000) : null,
-        stdout: stdoutText ? stdoutText.slice(0, 20000) : null,
-        stderr: stderrText ? stderrText.slice(0, 20000) : null,
-      };
-    }
+    const diagnostics = await buildCompileDiagnostics({
+      compile: result.compile,
+      client,
+      numOrZero,
+      maxErrors: 200,
+      maxWarnings: 200,
+      maxSnippet: 800,
+    });
 
     // ALWAYS try to fetch the PDF (like before)
     const pdfFile =
@@ -462,7 +365,7 @@ function createExamService({ examRepo, courseRepo }) {
         buildId: result.compile.buildId,
         stats: result.compile.stats || {},
         outputFiles: result.compile.outputFiles || [],
-        errors,
+        diagnostics,
       };
       throw e;
     }
@@ -474,7 +377,12 @@ function createExamService({ examRepo, courseRepo }) {
     );
     const filename = safeFilename(filenameBase) + ".pdf";
 
-    return { pdfBuffer, filename, errors };
+    return {
+      pdfBuffer,
+      filename,
+      diagnostics,
+      errors: diagnostics,
+    };
   }
 
   return {

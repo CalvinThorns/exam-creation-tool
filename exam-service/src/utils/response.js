@@ -3,22 +3,81 @@ const {
   buildSingleError,
 } = require("./helpers/responseHelpers");
 
-function sendSuccess(res, { data = null, status = 200, meta } = {}) {
-  const body = { success: true };
-  if (data !== null && data !== undefined) body.data = data;
-  if (meta !== undefined) body.meta = meta;
-  return res.status(status).json(body);
+function normalizeStatus(value) {
+  const status = Number(value);
+  if (!Number.isFinite(status)) return 500;
+  if (status < 100 || status > 599) return 500;
+  return status;
 }
 
-function sendError(res, err = {}) {
-  const status = err.status || err.statusCode || 500;
+function buildMeta(req, status, extraMeta) {
+  const baseMeta = {
+    timestamp: new Date().toISOString(),
+    status,
+  };
 
-  const body = { success: false, error: {} };
+  if (req) {
+    baseMeta.requestId = req.id || null;
+    baseMeta.path = req.originalUrl || req.url || null;
+    baseMeta.method = req.method || null;
+  }
 
-  if (Array.isArray(err.errors)) {
-    body.error.errors = buildValidationErrors(err.errors);
-  } else {
-    body.error = buildSingleError(err);
+  return {
+    ...baseMeta,
+    ...(extraMeta || {}),
+  };
+}
+
+function sendSuccess(res, { req, data = null, status = 200, meta } = {}) {
+  const normalizedStatus = normalizeStatus(status);
+  const body = {
+    success: true,
+    meta: buildMeta(req, normalizedStatus, meta),
+  };
+
+  if (data !== null && data !== undefined) {
+    body.data = data;
+  }
+
+  return res.status(normalizedStatus).json(body);
+}
+
+function resolveSendErrorArgs(arg1, arg2, arg3) {
+  if (arg3 !== undefined) {
+    return { req: arg1, res: arg2, err: arg3 };
+  }
+
+  return { req: null, res: arg1, err: arg2 };
+}
+
+function sendError(arg1, arg2, arg3) {
+  const { req, res, err = {} } = resolveSendErrorArgs(arg1, arg2, arg3);
+  const status = normalizeStatus(err.status || err.statusCode || 500);
+  const isValidation = Array.isArray(err.errors);
+
+  const single = buildSingleError(err, status);
+
+  const errorBody = {
+    code: single.code,
+    message: single.message,
+  };
+
+  if (single.details !== undefined) {
+    errorBody.details = single.details;
+  }
+
+  if (isValidation) {
+    errorBody.issues = buildValidationErrors(err.errors);
+  }
+
+  const body = {
+    success: false,
+    error: errorBody,
+    meta: buildMeta(req, status),
+  };
+
+  if (isValidation) {
+    body.error.errors = errorBody.issues;
   }
 
   return res.status(status).json(body);

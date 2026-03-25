@@ -5,6 +5,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { examsApi } from "../../api/exams.api";
+import i18n from "../../i18n";
+import { notifySuccess } from "../../app/notifications";
 
 export function useExams(params) {
   return useQuery({
@@ -18,7 +20,10 @@ export function useCreateExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: examsApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["exams"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.examCreated"));
+      return qc.invalidateQueries({ queryKey: ["exams"] });
+    },
   });
 }
 
@@ -26,7 +31,10 @@ export function useUpdateExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }) => examsApi.update(id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["exams"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.examUpdated"));
+      return qc.invalidateQueries({ queryKey: ["exams"] });
+    },
   });
 }
 
@@ -34,13 +42,19 @@ export function useDeleteExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: examsApi.remove,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["exams"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.examDeleted"));
+      return qc.invalidateQueries({ queryKey: ["exams"] });
+    },
   });
 }
 
 export function useGenerateExam() {
   return useMutation({
     mutationFn: examsApi.generate,
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.examGenerated"));
+    },
   });
 }
 
@@ -48,6 +62,9 @@ export function useGenerateExam() {
 export function useGenerateDraft() {
   return useMutation({
     mutationFn: examsApi.draft,
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.draftGenerated"));
+    },
   });
 }
 
@@ -55,6 +72,9 @@ export function useGenerateDraft() {
 export function useRegenerateDraftTopic() {
   return useMutation({
     mutationFn: examsApi.regenerateTopic,
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.topicRegenerated"));
+    },
   });
 }
 

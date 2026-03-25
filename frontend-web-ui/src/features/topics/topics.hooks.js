@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { topicsApi } from "../../api/topics.api";
+import i18n from "../../i18n";
+import { notifySuccess } from "../../app/notifications";
 
 export function useTopics(params) {
   return useQuery({
@@ -20,7 +22,10 @@ export function useCreateTopic() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: topicsApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["topics"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.topicCreated"));
+      return qc.invalidateQueries({ queryKey: ["topics"] });
+    },
   });
 }
 
@@ -28,7 +33,10 @@ export function useUpdateTopic() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }) => topicsApi.update(id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["topics"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.topicUpdated"));
+      return qc.invalidateQueries({ queryKey: ["topics"] });
+    },
   });
 }
 
@@ -36,6 +44,9 @@ export function useDeleteTopic() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: topicsApi.remove,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["topics"] }),
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.topicDeleted"));
+      return qc.invalidateQueries({ queryKey: ["topics"] });
+    },
   });
 }

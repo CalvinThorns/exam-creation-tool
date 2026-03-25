@@ -211,6 +211,23 @@
   "confirmDialog": {
     "confirm": "Bestätigen"
   },
+  "notifications": {
+    "courseCreated": "Kurs erfolgreich erstellt",
+    "courseUpdated": "Kurs erfolgreich aktualisiert",
+    "courseDeleted": "Kurs erfolgreich gelöscht",
+    "topicCreated": "Aufgabe erfolgreich erstellt",
+    "topicUpdated": "Aufgabe erfolgreich aktualisiert",
+    "topicDeleted": "Aufgabe erfolgreich gelöscht",
+    "examCreated": "Prüfung erfolgreich gespeichert",
+    "examUpdated": "Prüfung erfolgreich aktualisiert",
+    "examDeleted": "Prüfung erfolgreich gelöscht",
+    "examGenerated": "Prüfung erfolgreich generiert",
+    "draftGenerated": "Entwurf erfolgreich generiert",
+    "topicRegenerated": "Aufgabe erfolgreich neu generiert",
+    "compileSuccess": "Kompilierung erfolgreich",
+    "compileWithWarnings": "Kompiliert mit {{count}} Warnung(en)",
+    "compileWithErrors": "Kompiliert mit {{count}} Fehler(n)"
+  },
   "errors": {
     "requestFailed": "Anfrage fehlgeschlagen",
     "requiredTitle": "Titel ist erforderlich",
