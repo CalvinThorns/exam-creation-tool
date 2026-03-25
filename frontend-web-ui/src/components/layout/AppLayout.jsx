@@ -12,7 +12,7 @@ export function AppLayout() {
         className="grid min-h-screen w-full"
         sx={{
           gridTemplateColumns: isSidebarCollapsed
-            ? "64px minmax(0,1fr)"
+            ? "48px minmax(0,1fr)"
             : "180px minmax(0,1fr)",
           transition: "grid-template-columns 0.2s ease-in-out",
         }}
