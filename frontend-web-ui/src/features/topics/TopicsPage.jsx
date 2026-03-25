@@ -1,40 +1,39 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Box, Button, Paper } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { ConfirmDialog, EntityTablePage } from "../../components/ui";
-import { TopicFormDialog } from "./TopicFormDialog";
-import {
-  useTopics,
-  useCreateTopic,
-  useUpdateTopic,
-  useDeleteTopic,
-} from "./hooks";
-import { useCourses } from "../courses";
+import { useNavigate } from "react-router-dom";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { ErrorState } from "../../components/ui/ErrorState";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { DataTable } from "../../components/ui/DataTable";
+import { useTopics, useDeleteTopic } from "./topics.hooks";
+import { useCourses } from "../courses/courses.hooks";
 import { useTranslation } from "react-i18next";
-import { useDialogState } from "../../hooks/useDialogState";
 
 export function TopicsPage() {
   const { t } = useTranslation();
+  const nav = useNavigate();
+  // const [courseFilter, setCourseFilter] = useState("");
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
-  const courses = useMemo(() => coursesData?.data ?? [], [coursesData]);
 
   const { data, isLoading, error } = useTopics({
     page: 1,
     limit: 100,
+    // courseId: courseFilter || undefined,
   });
 
-  const createM = useCreateTopic();
-  const updateM = useUpdateTopic();
   const deleteM = useDeleteTopic();
 
-  const formDialog = useDialogState(null);
-  const confirmDialog = useDialogState(null);
+  const [confirm, setConfirm] = useState({ open: false, id: null });
 
   const courseTitleById = useMemo(() => {
+    const sourceCourses = coursesData?.data ?? [];
     const m = new Map();
-    courses.forEach((c) => m.set(c.id, c.title));
+    sourceCourses.forEach((c) => m.set(c.id, c.title));
     return m;
-  }, [courses]);
+  }, [coursesData?.data]);
 
   const rows = useMemo(
     () =>
@@ -60,70 +59,89 @@ export function TopicsPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => formDialog.openDialog(row),
+        onClick: (row) => nav(`/tasks/edit/${row.id}`),
       },
       {
         id: "delete",
         label: t("common.delete"),
         icon: DeleteIcon,
-        onClick: (row) => confirmDialog.openDialog(row.id),
+        onClick: (row) => {
+          setConfirm({ open: true, id: row.id });
+        },
       },
     ],
-    [confirmDialog, formDialog, t],
+    [nav, t],
   );
 
-  const openAdd = () => {
-    formDialog.openDialog(null);
-  };
-
-  const submit = async (values) => {
-    const editing = formDialog.data;
-    if (editing) await updateM.mutateAsync({ id: editing.id, body: values });
-    else await createM.mutateAsync(values);
-    formDialog.closeDialog();
-  };
-
   const remove = async () => {
-    await deleteM.mutateAsync(confirmDialog.data);
-    confirmDialog.closeDialog();
+    await deleteM.mutateAsync(confirm.id);
+    setConfirm({ open: false, id: null });
   };
 
   return (
-    <EntityTablePage
-      title={t("topics.pageTitle")}
-      addLabel={t("common.addNew")}
-      onAdd={openAdd}
-      error={error?.userMessage || null}
-      dataTableProps={{
-        columnDefs: columns,
-        rowData: rows,
-        loading: isLoading,
-        noRowsTitle: t("topics.noRows"),
-        noRowsHint: t("topics.noRowsHint"),
-        noFilteredRowsTitle: t("topics.noFilteredRows"),
-        noFilteredRowsHint: t("datatable.noFilteredHint"),
-        actions,
-        actionsHeaderName: t("common.actions"),
-        pageSize: 10,
-        height: "100%",
-      }}
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
     >
-      <TopicFormDialog
-        open={formDialog.open}
-        onClose={formDialog.closeDialog}
-        initialValues={formDialog.data}
-        onSubmit={submit}
-        submitting={createM.isPending || updateM.isPending}
-        courses={courses}
+      <PageHeader
+        title={t("topics.pageTitle")}
+        right={
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => nav("/tasks/create")}
+          >
+            {t("common.addNew")}
+          </Button>
+        }
       />
 
+      {/* <Paper sx={{ p: 2, mb: 2 }}>
+        <TextField
+          select
+          label="Course filter"
+          value={courseFilter}
+          onChange={(e) => setCourseFilter(e.target.value)}
+          sx={{ minWidth: 320 }}
+        >
+          <MenuItem value="">All courses</MenuItem>
+          {courses.map((c) => (
+            <MenuItem key={c.id} value={c.id}>
+              {c.title} ({c.shortName})
+            </MenuItem>
+          ))}
+        </TextField>
+      </Paper> */}
+
+      {error ? <ErrorState message={error.userMessage} /> : null}
+
+      {!error ? (
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+          <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
+            <DataTable
+              columnDefs={columns}
+              rowData={rows}
+              loading={isLoading}
+              noRowsTitle={t("topics.noRows")}
+              noRowsHint={t("topics.noRowsHint")}
+              noFilteredRowsTitle={t("topics.noFilteredRows")}
+              noFilteredRowsHint={t("datatable.noFilteredHint")}
+              actions={actions}
+              actionsHeaderName={t("common.actions")}
+              pageSize={10}
+              height="100%"
+            />
+          </Paper>
+        </Box>
+      ) : null}
+
       <ConfirmDialog
-        open={confirmDialog.open}
+        open={confirm.open}
         title={t("topics.deleteTitle")}
         message={t("topics.deleteMessage")}
-        onCancel={confirmDialog.closeDialog}
+        onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />
-    </EntityTablePage>
+    </Box>
   );
 }

@@ -11,7 +11,16 @@ export function PageHeader({ title, right }) {
       >
         <Typography variant="h6">{title}</Typography>
 
-        <Box sx={{ flexShrink: 0 }}>{right}</Box>
+        <Box
+          sx={{
+            flexShrink: 0,
+            "& .MuiButton-root": {
+              px: 2,
+            },
+          }}
+        >
+          {right}
+        </Box>
       </Stack>
     </Paper>
   );

@@ -28,12 +28,23 @@ export function useCourses(params) {
   });
 }
 
+export function useCourse(id, options) {
+  return useQuery({
+    queryKey: ["course", id],
+    queryFn: async () => {
+      const response = await coursesApi.getById(id);
+      return response;
+    },
+    enabled: Boolean(id) && (options?.enabled ?? true),
+  });
+}
+
 export function useCreateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (values) => {
       const dto = toCreateDto(values);
-      return await coursesApi.createCourse(dto);
+      return await coursesApi.create(dto);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
   });
@@ -44,7 +55,7 @@ export function useUpdateCourse() {
   return useMutation({
     mutationFn: async ({ id, body }) => {
       const dto = toUpdateDto(body);
-      return await coursesApi.updateCourse(id, dto);
+      return await coursesApi.update(id, dto);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
   });
@@ -54,7 +65,7 @@ export function useDeleteCourse() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id) => {
-      return await coursesApi.deleteCourse(id);
+      return await coursesApi.remove(id);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
   });

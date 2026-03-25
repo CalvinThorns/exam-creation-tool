@@ -10,6 +10,7 @@
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "save": "Speichern",
+    "reset": "Zurücksetzen",
     "close": "Schließen",
     "cancel": "Abbrechen",
     "loading": "Lädt...",
@@ -79,6 +80,7 @@
     "deleteTitle": "Kurs löschen",
     "deleteMessage": "Möchten Sie diesen Kurs wirklich löschen?",
     "addTitle": "Kurs hinzufügen",
+    "createTitle": "Kurs erstellen",
     "editTitle": "Kurs bearbeiten",
     "coverPage": "Deckblatt",
     "coverPageLatex": "Deckblatt LaTeX",
@@ -87,7 +89,10 @@
     "resizeAria": "Größe von Deckblatteditor und Vorschau ändern",
     "compilingPreview": "Deckblatt-Vorschau wird kompiliert…",
     "emptyPreview": "Kompilieren, um die Deckblatt-PDF-Vorschau zu sehen",
-    "compileFailed": "Deckblatt-Vorschau konnte nicht kompiliert werden."
+    "compileFailed": "Deckblatt-Vorschau konnte nicht kompiliert werden.",
+    "confirmCancelTitle": "Änderungen verwerfen?",
+    "confirmYes": "Ja",
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },
   "topics": {
     "pageTitle": "Aufgaben",
@@ -98,6 +103,10 @@
     "deleteTitle": "Aufgabensatz löschen",
     "deleteMessage": "Möchten Sie dieses Thema und seine Aufgaben wirklich löschen?",
     "dialogTitle": "Aufgabe hinzufügen",
+    "createTitle": "Aufgaben erstellen",
+    "editTitle": "Aufgaben bearbeiten",
+    "previewSourceTitle": "Kombinierte LaTeX-Quelle",
+    "previewDocTitle": "Aufgaben-Vorschau",
     "descriptionLatex": "Beschreibung LaTeX",
     "uploadImage": "Bild hochladen",
     "taskBlockTitle": "Aufgabe",
@@ -108,7 +117,10 @@
     "taskLatex": "Aufgabe LaTeX",
     "solutionLatex": "Lösung LaTeX",
     "uploadTaskImage": "Aufgabenbild hochladen",
-    "relatedToTopic": "Zum Thema gehörend"
+    "relatedToTopic": "Zum Thema gehörend",
+    "confirmCancelTitle": "Änderungen verwerfen?",
+    "confirmYes": "Ja",
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },
   "exams": {
     "pageTitle": "Prüfungen",
@@ -119,6 +131,7 @@
     "deleteMessage": "Möchten Sie diese Prüfung wirklich löschen?",
     "date": "Datum",
     "generateTitle": "Prüfung erzeugen",
+    "createTitle": "Prüfung erstellen",
     "editTitle": "Prüfung bearbeiten",
     "loadingExam": "Prüfung wird geladen…",
     "generate": "Erzeugen",
@@ -144,7 +157,10 @@
     "addTask": "Aufgabe hinzufügen",
     "regenerate": "Neu erzeugen",
     "tasksCount": "Aufgaben ({{count}})",
-    "pts": "Pkt"
+    "pts": "Pkt",
+    "confirmCancelTitle": "Änderungen verwerfen?",
+    "confirmYes": "Ja",
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },
   "coverPageDialog": {
     "title": "Deckblatt bearbeiten",
