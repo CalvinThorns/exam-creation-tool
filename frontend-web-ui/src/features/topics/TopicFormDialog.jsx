@@ -1,9 +1,5 @@
 import { useEffect } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   TextField,
   MenuItem,
@@ -18,8 +14,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
 import { fileToBase64 } from "../../utils/fileToBase64";
 import { TaskEditor } from "./TaskEditor";
-import { LatexEditor } from "../../components/ui/LatexEditor";
 import { useTranslation } from "react-i18next";
+import {
+  AppDialog,
+  DialogSubmitActions,
+  LatexFormField,
+} from "../../components/ui";
 
 export function TopicFormDialog({
   open,
@@ -104,149 +104,127 @@ export function TopicFormDialog({
   };
 
   return (
-    <Dialog
+    <AppDialog
       open={open}
       onClose={onClose}
       maxWidth={false}
-      PaperProps={{ sx: { width: "92vw", maxWidth: 1400, borderRadius: 3 } }}
-    >
-      {/* Header bar like mock */}
-      <DialogTitle sx={{ p: 0 }}>
+      title={
         <Box className="px-6 py-3">
           <Typography className="font-semibold text-lg">
             {t("topics.dialogTitle")}
           </Typography>
         </Box>
-      </DialogTitle>
+      }
+      titleSx={{ p: 0 }}
+      contentSx={{ p: 0, bgcolor: "background.paper" }}
+      actionsSx={{ px: 10, py: 4, gap: 2 }}
+      actions={
+        <DialogSubmitActions
+          cancelLabel={t("common.cancel")}
+          submitLabel={t("common.save")}
+          onCancel={onClose}
+          onSubmit={handleSubmit(onSubmit)}
+          submitting={submitting}
+        />
+      }
+      PaperProps={{ sx: { width: "92vw", maxWidth: 1400, borderRadius: 3 } }}
+    >
+      <Box className="px-10 py-8">
+        {/* Row 1: Course + Topic */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <TextField
+            select
+            label={t("common.course")}
+            fullWidth
+            {...register("courseId")}
+            error={!!formState.errors.courseId}
+            helperText={formState.errors.courseId?.message}
+          >
+            <MenuItem value="">{t("common.selectCourse")}</MenuItem>
+            {(courses || []).map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.title} ({c.shortName})
+              </MenuItem>
+            ))}
+          </TextField>
 
-      <DialogContent sx={{ p: 0, bgcolor: "background.paper" }}>
-        <Box className="px-10 py-8">
-          {/* Row 1: Course + Topic */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <TextField
-              select
-              label={t("common.course")}
-              fullWidth
-              {...register("courseId")}
-              error={!!formState.errors.courseId}
-              helperText={formState.errors.courseId?.message}
-            >
-              <MenuItem value="">{t("common.selectCourse")}</MenuItem>
-              {(courses || []).map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.title} ({c.shortName})
-                </MenuItem>
-              ))}
-            </TextField>
+          <TextField
+            label={t("common.topic")}
+            fullWidth
+            {...register("topic")}
+            error={!!formState.errors.topic}
+            helperText={formState.errors.topic?.message}
+          />
+        </div>
 
-            <TextField
-              label={t("common.topic")}
-              fullWidth
-              {...register("topic")}
-              error={!!formState.errors.topic}
-              helperText={formState.errors.topic?.message}
+        {/* Description */}
+        <div className="mt-8">
+          <LatexFormField
+            label={t("common.description")}
+            value={descriptionValue}
+            onChange={(value) =>
+              setValue("description", value, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            height={300}
+            placeholder={t("topics.descriptionLatex")}
+            errorText={formState.errors.description?.message}
+          />
+        </div>
+
+        {/* Row 3: Image + Points */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <Button
+            variant="outlined"
+            component="label"
+            startIcon={<UploadIcon />}
+            className="justify-between"
+            fullWidth
+          >
+            {t("topics.uploadImage")}
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={(e) => setDescriptionImage(e.target.files?.[0] || null)}
             />
-          </div>
+          </Button>
 
-          {/* Description */}
-          <div className="mt-8">
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mb: 0.5, display: "block" }}
-            >
-              {t("common.description")}
+          <TextField
+            label={t("common.points")}
+            placeholder={t("common.points")}
+            type="number"
+            fullWidth
+            {...register("points")}
+            error={!!formState.errors.points}
+            helperText={formState.errors.points?.message}
+          />
+        </div>
+
+        {/* Task block */}
+        <div className="mt-10 rounded-2xl border p-5">
+          <div className="flex items-center mb-4">
+            <Typography className="font-semibold">
+              {t("topics.taskBlockTitle")}
             </Typography>
-            <LatexEditor
-              value={descriptionValue}
-              onChange={(value) =>
-                setValue("description", value, {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                })
-              }
-              height={300}
-              placeholder={t("topics.descriptionLatex")}
-            />
-            {formState.errors.description?.message ? (
-              <Typography
-                variant="caption"
-                color="error.main"
-                sx={{ mt: 0.75, display: "block" }}
-              >
-                {formState.errors.description.message}
-              </Typography>
-            ) : null}
           </div>
 
-          {/* Row 3: Image + Points */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<UploadIcon />}
-              className="justify-between"
-              fullWidth
-            >
-              {t("topics.uploadImage")}
-              <input
-                hidden
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  setDescriptionImage(e.target.files?.[0] || null)
-                }
-              />
-            </Button>
+          <TaskEditor
+            control={control}
+            register={register}
+            setValue={setValue}
+            errors={formState.errors}
+          />
 
-            <TextField
-              label={t("common.points")}
-              placeholder={t("common.points")}
-              type="number"
-              fullWidth
-              {...register("points")}
-              error={!!formState.errors.points}
-              helperText={formState.errors.points?.message}
-            />
+          <div className="mt-4 flex justify-end">
+            <IconButton onClick={addTask}>
+              <AddIcon />
+            </IconButton>
           </div>
-
-          {/* Task block */}
-          <div className="mt-10 rounded-2xl border p-5">
-            <div className="flex items-center mb-4">
-              <Typography className="font-semibold">
-                {t("topics.taskBlockTitle")}
-              </Typography>
-            </div>
-
-            <TaskEditor
-              control={control}
-              register={register}
-              setValue={setValue}
-              errors={formState.errors}
-            />
-
-            <div className="mt-4 flex justify-end">
-              <IconButton onClick={addTask}>
-                <AddIcon />
-              </IconButton>
-            </div>
-          </div>
-        </Box>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 10, py: 4, gap: 2 }}>
-        <Button variant="contained" color="secondary" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
-
-        <Button
-          variant="contained"
-          onClick={handleSubmit(onSubmit)}
-          disabled={submitting}
-        >
-          {t("common.save")}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        </div>
+      </Box>
+    </AppDialog>
   );
 }

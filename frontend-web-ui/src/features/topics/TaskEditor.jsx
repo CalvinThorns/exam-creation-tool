@@ -9,8 +9,8 @@ import {
 } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
 import { fileToBase64 } from "../../utils/fileToBase64";
-import { LatexEditor } from "../../components/ui/LatexEditor";
 import { useTranslation } from "react-i18next";
+import { LatexFormField } from "../../components/ui";
 
 export function TaskEditor({ control, register, setValue, errors }) {
   const { t } = useTranslation();
@@ -45,14 +45,8 @@ export function TaskEditor({ control, register, setValue, errors }) {
             ) : null}
           </div>
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mb: 0.5, display: "block" }}
-          >
-            {t("topics.taskBlockTitle")}
-          </Typography>
-          <LatexEditor
+          <LatexFormField
+            label={t("topics.taskBlockTitle")}
             value={watchedTasks[idx]?.question || ""}
             onChange={(value) =>
               setValue(`tasks.${idx}.question`, value, {
@@ -62,26 +56,12 @@ export function TaskEditor({ control, register, setValue, errors }) {
             }
             height={300}
             placeholder={t("topics.taskLatex")}
+            errorText={errors?.tasks?.[idx]?.question?.message}
           />
-          {errors?.tasks?.[idx]?.question?.message ? (
-            <Typography
-              variant="caption"
-              color="error.main"
-              sx={{ mt: 0.75, display: "block" }}
-            >
-              {errors.tasks[idx].question.message}
-            </Typography>
-          ) : null}
 
           <div className="mt-5">
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mb: 0.5, display: "block" }}
-            >
-              {t("common.solution")}
-            </Typography>
-            <LatexEditor
+            <LatexFormField
+              label={t("common.solution")}
               value={watchedTasks[idx]?.solution || ""}
               onChange={(value) =>
                 setValue(`tasks.${idx}.solution`, value, {
@@ -91,16 +71,8 @@ export function TaskEditor({ control, register, setValue, errors }) {
               }
               height={300}
               placeholder={t("topics.solutionLatex")}
+              errorText={errors?.tasks?.[idx]?.solution?.message}
             />
-            {errors?.tasks?.[idx]?.solution?.message ? (
-              <Typography
-                variant="caption"
-                color="error.main"
-                sx={{ mt: 0.75, display: "block" }}
-              >
-                {errors.tasks[idx].solution.message}
-              </Typography>
-            ) : null}
           </div>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">

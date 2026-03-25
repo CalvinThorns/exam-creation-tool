@@ -1,12 +1,6 @@
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-} from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { AppDialog } from "./AppDialog";
 
 export function ConfirmDialog({
   open,
@@ -20,19 +14,23 @@ export function ConfirmDialog({
   const resolvedConfirmText = confirmText || t("common.delete");
 
   return (
-    <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
-      <DialogTitle>{title || t("confirmDialog.confirm")}</DialogTitle>
-      <DialogContent>
-        <Typography>{message}</Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button color="secondary" variant="contained" onClick={onCancel}>
-          {t("common.cancel")}
-        </Button>
-        <Button color="error" variant="contained" onClick={onConfirm}>
-          {resolvedConfirmText}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={onCancel}
+      title={title || t("confirmDialog.confirm")}
+      maxWidth="xs"
+      actions={
+        <>
+          <Button color="secondary" variant="contained" onClick={onCancel}>
+            {t("common.cancel")}
+          </Button>
+          <Button color="error" variant="contained" onClick={onConfirm}>
+            {resolvedConfirmText}
+          </Button>
+        </>
+      }
+    >
+      <Typography>{message}</Typography>
+    </AppDialog>
   );
 }
