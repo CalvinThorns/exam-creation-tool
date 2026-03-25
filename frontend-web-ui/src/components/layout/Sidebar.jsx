@@ -29,13 +29,17 @@ export function Sidebar({ isCollapsed, onToggle }) {
       : theme.palette.primary.main;
   const sidebarText = theme.palette.getContrastText(sidebarBackground);
   const items = [
-    { label: t("sidebar.exams"), to: "/exams", icon: AssignmentOutlined },
+    {
+      label: t("sidebar.exams"),
+      to: "/exams/list",
+      icon: AssignmentOutlined,
+    },
     {
       label: t("sidebar.courses"),
-      to: "/courses",
+      to: "/courses/list",
       icon: SchoolOutlined,
     },
-    { label: t("sidebar.tasks"), to: "/tasks", icon: TaskOutlined },
+    { label: t("sidebar.tasks"), to: "/tasks/list", icon: TaskOutlined },
   ];
 
   return (

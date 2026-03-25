@@ -21,6 +21,7 @@ export function TopicCard({
   topic,
   topicIndex,
   solutionSpaceOptions,
+  editable = true,
   onTopicField,
   onTaskField,
   onAddTask,
@@ -64,7 +65,7 @@ export function TopicCard({
             size="small"
             startIcon={<RefreshIcon />}
             onClick={() => onRegenerate(topic.topic)}
-            disabled={regenPending}
+            disabled={regenPending || !editable}
           >
             {t("exams.regenerate")}
           </Button>
@@ -85,6 +86,7 @@ export function TopicCard({
             onChange={(e) => onTopicField(topicIndex, "topic", e.target.value)}
             fullWidth
             size="small"
+            disabled={!editable}
           />
           <TextField
             label={t("common.points")}
@@ -95,6 +97,7 @@ export function TopicCard({
             }
             sx={{ width: 110 }}
             size="small"
+            disabled={!editable}
           />
         </Box>
 
@@ -107,7 +110,10 @@ export function TopicCard({
         </Typography>
         <LatexEditor
           value={topic.description || ""}
-          onChange={(value) => onTopicField(topicIndex, "description", value)}
+          onChange={(value) => {
+            if (!editable) return;
+            onTopicField(topicIndex, "description", value);
+          }}
           height={140}
         />
 
@@ -167,6 +173,7 @@ export function TopicCard({
                           }
                           sx={{ width: 100 }}
                           size="small"
+                          disabled={!editable}
                         />
                         <Button
                           variant="text"
@@ -174,6 +181,7 @@ export function TopicCard({
                           size="small"
                           startIcon={<DeleteOutlineIcon />}
                           onClick={() => onRemoveTask(topicIndex, taskIndex)}
+                          disabled={!editable}
                         >
                           {t("topics.remove")}
                         </Button>
@@ -189,9 +197,10 @@ export function TopicCard({
                     </Typography>
                     <LatexEditor
                       value={task.question || ""}
-                      onChange={(value) =>
-                        onTaskField(topicIndex, taskIndex, "question", value)
-                      }
+                      onChange={(value) => {
+                        if (!editable) return;
+                        onTaskField(topicIndex, taskIndex, "question", value);
+                      }}
                       height={160}
                     />
 
@@ -204,9 +213,10 @@ export function TopicCard({
                     </Typography>
                     <LatexEditor
                       value={task.solution || ""}
-                      onChange={(value) =>
-                        onTaskField(topicIndex, taskIndex, "solution", value)
-                      }
+                      onChange={(value) => {
+                        if (!editable) return;
+                        onTaskField(topicIndex, taskIndex, "solution", value);
+                      }}
                       height={120}
                     />
 
@@ -224,6 +234,7 @@ export function TopicCard({
                       }
                       size="small"
                       sx={{ mt: 1.5, width: "50%" }}
+                      disabled={!editable}
                     >
                       {solutionSpaceOptions.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -241,6 +252,7 @@ export function TopicCard({
                 variant="outlined"
                 startIcon={<AddIcon />}
                 onClick={() => onAddTask(topicIndex)}
+                disabled={!editable}
               >
                 {t("exams.addTask")}
               </Button>

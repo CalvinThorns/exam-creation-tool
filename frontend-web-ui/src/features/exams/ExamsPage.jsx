@@ -1,13 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
+import { Box, Button, Paper } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate } from "react-router-dom";
-import { ConfirmDialog, EntityTablePage } from "../../components/ui";
-import { useExams, useDeleteExam } from "./hooks";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { ErrorState } from "../../components/ui/ErrorState";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { DataTable } from "../../components/ui/DataTable";
+import { useExams, useDeleteExam } from "./exams.hooks";
 import { formatDate } from "../../utils/format";
 import { agGridFilterToApiFilters } from "../../utils/listQuery";
 import { useTranslation } from "react-i18next";
-import { useDialogState } from "../../hooks/useDialogState";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -20,12 +24,7 @@ export function ExamsPage() {
     { colId: "createdAt", sort: "desc" },
   ]);
   const [filterModel, setFilterModel] = useState(null);
-  const {
-    open: isConfirmOpen,
-    data: confirmId,
-    openDialog: openConfirmDialog,
-    closeDialog: closeConfirmDialog,
-  } = useDialogState(null);
+  const [confirm, setConfirm] = useState({ open: false, id: null });
 
   const queryParams = useMemo(() => {
     const sort =
@@ -84,17 +83,17 @@ export function ExamsPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => nav(`/exams/${row.id}/edit`),
+        onClick: (row) => nav(`/exams/edit/${row.id}`),
       },
       {
         id: "delete",
         label: t("common.delete"),
         icon: DeleteIcon,
         maxWidth: 100,
-        onClick: (row) => openConfirmDialog(row.id),
+        onClick: (row) => setConfirm({ open: true, id: row.id }),
       },
     ],
-    [nav, openConfirmDialog, t],
+    [nav, t],
   );
 
   const handlePageChange = useCallback((newPage, newPageSize) => {
@@ -113,45 +112,65 @@ export function ExamsPage() {
   }, []);
 
   const remove = async () => {
-    await deleteM.mutateAsync(confirmId);
-    closeConfirmDialog();
+    await deleteM.mutateAsync(confirm.id);
+    setConfirm({ open: false, id: null });
   };
 
   return (
-    <EntityTablePage
-      title={t("exams.pageTitle")}
-      addLabel={t("common.addNew")}
-      onAdd={() => nav("/exams/generate")}
-      error={error?.userMessage || null}
-      dataTableProps={{
-        columnDefs: columns,
-        rowData: rows,
-        loading: isLoading || isFetching,
-        noRowsTitle: t("exams.noRows"),
-        noRowsHint: t("exams.noRowsHint"),
-        noFilteredRowsTitle: t("exams.noFilteredRows"),
-        noFilteredRowsHint: t("datatable.noFilteredHint"),
-        actions,
-        actionsHeaderName: t("common.actions"),
-        height: "100%",
-        serverSide: true,
-        rowCount,
-        page,
-        pageSize,
-        onPageChange: handlePageChange,
-        onSortChange: handleSortChange,
-        onFilterChange: handleFilterChange,
-        sortModel,
-        filterModel,
-      }}
+    <Box
+      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
     >
+      <PageHeader
+        title={t("exams.pageTitle")}
+        right={
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => nav("/exams/create")}
+          >
+            {t("common.addNew")}
+          </Button>
+        }
+      />
+
+      {error ? <ErrorState message={error.userMessage} /> : null}
+
+      {!error ? (
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+          <Paper sx={{ overflow: "hidden", p: 1, height: "100%" }}>
+            <DataTable
+              columnDefs={columns}
+              rowData={rows}
+              loading={isLoading || isFetching}
+              noRowsTitle={t("exams.noRows")}
+              noRowsHint={t("exams.noRowsHint")}
+              noFilteredRowsTitle={t("exams.noFilteredRows")}
+              noFilteredRowsHint={t("datatable.noFilteredHint")}
+              actions={actions}
+              actionsHeaderName={t("common.actions")}
+              height="100%"
+              serverSide
+              rowCount={rowCount}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onSortChange={handleSortChange}
+              onFilterChange={handleFilterChange}
+              sortModel={sortModel}
+              filterModel={filterModel}
+            />
+          </Paper>
+        </Box>
+      ) : null}
+
       <ConfirmDialog
-        open={isConfirmOpen}
+        open={confirm.open}
         title={t("exams.deleteTitle")}
         message={t("exams.deleteMessage")}
-        onCancel={closeConfirmDialog}
+        onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
       />
-    </EntityTablePage>
+    </Box>
   );
 }

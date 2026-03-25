@@ -12,7 +12,13 @@ import { fileToBase64 } from "../../utils/fileToBase64";
 import { useTranslation } from "react-i18next";
 import { LatexFormField } from "../../components/ui";
 
-export function TaskEditor({ control, register, setValue, errors }) {
+export function TaskEditor({
+  control,
+  register,
+  setValue,
+  errors,
+  editable = true,
+}) {
   const { t } = useTranslation();
   const { fields, remove } = useFieldArray({ control, name: "tasks" });
   const watchedTasks = useWatch({ control, name: "tasks" }) || [];
@@ -39,7 +45,13 @@ export function TaskEditor({ control, register, setValue, errors }) {
               {t("topics.taskLabel", { index: idx + 1 })}
             </Typography>
             {fields.length > 1 ? (
-              <Button color="error" variant="text" onClick={() => remove(idx)}>
+              <Button
+                color="error"
+                variant="text"
+                onClick={() => remove(idx)}
+                disabled={!editable}
+                size="small"
+              >
                 {t("topics.remove")}
               </Button>
             ) : null}
@@ -48,13 +60,14 @@ export function TaskEditor({ control, register, setValue, errors }) {
           <LatexFormField
             label={t("topics.taskBlockTitle")}
             value={watchedTasks[idx]?.question || ""}
-            onChange={(value) =>
+            onChange={(value) => {
+              if (!editable) return;
               setValue(`tasks.${idx}.question`, value, {
                 shouldValidate: true,
                 shouldDirty: true,
-              })
-            }
-            height={300}
+              });
+            }}
+            height={220}
             placeholder={t("topics.taskLatex")}
             errorText={errors?.tasks?.[idx]?.question?.message}
           />
@@ -63,24 +76,27 @@ export function TaskEditor({ control, register, setValue, errors }) {
             <LatexFormField
               label={t("common.solution")}
               value={watchedTasks[idx]?.solution || ""}
-              onChange={(value) =>
+              onChange={(value) => {
+                if (!editable) return;
                 setValue(`tasks.${idx}.solution`, value, {
                   shouldValidate: true,
                   shouldDirty: true,
-                })
-              }
-              height={300}
+                });
+              }}
+              height={220}
               placeholder={t("topics.solutionLatex")}
               errorText={errors?.tasks?.[idx]?.solution?.message}
             />
           </div>
 
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
             <Button
               variant="outlined"
               component="label"
               startIcon={<UploadIcon />}
               fullWidth
+              size="small"
+              disabled={!editable}
             >
               {t("topics.uploadTaskImage")}
               <input
@@ -96,9 +112,11 @@ export function TaskEditor({ control, register, setValue, errors }) {
               placeholder={t("common.points")}
               type="number"
               fullWidth
+              size="small"
               {...register(`tasks.${idx}.points`)}
               error={!!errors?.tasks?.[idx]?.points}
               helperText={errors?.tasks?.[idx]?.points?.message}
+              disabled={!editable}
             />
           </div>
 
@@ -108,6 +126,7 @@ export function TaskEditor({ control, register, setValue, errors }) {
                 <Checkbox
                   defaultChecked
                   {...register(`tasks.${idx}.isRelatedToTopic`)}
+                  disabled={!editable}
                 />
               }
               label={t("topics.relatedToTopic")}

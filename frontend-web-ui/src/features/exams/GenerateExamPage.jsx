@@ -1,6 +1,6 @@
 // GenerateExamPage.jsx
 import { useMemo, useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Autocomplete,
   Box,
@@ -24,6 +24,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import BuildIcon from "@mui/icons-material/Build";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
@@ -35,6 +36,7 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditIcon from "@mui/icons-material/Edit";
 
 import { PageHeader, PdfPreviewPanel } from "../../components/ui";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { TopicCard, CoverPagePreviewDialog } from "./components";
 import { useCourses } from "../courses";
@@ -49,10 +51,10 @@ import {
 import { examsApi } from "../../api/exams.api";
 import { useTranslation } from "react-i18next";
 
-const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages"];
+const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages", "3 Pages", "4 Pages"];
 
 const DEFAULT_SOLUTION_SPACE = "1 Page";
-const DEFAULT_SPLIT_PERCENT = 66.6667;
+const DEFAULT_SPLIT_PERCENT = 70;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
 
 function sumPoints(topics) {
@@ -160,6 +162,7 @@ function CompileButton({ disabled, onCompile }) {
 export function GenerateExamPage() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const nav = useNavigate();
   const { id: examId } = useParams(); // present only in edit mode (/exams/:id/edit)
   const isEditMode = Boolean(examId);
 
@@ -170,7 +173,7 @@ export function GenerateExamPage() {
   );
 
   const [courseId, setCourseId] = useState("");
-  const [targetPoints, setTargetPoints] = useState(null);
+  const [targetPoints, setTargetPoints] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
   const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
     usePdfPreview("exam.pdf");
@@ -191,7 +194,18 @@ export function GenerateExamPage() {
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
   const [collapsedPane, setCollapsedPane] = useState(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [isEditable, setIsEditable] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    action: null, // "cancel" or "reset"
+  });
   const splitContainerRef = useRef(null);
+  const initialStateRef = useRef({
+    courseId: "",
+    targetPoints: "",
+    selectedTopics: [],
+    draft: null,
+  });
 
   // Fetch existing exam when in edit mode
   const { data: examData, isLoading: examLoading } = useExam(examId, {
@@ -225,7 +239,37 @@ export function GenerateExamPage() {
       diff: 0,
       topics: exam.topics || [],
     });
+    initialStateRef.current = {
+      courseId: resolvedCourseId || "",
+      targetPoints: exam.targetPoints ?? exam.points ?? 0,
+      selectedTopics: topicNames,
+      draft: {
+        course:
+          typeof exam.courseId === "object"
+            ? exam.courseId
+            : { id: resolvedCourseId },
+        targetPoints: exam.targetPoints ?? exam.points ?? 0,
+        totalPoints:
+          exam.totalPoints ??
+          (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
+        diff: 0,
+        topics: exam.topics || [],
+      },
+    };
+    setIsEditable(true);
   }, [examData]);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      initialStateRef.current = {
+        courseId: "",
+        targetPoints: "",
+        selectedTopics: [],
+        draft: null,
+      };
+      setIsEditable(true);
+    }
+  }, [isEditMode]);
 
   const { data: topicsData } = useTopics({
     page: 1,
@@ -274,13 +318,14 @@ export function GenerateExamPage() {
   };
 
   const handleTargetPointsChange = (e) => {
-    const nextTarget = Number(e.target.value || 0);
+    const nextRawValue = e.target.value;
+    const nextTarget = nextRawValue === "" ? "" : Number(nextRawValue);
     setTargetPoints(nextTarget);
 
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.targetPoints = nextTarget;
+      next.targetPoints = Number(nextTarget || 0);
       return recalcDraftTotals(next);
     });
   };
@@ -514,6 +559,55 @@ export function GenerateExamPage() {
     }
 
     await saveM.mutateAsync(body);
+    nav("/exams/list");
+  };
+
+  const hasUnsavedChanges = () => {
+    const snapshot = initialStateRef.current;
+    return (
+      courseId !== snapshot.courseId ||
+      targetPoints !== snapshot.targetPoints ||
+      JSON.stringify(selectedTopics) !==
+        JSON.stringify(snapshot.selectedTopics) ||
+      JSON.stringify(draft) !== JSON.stringify(snapshot.draft)
+    );
+  };
+
+  const handleCancelClick = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmDialog({ open: true, action: "cancel" });
+    } else {
+      nav("/exams/list");
+    }
+  };
+
+  const handleResetClick = () => {
+    resetExamForm();
+  };
+
+  const handleConfirmDialogConfirm = () => {
+    const action = confirmDialog.action;
+    setConfirmDialog({ open: false, action: null });
+
+    if (action === "cancel") {
+      nav("/exams/list");
+    }
+  };
+
+  const handleConfirmDialogCancel = () => {
+    setConfirmDialog({ open: false, action: null });
+  };
+
+  const resetExamForm = () => {
+    const snapshot = initialStateRef.current;
+    setCourseId(snapshot.courseId || "");
+    setTargetPoints(snapshot.targetPoints ?? "");
+    setSelectedTopics(snapshot.selectedTopics || []);
+    setDraft(snapshot.draft ? structuredClone(snapshot.draft) : null);
+    setCompileDiagnostics(null);
+    clearPdf();
+    setCompiledVersion(null);
+    setIsEditable(true);
   };
 
   const resetSplitLayout = () => {
@@ -601,7 +695,35 @@ export function GenerateExamPage() {
     >
       {/* ── Page header ── */}
       <PageHeader
-        title={isEditMode ? t("exams.editTitle") : t("exams.generateTitle")}
+        title={isEditMode ? t("exams.editTitle") : t("exams.createTitle")}
+        right={
+          <Stack direction="row" spacing={1}>
+            {!isEditMode ? (
+              <Button
+                variant="outlined"
+                startIcon={<RestartAltIcon />}
+                size="small"
+                onClick={handleResetClick}
+              >
+                {t("common.reset")}
+              </Button>
+            ) : null}
+            <Button variant="outlined" size="small" onClick={handleCancelClick}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              size="small"
+              onClick={saveExam}
+              disabled={
+                !draft || saveM.isPending || updateM.isPending || !isEditable
+              }
+            >
+              {t("common.save")}
+            </Button>
+          </Stack>
+        }
       />
 
       {/* Loading skeleton while fetching exam in edit mode */}
@@ -692,21 +814,11 @@ export function GenerateExamPage() {
                           !courseId ||
                           selectedTopics.length === 0 ||
                           Number(targetPoints) <= 0 ||
-                          generateM.isPending
+                          generateM.isPending ||
+                          !isEditable
                         }
                       >
                         {t("exams.generate")}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        color="secondary"
-                        startIcon={<SaveIcon />}
-                        onClick={saveExam}
-                        disabled={
-                          !draft || saveM.isPending || updateM.isPending
-                        }
-                      >
-                        {t("common.save")}
                       </Button>
                     </Stack>
                   </>
@@ -745,7 +857,7 @@ export function GenerateExamPage() {
                   onChange={handleCourseChange}
                   fullWidth
                   size="small"
-                  disabled={isEditMode}
+                  disabled={isEditMode || !isEditable}
                 >
                   <MenuItem value="">{t("common.selectCourse")}</MenuItem>
                   {courses.map((c) => (
@@ -767,6 +879,7 @@ export function GenerateExamPage() {
                   onChange={handleTargetPointsChange}
                   fullWidth
                   size="small"
+                  disabled={!isEditable}
                 />
 
                 <Autocomplete
@@ -774,7 +887,7 @@ export function GenerateExamPage() {
                   options={topicNames}
                   value={selectedTopics}
                   onChange={(_, value) => setSelectedTopics(value)}
-                  disabled={!courseId}
+                  disabled={!courseId || !isEditable}
                   fullWidth
                   size="small"
                   filterSelectedOptions
@@ -872,19 +985,11 @@ export function GenerateExamPage() {
                         !courseId ||
                         selectedTopics.length === 0 ||
                         Number(targetPoints) <= 0 ||
-                        generateM.isPending
+                        generateM.isPending ||
+                        !isEditable
                       }
                     >
                       {t("exams.generate")}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      startIcon={<SaveIcon />}
-                      onClick={saveExam}
-                      disabled={!draft || saveM.isPending || updateM.isPending}
-                    >
-                      {t("common.save")}
                     </Button>
                   </Stack>
                 </Stack>
@@ -987,7 +1092,7 @@ export function GenerateExamPage() {
                         size="small"
                         startIcon={<EditIcon />}
                         onClick={openCoverPageDialog}
-                        disabled={!draft}
+                        disabled={!draft || !isEditable}
                       >
                         {t("exams.editCoverPage")}
                       </Button>
@@ -1006,7 +1111,7 @@ export function GenerateExamPage() {
                         </Button>
                       ) : (
                         <CompileButton
-                          disabled={!draft}
+                          disabled={!draft || !isEditable}
                           onCompile={compileDraft}
                         />
                       )}
@@ -1055,6 +1160,7 @@ export function GenerateExamPage() {
                             topic={topic}
                             topicIndex={i}
                             solutionSpaceOptions={SOLUTION_SPACE_OPTIONS}
+                            editable={isEditable}
                             onTopicField={updateTopicField}
                             onTaskField={updateTaskField}
                             onAddTask={addTask}
@@ -1250,6 +1356,15 @@ export function GenerateExamPage() {
           disableActions={!draft}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={t("exams.confirmCancelTitle")}
+        message={t("exams.unsavedChangesMessage")}
+        confirmText={t("exams.confirmYes")}
+        onCancel={handleConfirmDialogCancel}
+        onConfirm={handleConfirmDialogConfirm}
+      />
     </Box>
   );
 }
