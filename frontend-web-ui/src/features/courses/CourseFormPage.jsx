@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import {
   alpha,
   CircularProgress,
@@ -76,6 +76,7 @@ export function CourseFormPage() {
   });
   const initialValuesRef = useRef({ title: "", shortName: "", coverPage: "" });
   const splitContainerRef = useRef(null);
+  const blockerRef = useRef(null);
   const { pdfUrl, setPdfFromBase64, clearPdf } =
     usePdfPreview("cover-page.pdf");
 
@@ -245,6 +246,23 @@ export function CourseFormPage() {
     );
   };
 
+  // Block route changes when there are unsaved changes
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  // Store blocker in ref and show dialog when navigation is blocked
+  useEffect(() => {
+    blockerRef.current = blocker;
+    if (blocker.state === "blocked") {
+      setConfirmDialog({
+        open: true,
+        action: "navigate",
+      });
+    }
+  }, [blocker.state]);
+
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
       setConfirmDialog({ open: true, action: "cancel" });
@@ -254,11 +272,20 @@ export function CourseFormPage() {
   };
 
   const handleConfirmDialogConfirm = () => {
+    const action = confirmDialog.action;
     setConfirmDialog({ open: false, action: null });
-    nav("/courses/list");
+
+    if (action === "cancel") {
+      nav("/courses/list");
+    } else if (action === "navigate" && blockerRef.current) {
+      blockerRef.current.proceed();
+    }
   };
 
   const handleConfirmDialogCancel = () => {
+    if (blockerRef.current?.state === "blocked") {
+      blockerRef.current.reset();
+    }
     setConfirmDialog({ open: false, action: null });
   };
 

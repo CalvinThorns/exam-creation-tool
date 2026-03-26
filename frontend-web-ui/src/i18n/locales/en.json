@@ -149,6 +149,10 @@
     "teacherVersion": "Teacher Version",
     "studentVersionHint": "No solutions",
     "teacherVersionHint": "Includes solutions",
+    "year": "Year",
+    "semester": "Semester",
+    "selectYear": "Select year",
+    "selectSemester": "Select semester",
     "totalPoints": "Total points",
     "topics": "Topics",
     "exam": "Exam",
@@ -236,6 +240,7 @@
     "requiredCourse": "Course is required",
     "requiredTopic": "Topic is required",
     "requiredQuestion": "Question is required",
-    "pointsMin": "Points must be >= 0"
+    "pointsMin": "Points must be >= 1",
+    "taskPointsMismatch": "Total points mismatch"
   }
 }

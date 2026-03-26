@@ -1,6 +1,6 @@
 // GenerateExamPage.jsx
-import { useMemo, useState, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import {
   Autocomplete,
   Box,
@@ -21,6 +21,10 @@ import {
   ListItemText,
   Tooltip,
 } from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import BuildIcon from "@mui/icons-material/Build";
@@ -57,10 +61,46 @@ import {
 } from "../../utils/compileDiagnostics";
 
 const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages", "3 Pages", "4 Pages"];
+const SEMESTER_OPTIONS = ["SoSe", "WiSe"];
 
 const DEFAULT_SOLUTION_SPACE = "1 Page";
 const DEFAULT_SPLIT_PERCENT = 65;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
+
+function parseSemesterStartYear(rawYear) {
+  const value = String(rawYear || "").trim();
+  const match = value.match(/^(\d{4})/);
+  return match ? match[1] : "";
+}
+
+function parseSemesterValue(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return { year: "", semesterType: "" };
+
+  const match = value.match(/^(.*)\s+(SoSe|WiSe)$/);
+  if (!match) {
+    return { year: value, semesterType: "" };
+  }
+
+  return {
+    year: String(match[1] || "").trim(),
+    semesterType: match[2],
+  };
+}
+
+function formatSemesterValue(year, semesterType) {
+  const normalizedYear = parseSemesterStartYear(year);
+  const normalizedType = String(semesterType || "").trim();
+  if (!normalizedYear || !normalizedType) return "";
+  if (normalizedType === "WiSe") {
+    const nextShortYear = String((Number(normalizedYear) + 1) % 100).padStart(
+      2,
+      "0",
+    );
+    return `${normalizedYear}/${nextShortYear} ${normalizedType}`;
+  }
+  return `${normalizedYear} ${normalizedType}`;
+}
 
 function sumPoints(topics) {
   return (topics || []).reduce((acc, topic) => {
@@ -178,6 +218,8 @@ export function GenerateExamPage() {
   );
 
   const [courseId, setCourseId] = useState("");
+  const [semesterYear, setSemesterYear] = useState("");
+  const [semesterType, setSemesterType] = useState("");
   const [targetPoints, setTargetPoints] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
   const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
@@ -202,11 +244,14 @@ export function GenerateExamPage() {
   const [isEditable, setIsEditable] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
-    action: null, // "cancel" or "reset"
+    action: null, // "cancel" or "navigate"
   });
   const splitContainerRef = useRef(null);
+  const blockerRef = useRef(null);
   const initialStateRef = useRef({
     courseId: "",
+    semesterYear: "",
+    semesterType: "",
     targetPoints: "",
     selectedTopics: [],
     draft: null,
@@ -224,9 +269,12 @@ export function GenerateExamPage() {
 
     const resolvedCourseId =
       typeof exam.courseId === "object" ? exam.courseId?.id : exam.courseId;
+    const parsedSemester = parseSemesterValue(exam.semester);
 
     setCourseId(resolvedCourseId || "");
-    setTargetPoints(exam.targetPoints ?? exam.points ?? 0);
+    setSemesterYear(parseSemesterStartYear(parsedSemester.year));
+    setSemesterType(parsedSemester.semesterType || "");
+    setTargetPoints(exam.targetPoints ?? exam.points ?? "");
 
     const topicNames = (exam.topics || []).map((t) => t.topic);
     setSelectedTopics(topicNames);
@@ -237,7 +285,7 @@ export function GenerateExamPage() {
         typeof exam.courseId === "object"
           ? exam.courseId
           : { id: resolvedCourseId },
-      targetPoints: exam.targetPoints ?? exam.points ?? 0,
+      targetPoints: exam.targetPoints ?? exam.points ?? "",
       totalPoints:
         exam.totalPoints ??
         (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
@@ -246,14 +294,16 @@ export function GenerateExamPage() {
     });
     initialStateRef.current = {
       courseId: resolvedCourseId || "",
-      targetPoints: exam.targetPoints ?? exam.points ?? 0,
+      semesterYear: parseSemesterStartYear(parsedSemester.year),
+      semesterType: parsedSemester.semesterType || "",
+      targetPoints: exam.targetPoints ?? exam.points ?? "",
       selectedTopics: topicNames,
       draft: {
         course:
           typeof exam.courseId === "object"
             ? exam.courseId
             : { id: resolvedCourseId },
-        targetPoints: exam.targetPoints ?? exam.points ?? 0,
+        targetPoints: exam.targetPoints ?? exam.points ?? "",
         totalPoints:
           exam.totalPoints ??
           (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
@@ -268,6 +318,8 @@ export function GenerateExamPage() {
     if (!isEditMode) {
       initialStateRef.current = {
         courseId: "",
+        semesterYear: "",
+        semesterType: "",
         targetPoints: "",
         selectedTopics: [],
         draft: null,
@@ -324,15 +376,25 @@ export function GenerateExamPage() {
 
   const handleTargetPointsChange = (e) => {
     const nextRawValue = e.target.value;
-    const nextTarget = nextRawValue === "" ? "" : Number(nextRawValue);
+    const nextTarget =
+      nextRawValue === "" ? "" : Math.max(1, Number(nextRawValue));
     setTargetPoints(nextTarget);
 
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.targetPoints = Number(nextTarget || 0);
+      next.targetPoints =
+        nextTarget === "" ? "" : Math.max(1, Number(nextTarget));
       return recalcDraftTotals(next);
     });
+  };
+
+  const handleSemesterYearChange = (e) => {
+    setSemesterYear(e.target.value);
+  };
+
+  const handleSemesterTypeChange = (e) => {
+    setSemesterType(e.target.value);
   };
 
   // version: "STUDENT" | "TEACHER"
@@ -448,7 +510,13 @@ export function GenerateExamPage() {
   };
 
   const generateDraft = async () => {
-    if (!courseId || selectedTopics.length === 0 || Number(targetPoints) <= 0)
+    const normalizedSemester = formatSemesterValue(semesterYear, semesterType);
+    if (
+      !courseId ||
+      !normalizedSemester ||
+      selectedTopics.length === 0 ||
+      Number(targetPoints) <= 0
+    )
       return;
     // Clear previous content immediately so the UI shows empty states while loading
     setDraft(null);
@@ -491,7 +559,7 @@ export function GenerateExamPage() {
         question: "",
         solution: "",
         solutionSpace: DEFAULT_SOLUTION_SPACE,
-        points: 0,
+        points: "",
       });
       syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
@@ -530,8 +598,12 @@ export function GenerateExamPage() {
 
   const saveExam = async () => {
     if (!draft) return;
+    const normalizedSemester = formatSemesterValue(semesterYear, semesterType);
+    if (!normalizedSemester) return;
+
     const body = {
       courseId: draft.course?.id || courseId,
+      semester: normalizedSemester,
       targetPoints: Number(draft.targetPoints),
       topics: withSolutionSpace(draft.topics),
     };
@@ -545,16 +617,25 @@ export function GenerateExamPage() {
     nav("/exams/list");
   };
 
-  const hasUnsavedChanges = () => {
+  const hasUnsavedChanges = useCallback(() => {
     const snapshot = initialStateRef.current;
     return (
       courseId !== snapshot.courseId ||
+      semesterYear !== snapshot.semesterYear ||
+      semesterType !== snapshot.semesterType ||
       targetPoints !== snapshot.targetPoints ||
       JSON.stringify(selectedTopics) !==
         JSON.stringify(snapshot.selectedTopics) ||
       JSON.stringify(draft) !== JSON.stringify(snapshot.draft)
     );
-  };
+  }, [
+    courseId,
+    semesterYear,
+    semesterType,
+    targetPoints,
+    selectedTopics,
+    draft,
+  ]);
 
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
@@ -563,6 +644,36 @@ export function GenerateExamPage() {
       nav("/exams/list");
     }
   };
+
+  // Prevent navigation if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (hasUnsavedChanges()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Block route changes when there are unsaved changes
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  // Store blocker in ref and show dialog when navigation is blocked
+  useEffect(() => {
+    blockerRef.current = blocker;
+    if (blocker.state === "blocked") {
+      setConfirmDialog({
+        open: true,
+        action: "navigate",
+      });
+    }
+  }, [blocker.state]);
 
   const handleResetClick = () => {
     resetExamForm();
@@ -574,16 +685,23 @@ export function GenerateExamPage() {
 
     if (action === "cancel") {
       nav("/exams/list");
+    } else if (action === "navigate" && blockerRef.current) {
+      blockerRef.current.proceed();
     }
   };
 
   const handleConfirmDialogCancel = () => {
+    if (blockerRef.current?.state === "blocked") {
+      blockerRef.current.reset();
+    }
     setConfirmDialog({ open: false, action: null });
   };
 
   const resetExamForm = () => {
     const snapshot = initialStateRef.current;
     setCourseId(snapshot.courseId || "");
+    setSemesterYear(snapshot.semesterYear || "");
+    setSemesterType(snapshot.semesterType || "");
     setTargetPoints(snapshot.targetPoints ?? "");
     setSelectedTopics(snapshot.selectedTopics || []);
     setDraft(snapshot.draft ? structuredClone(snapshot.draft) : null);
@@ -665,6 +783,9 @@ export function GenerateExamPage() {
     collapsedPane === "right" ? "100%" : `${splitPercent}%`;
   const rightPanelWidth =
     collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
+  const isSemesterReady = Boolean(
+    formatSemesterValue(semesterYear, semesterType),
+  );
 
   return (
     <Box
@@ -700,7 +821,11 @@ export function GenerateExamPage() {
               size="small"
               onClick={saveExam}
               disabled={
-                !draft || saveM.isPending || updateM.isPending || !isEditable
+                !draft ||
+                saveM.isPending ||
+                updateM.isPending ||
+                !isEditable ||
+                !formatSemesterValue(semesterYear, semesterType)
               }
             >
               {t("common.save")}
@@ -791,10 +916,12 @@ export function GenerateExamPage() {
                     <Stack direction="row" spacing={1}>
                       <Button
                         variant="contained"
+                        size="small"
                         startIcon={<RefreshIcon />}
                         onClick={generateDraft}
                         disabled={
                           !courseId ||
+                          !isSemesterReady ||
                           selectedTopics.length === 0 ||
                           Number(targetPoints) <= 0 ||
                           generateM.isPending ||
@@ -829,7 +956,7 @@ export function GenerateExamPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "20% 10% 65%",
+                  gridTemplateColumns: "15% 20% 10% 50%",
                   gap: 2,
                 }}
               >
@@ -855,9 +982,59 @@ export function GenerateExamPage() {
                     )}
                 </TextField>
 
+                <Stack direction="row" spacing={1}>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      label={t("exams.year")}
+                      views={["year"]}
+                      openTo="year"
+                      value={
+                        semesterYear && /^\d{4}$/.test(semesterYear)
+                          ? dayjs(`${semesterYear}-01-01`)
+                          : null
+                      }
+                      onChange={(value) => {
+                        const year = value ? value.year() : "";
+                        handleSemesterYearChange({
+                          target: { value: year ? String(year) : "" },
+                        });
+                      }}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          disabled: isEditMode || !isEditable,
+                        },
+                      }}
+                      format="YYYY"
+                      yearsOrder="asc"
+                      minDate={dayjs(`${new Date().getFullYear()}-01-01`)}
+                      maxDate={dayjs(`${new Date().getFullYear() + 10}-12-31`)}
+                    />
+                  </LocalizationProvider>
+
+                  <TextField
+                    select
+                    label={t("exams.semester")}
+                    value={semesterType}
+                    onChange={handleSemesterTypeChange}
+                    fullWidth
+                    size="small"
+                    disabled={isEditMode || !isEditable}
+                  >
+                    <MenuItem value="">{t("exams.selectSemester")}</MenuItem>
+                    {SEMESTER_OPTIONS.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
+
                 <TextField
                   label={t("exams.totalPoints")}
                   type="number"
+                  slotProps={{ htmlInput: { min: 1 } }}
                   value={targetPoints}
                   onChange={handleTargetPointsChange}
                   fullWidth
@@ -962,10 +1139,12 @@ export function GenerateExamPage() {
                   <Stack direction="row" spacing={1}>
                     <Button
                       variant="contained"
+                      size="small"
                       startIcon={<RefreshIcon />}
                       onClick={generateDraft}
                       disabled={
                         !courseId ||
+                        !isSemesterReady ||
                         selectedTopics.length === 0 ||
                         Number(targetPoints) <= 0 ||
                         generateM.isPending ||

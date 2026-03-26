@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import {
   alpha,
   CircularProgress,
@@ -14,7 +14,7 @@ import {
   Tooltip,
   useTheme,
 } from "@mui/material";
-import UploadIcon from "@mui/icons-material/Upload";
+// import UploadIcon from "@mui/icons-material/Upload";
 import AddIcon from "@mui/icons-material/Add";
 import BuildIcon from "@mui/icons-material/Build";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -25,7 +25,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
-import { fileToBase64 } from "../../utils/fileToBase64";
+// import { fileToBase64 } from "../../utils/fileToBase64";
 import { examsApi } from "../../api/exams.api";
 import { TaskEditor } from "./TaskEditor";
 import { LatexEditor } from "../../components/ui/LatexEditor";
@@ -51,10 +51,10 @@ const COLLAPSE_THRESHOLD_PERCENT = 10;
 function getDefaultTask() {
   return {
     question: "",
-    points: 0,
-    question_img: null,
+    points: "",
+    // question_img: null,
     solution: "",
-    isRelatedToTopic: true,
+    // isRelatedToTopic: true,
   };
 }
 
@@ -89,11 +89,12 @@ export function TopicFormPage() {
     action: null,
   });
   const splitContainerRef = useRef(null);
+  const blockerRef = useRef(null);
   const initialValuesRef = useRef({
     courseId: "",
     topic: "",
     description: "",
-    points: 0,
+    points: "",
     description_img: null,
     tasks: [getDefaultTask()],
   });
@@ -106,7 +107,7 @@ export function TopicFormPage() {
       courseId: "",
       topic: "",
       description: "",
-      points: 0,
+      points: "",
       description_img: null,
       tasks: [getDefaultTask()],
     },
@@ -118,7 +119,7 @@ export function TopicFormPage() {
         courseId: "",
         topic: "",
         description: "",
-        points: 0,
+        points: "",
         description_img: null,
         tasks: [getDefaultTask()],
       };
@@ -144,9 +145,14 @@ export function TopicFormPage() {
       courseId: resolvedCourseId,
       topic: resolved?.topic || "",
       description: resolved?.description || "",
-      points: resolved?.points ?? 0,
+      points: resolved?.points ?? "",
       description_img: null,
-      tasks: resolved?.tasks?.length ? resolved.tasks : [getDefaultTask()],
+      tasks: resolved?.tasks?.length
+        ? resolved.tasks.map((task) => ({
+            ...task,
+            points: task?.points ?? "",
+          }))
+        : [getDefaultTask()],
     };
 
     form.reset(hydratedValues);
@@ -212,18 +218,18 @@ export function TopicFormPage() {
     form;
   const descriptionValue = useWatch({ control, name: "description" }) || "";
 
-  const setDescriptionImage = async (file) => {
-    if (!file) {
-      setValue("description_img", null);
-      return;
-    }
-    const base64 = await fileToBase64(file);
-    setValue("description_img", {
-      base64,
-      contentType: file.type || "application/octet-stream",
-      filename: file.name || "",
-    });
-  };
+  // const setDescriptionImage = async (file) => {
+  //   if (!file) {
+  //     setValue("description_img", null);
+  //     return;
+  //   }
+  //   const base64 = await fileToBase64(file);
+  //   setValue("description_img", {
+  //     base64,
+  //     contentType: file.type || "application/octet-stream",
+  //     filename: file.name || "",
+  //   });
+  // };
 
   const addTask = () => {
     const current = getValues("tasks") || [];
@@ -339,6 +345,23 @@ export function TopicFormPage() {
     );
   };
 
+  // Block route changes when there are unsaved changes
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  // Store blocker in ref and show dialog when navigation is blocked
+  useEffect(() => {
+    blockerRef.current = blocker;
+    if (blocker.state === "blocked") {
+      setConfirmDialog({
+        open: true,
+        action: "navigate",
+      });
+    }
+  }, [blocker.state]);
+
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
       setConfirmDialog({ open: true, action: "cancel" });
@@ -348,11 +371,20 @@ export function TopicFormPage() {
   };
 
   const handleConfirmDialogConfirm = () => {
+    const action = confirmDialog.action;
     setConfirmDialog({ open: false, action: null });
-    nav("/tasks/list");
+
+    if (action === "cancel") {
+      nav("/tasks/list");
+    } else if (action === "navigate" && blockerRef.current) {
+      blockerRef.current.proceed();
+    }
   };
 
   const handleConfirmDialogCancel = () => {
+    if (blockerRef.current?.state === "blocked") {
+      blockerRef.current.reset();
+    }
     setConfirmDialog({ open: false, action: null });
   };
 
@@ -374,7 +406,11 @@ export function TopicFormPage() {
 
   return (
     <Box
-      sx={{ display: "flex", flexDirection: "column", height: "95vh", pb: 1 }}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "95vh",
+      }}
     >
       <PageHeader
         title={isEditMode ? t("topics.editTitle") : t("topics.createTitle")}
@@ -509,11 +545,24 @@ export function TopicFormPage() {
                   </Stack>
 
                   <Box
-                    sx={{ flex: 1, minHeight: 0, overflow: "auto", pr: 0.5 }}
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: "auto",
+                      pr: 0.5,
+                      py: 2,
+                    }}
                   >
                     <Box
-                      className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                      sx={{ mb: 2 }}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: {
+                          xs: "1fr",
+                          md: "40% 40% 15%",
+                        },
+                        gap: 2,
+                        mb: 2,
+                      }}
                     >
                       <TextField
                         select
@@ -540,6 +589,19 @@ export function TopicFormPage() {
                         {...register("topic")}
                         error={!!formState.errors.topic}
                         helperText={formState.errors.topic?.message}
+                        disabled={!isEditable}
+                      />
+
+                      <TextField
+                        label={t("common.points")}
+                        placeholder={t("common.points")}
+                        type="number"
+                        slotProps={{ htmlInput: { min: 1 } }}
+                        fullWidth
+                        size="small"
+                        {...register("points")}
+                        error={!!formState.errors.points}
+                        helperText={formState.errors.points?.message}
                         disabled={!isEditable}
                       />
                     </Box>
@@ -575,7 +637,7 @@ export function TopicFormPage() {
                       ) : null}
                     </Box>
 
-                    <Box
+                    {/* <Box
                       className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
                       sx={{ mb: 2 }}
                     >
@@ -598,19 +660,7 @@ export function TopicFormPage() {
                           }
                         />
                       </Button>
-
-                      <TextField
-                        label={t("common.points")}
-                        placeholder={t("common.points")}
-                        type="number"
-                        fullWidth
-                        size="small"
-                        {...register("points")}
-                        error={!!formState.errors.points}
-                        helperText={formState.errors.points?.message}
-                        disabled={!isEditable}
-                      />
-                    </Box>
+                    </Box> */}
 
                     <Box
                       className="rounded-2xl border p-4"

@@ -48,7 +48,12 @@ export function TopicsPage() {
     () => [
       { headerName: t("topics.topicColumn"), field: "topic" },
       { headerName: t("common.course"), field: "courseTitle" },
-      { headerName: t("common.points"), field: "points" },
+      {
+        headerName: t("common.points"),
+        field: "points",
+        cellDataType: "number",
+        cellStyle: { textAlign: "right" },
+      },
     ],
     [t],
   );
