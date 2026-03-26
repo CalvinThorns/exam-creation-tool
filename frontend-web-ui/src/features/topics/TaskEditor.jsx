@@ -1,14 +1,5 @@
 import { useFieldArray, useWatch } from "react-hook-form";
-import {
-  Box,
-  TextField,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Typography,
-} from "@mui/material";
-import UploadIcon from "@mui/icons-material/Upload";
-import { fileToBase64 } from "../../utils/fileToBase64";
+import { Box, TextField, Button, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { LatexFormField } from "../../components/ui";
 
@@ -23,18 +14,18 @@ export function TaskEditor({
   const { fields, remove } = useFieldArray({ control, name: "tasks" });
   const watchedTasks = useWatch({ control, name: "tasks" }) || [];
 
-  const setTaskImage = async (index, file) => {
-    if (!file) {
-      setValue(`tasks.${index}.question_img`, null);
-      return;
-    }
-    const base64 = await fileToBase64(file);
-    setValue(`tasks.${index}.question_img`, {
-      base64,
-      contentType: file.type || "application/octet-stream",
-      filename: file.name || "",
-    });
-  };
+  // const setTaskImage = async (index, file) => {
+  //   if (!file) {
+  //     setValue(`tasks.${index}.question_img`, null);
+  //     return;
+  //   }
+  //   const base64 = await fileToBase64(file);
+  //   setValue(`tasks.${index}.question_img`, {
+  //     base64,
+  //     contentType: file.type || "application/octet-stream",
+  //     filename: file.name || "",
+  //   });
+  // };
 
   return (
     <Box className="flex flex-col gap-5">
@@ -90,7 +81,7 @@ export function TaskEditor({
           </div>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <Button
+            {/* <Button
               variant="outlined"
               component="label"
               startIcon={<UploadIcon />}
@@ -105,12 +96,13 @@ export function TaskEditor({
                 accept="image/*"
                 onChange={(e) => setTaskImage(idx, e.target.files?.[0] || null)}
               />
-            </Button>
+            </Button> */}
 
             <TextField
               label={t("common.points")}
               placeholder={t("common.points")}
               type="number"
+              slotProps={{ htmlInput: { min: 1 } }}
               fullWidth
               size="small"
               {...register(`tasks.${idx}.points`)}
@@ -120,7 +112,7 @@ export function TaskEditor({
             />
           </div>
 
-          <div className="mt-4">
+          {/* <div className="mt-4">
             <FormControlLabel
               control={
                 <Checkbox
@@ -131,7 +123,7 @@ export function TaskEditor({
               }
               label={t("topics.relatedToTopic")}
             />
-          </div>
+          </div> */}
         </Box>
       ))}
     </Box>

@@ -100,6 +100,16 @@ ${BASE_TEMPLATE_PLACEHOLDER}
 \end{document}`;
 
 function createExamService({ examRepo, courseRepo }) {
+  function normalizeSemester(value, { required = false } = {}) {
+    if (value === undefined || value === null) {
+      if (required) throw badRequest("semester is required");
+      return "";
+    }
+    const semester = String(value).trim();
+    if (required && !semester) throw badRequest("semester is required");
+    return semester;
+  }
+
   async function ensureBaseTemplateFileExists() {
     try {
       await fs.access(BASE_TEMPLATE_PATH);
@@ -505,6 +515,7 @@ function createExamService({ examRepo, courseRepo }) {
       try {
         const courseId = String(data.courseId || "").trim();
         await validateCourseId(courseId);
+        const semester = normalizeSemester(data.semester, { required: true });
 
         const targetPoints = numOrZero(data.targetPoints);
         if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
@@ -524,6 +535,7 @@ function createExamService({ examRepo, courseRepo }) {
 
         return examRepo.create({
           courseId,
+          semester,
           targetPoints,
           points,
           topics,
@@ -593,6 +605,10 @@ function createExamService({ examRepo, courseRepo }) {
         if (!isValidObjectId(courseId))
           throw badRequest("courseId must be a valid id");
         update.courseId = courseId;
+      }
+
+      if (data.semester !== undefined) {
+        update.semester = normalizeSemester(data.semester, { required: true });
       }
 
       if (data.targetPoints !== undefined) {

@@ -91,10 +91,14 @@ export function TopicCard({
           <TextField
             label={t("common.points")}
             type="number"
-            value={topic.points ?? 0}
-            onChange={(e) =>
-              onTopicField(topicIndex, "points", Number(e.target.value || 0))
-            }
+            slotProps={{ htmlInput: { min: 1 } }}
+            value={topic.points ?? ""}
+            onChange={(e) => {
+              const rawValue = e.target.value;
+              const nextValue =
+                rawValue === "" ? "" : Math.max(1, Number(rawValue));
+              onTopicField(topicIndex, "points", nextValue);
+            }}
             sx={{ width: 110 }}
             size="small"
             disabled={!editable}
@@ -162,15 +166,21 @@ export function TopicCard({
                         <TextField
                           label={t("common.points")}
                           type="number"
-                          value={task.points ?? 0}
-                          onChange={(e) =>
+                          slotProps={{ htmlInput: { min: 1 } }}
+                          value={task.points ?? ""}
+                          onChange={(e) => {
+                            const rawValue = e.target.value;
+                            const nextValue =
+                              rawValue === ""
+                                ? ""
+                                : Math.max(1, Number(rawValue));
                             onTaskField(
                               topicIndex,
                               taskIndex,
                               "points",
-                              Number(e.target.value || 0),
-                            )
-                          }
+                              nextValue,
+                            );
+                          }}
                           sx={{ width: 100 }}
                           size="small"
                           disabled={!editable}

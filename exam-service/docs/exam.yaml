@@ -643,6 +643,8 @@ components:
           oneOf:
             - type: string
             - $ref: "#/components/schemas/CourseSnapshotDto"
+        semester:
+          type: string
         targetPoints:
           type: number
         points:
@@ -660,9 +662,11 @@ components:
 
     CreateExamDto:
       type: object
-      required: [courseId, targetPoints, topics]
+      required: [courseId, semester, targetPoints, topics]
       properties:
         courseId:
+          type: string
+        semester:
           type: string
         targetPoints:
           type: number
@@ -676,6 +680,8 @@ components:
       type: object
       properties:
         courseId:
+          type: string
+        semester:
           type: string
         targetPoints:
           type: number

@@ -149,6 +149,10 @@
     "teacherVersion": "Lehrerversion",
     "studentVersionHint": "Ohne Lösungen",
     "teacherVersionHint": "Mit Lösungen",
+    "year": "Jahr",
+    "semester": "Semester",
+    "selectYear": "Jahr auswählen",
+    "selectSemester": "Semester auswählen",
     "totalPoints": "Gesamtpunkte",
     "topics": "Themen",
     "exam": "Prüfung",
@@ -236,6 +240,7 @@
     "requiredCourse": "Kurs ist erforderlich",
     "requiredTopic": "Thema ist erforderlich",
     "requiredQuestion": "Aufgabe ist erforderlich",
-    "pointsMin": "Punkte müssen >= 0 sein"
+    "pointsMin": "Punkte müssen >= 1 sein",
+    "taskPointsMismatch": "Die Summe der Aufgabenpunkte muss den Themenpunkten entsprechen"
   }
 }

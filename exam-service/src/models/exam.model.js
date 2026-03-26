@@ -13,6 +13,7 @@ const examSchema = new mongoose.Schema(
       ref: "Course",
       required: true,
     },
+    semester: { type: String, trim: true, default: "" },
     points: { type: Number, required: true, min: 0 },
     isDeleted: { type: Boolean, default: false },
     topics: {

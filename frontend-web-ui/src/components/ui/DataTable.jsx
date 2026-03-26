@@ -63,7 +63,7 @@ export function DataTable({
   rowData,
   actions = [],
   actionsHeaderName,
-  actionsWidth = 220,
+  actionsWidth = 10,
   // client-side
   pageSize = 10,
   height = 500,
@@ -189,6 +189,9 @@ export function DataTable({
     () => ({
       sortable: true,
       filter: true,
+      filterParams: {
+        buttons: ["clear"],
+      },
       resizable: true,
       flex: 1,
       minWidth: 120,
@@ -239,6 +242,8 @@ export function DataTable({
         sortable: false,
         filter: false,
         width: actionsWidth,
+        flex: 0,
+        pinned: "right",
         cellRenderer: (params) => {
           const row = params.data;
 
