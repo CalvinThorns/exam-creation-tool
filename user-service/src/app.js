@@ -3,6 +3,7 @@ const morgan = require("morgan");
 const routes = require("./routes");
 const { errorHandler } = require("./middlewares/errorHandler");
 const { httpLogger } = require("./middlewares/logger");
+const { extractUserFromToken } = require("./middlewares/auth");
 const cors = require("cors");
 
 const app = express();
@@ -14,6 +15,8 @@ app.use(httpLogger);
 app.use(express.json({ limit: "5mb" }));
 
 app.use(morgan("combined"));
+
+app.use(extractUserFromToken);
 
 const { sendSuccess, sendError } = require("./utils/response");
 
