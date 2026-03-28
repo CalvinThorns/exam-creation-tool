@@ -1,6 +1,7 @@
 import axios from "axios";
 import i18n from "../i18n";
 import { notifyError } from "../app/notifications";
+import { getAuthToken } from "../features/auth/authSession";
 
 function extractApiErrorMessage(err) {
   const data = err?.response?.data;
@@ -21,6 +22,17 @@ export function createHttp({ baseURL, headers } = {}) {
   const client = axios.create({
     baseURL: baseURL || import.meta.env.VITE_API_URL || "/api",
     headers: { "Content-Type": "application/json", ...(headers || {}) },
+  });
+
+  client.interceptors.request.use((config) => {
+    const token = getAuthToken();
+
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
   });
 
   client.interceptors.response.use(

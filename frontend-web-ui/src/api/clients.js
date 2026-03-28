@@ -18,3 +18,10 @@ export const tasksHttp = createHttp({
     import.meta.env.VITE_API_URL ||
     "/api",
 });
+
+export const usersHttp = createHttp({
+  baseURL:
+    import.meta.env.VITE_USERS_API_URL ||
+    import.meta.env.VITE_API_URL ||
+    "/api",
+});

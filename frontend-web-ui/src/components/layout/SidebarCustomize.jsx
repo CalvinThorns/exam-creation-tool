@@ -155,7 +155,7 @@ export function SidebarCustomize({ isCollapsed }) {
 
   return (
     <>
-      <Box sx={{ mt: "auto" }}>
+      <Box>
         <List disablePadding>
           <Tooltip
             title={t("sidebar.customize")}
