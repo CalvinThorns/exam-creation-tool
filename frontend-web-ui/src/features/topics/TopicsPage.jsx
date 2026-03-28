@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -11,18 +11,35 @@ import { DataTable } from "../../components/ui/DataTable";
 import { useTopics, useDeleteTopic } from "./topics.hooks";
 import { useCourses } from "../courses/courses.hooks";
 import { useTranslation } from "react-i18next";
+import { agGridFilterToApiFilters } from "../../utils/listQuery";
+
+const DEFAULT_PAGE_SIZE = 10;
 
 export function TopicsPage() {
   const { t } = useTranslation();
   const nav = useNavigate();
-  // const [courseFilter, setCourseFilter] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [sortModel, setSortModel] = useState([{ colId: "topic", sort: "asc" }]);
+  const [filterModel, setFilterModel] = useState(null);
+
   const { data: coursesData } = useCourses({ page: 1, limit: 200 });
 
-  const { data, isLoading, error } = useTopics({
-    page: 1,
-    limit: 100,
-    // courseId: courseFilter || undefined,
-  });
+  const queryParams = useMemo(() => {
+    const sort =
+      sortModel?.length > 0
+        ? sortModel.map((s) => `${s.colId}:${s.sort || "asc"}`).join(",")
+        : undefined;
+    const filters = agGridFilterToApiFilters(filterModel);
+    return {
+      page: page + 1,
+      limit: pageSize,
+      sort,
+      filters: filters.length ? filters : undefined,
+    };
+  }, [page, pageSize, sortModel, filterModel]);
+
+  const { data, isLoading, isFetching, error } = useTopics(queryParams);
 
   const deleteM = useDeleteTopic();
 
@@ -43,11 +60,17 @@ export function TopicsPage() {
       })),
     [data, courseTitleById],
   );
+  const rowCount = useMemo(() => data?.meta?.total ?? 0, [data]);
 
   const columns = useMemo(
     () => [
       { headerName: t("topics.topicColumn"), field: "topic" },
-      { headerName: t("common.course"), field: "courseTitle" },
+      {
+        headerName: t("common.course"),
+        field: "courseTitle",
+        // sortable: false,
+        // filter: false,
+      },
       {
         headerName: t("common.points"),
         field: "points",
@@ -57,6 +80,21 @@ export function TopicsPage() {
     ],
     [t],
   );
+
+  const handlePageChange = useCallback((newPage, newPageSize) => {
+    setPage(newPage);
+    if (newPageSize != null) setPageSize(newPageSize);
+  }, []);
+
+  const handleSortChange = useCallback((newSortModel) => {
+    setSortModel(newSortModel ?? []);
+    setPage(0);
+  }, []);
+
+  const handleFilterChange = useCallback((newFilterModel) => {
+    setFilterModel(newFilterModel ?? null);
+    setPage(0);
+  }, []);
 
   const actions = useMemo(
     () => [
@@ -101,23 +139,6 @@ export function TopicsPage() {
         }
       />
 
-      {/* <Paper sx={{ p: 2, mb: 2 }}>
-        <TextField
-          select
-          label="Course filter"
-          value={courseFilter}
-          onChange={(e) => setCourseFilter(e.target.value)}
-          sx={{ minWidth: 320 }}
-        >
-          <MenuItem value="">All courses</MenuItem>
-          {courses.map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.title} ({c.shortName})
-            </MenuItem>
-          ))}
-        </TextField>
-      </Paper> */}
-
       {error ? <ErrorState message={error.userMessage} /> : null}
 
       {!error ? (
@@ -126,15 +147,23 @@ export function TopicsPage() {
             <DataTable
               columnDefs={columns}
               rowData={rows}
-              loading={isLoading}
+              loading={isLoading || isFetching}
               noRowsTitle={t("topics.noRows")}
               noRowsHint={t("topics.noRowsHint")}
               noFilteredRowsTitle={t("topics.noFilteredRows")}
               noFilteredRowsHint={t("datatable.noFilteredHint")}
               actions={actions}
               actionsHeaderName={t("common.actions")}
-              pageSize={10}
               height="100%"
+              serverSide
+              rowCount={rowCount}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onSortChange={handleSortChange}
+              onFilterChange={handleFilterChange}
+              sortModel={sortModel}
+              filterModel={filterModel}
             />
           </Paper>
         </Box>

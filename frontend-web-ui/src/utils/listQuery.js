@@ -17,7 +17,7 @@ function isDefined(v) {
 }
 
 // Converts UI params -> backend params
-export function toExamsListQuery(ui = {}) {
+export function toApiListQuery(ui = {}) {
   const q = {};
 
   // pagination
@@ -65,6 +65,14 @@ export function toExamsListQuery(ui = {}) {
   return q;
 }
 
+export function toExamsListQuery(ui = {}) {
+  return toApiListQuery(ui);
+}
+
+export function toTasksListQuery(ui = {}) {
+  return toApiListQuery(ui);
+}
+
 /**
  * Map AG Grid filter model to API filter array.
  * Only supports common filter types (text → regex, number → eq/gte/lte/gt/lt).
@@ -80,7 +88,11 @@ export function agGridFilterToApiFilters(filterModel) {
     if (filterType === "text") {
       const op = type === "equals" ? "eq" : "regex";
       const value = type === "equals" ? filter : filter;
-      filters.push({ field: colId, op, value: op === "regex" ? filter : value });
+      filters.push({
+        field: colId,
+        op,
+        value: op === "regex" ? filter : value,
+      });
     } else if (filterType === "number") {
       const opMap = {
         equals: "eq",

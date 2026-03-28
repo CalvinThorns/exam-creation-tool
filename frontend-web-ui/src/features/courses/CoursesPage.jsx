@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -10,15 +10,38 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
 import { useCourses, useDeleteCourse } from "./courses.hooks";
 import { useTranslation } from "react-i18next";
+import { agGridFilterToApiFilters } from "../../utils/listQuery";
+
+const DEFAULT_PAGE_SIZE = 10;
 
 export function CoursesPage() {
   const { t } = useTranslation();
   const nav = useNavigate();
-  const { data, isLoading, error } = useCourses();
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [sortModel, setSortModel] = useState([{ colId: "title", sort: "asc" }]);
+  const [filterModel, setFilterModel] = useState(null);
+
+  const queryParams = useMemo(() => {
+    const sort =
+      sortModel?.length > 0
+        ? sortModel.map((s) => `${s.colId}:${s.sort || "asc"}`).join(",")
+        : undefined;
+    const filters = agGridFilterToApiFilters(filterModel);
+    return {
+      page: page + 1,
+      limit: pageSize,
+      sort,
+      filters: filters.length ? filters : undefined,
+    };
+  }, [page, pageSize, sortModel, filterModel]);
+
+  const { data, isLoading, isFetching, error } = useCourses(queryParams);
   const deleteM = useDeleteCourse();
 
   const [confirm, setConfirm] = useState({ open: false, id: null });
   const rows = useMemo(() => data?.data || [], [data]);
+  const rowCount = useMemo(() => data?.meta?.total ?? 0, [data]);
 
   const columns = useMemo(
     () => [
@@ -27,6 +50,21 @@ export function CoursesPage() {
     ],
     [t],
   );
+
+  const handlePageChange = useCallback((newPage, newPageSize) => {
+    setPage(newPage);
+    if (newPageSize != null) setPageSize(newPageSize);
+  }, []);
+
+  const handleSortChange = useCallback((newSortModel) => {
+    setSortModel(newSortModel ?? []);
+    setPage(0);
+  }, []);
+
+  const handleFilterChange = useCallback((newFilterModel) => {
+    setFilterModel(newFilterModel ?? null);
+    setPage(0);
+  }, []);
 
   const actions = useMemo(
     () => [
@@ -81,15 +119,23 @@ export function CoursesPage() {
             <DataTable
               columnDefs={columns}
               rowData={rows}
-              loading={isLoading}
+              loading={isLoading || isFetching}
               noRowsTitle={t("courses.noRows")}
               noRowsHint={t("courses.noRowsHint")}
               noFilteredRowsTitle={t("courses.noFilteredRows")}
               noFilteredRowsHint={t("datatable.noFilteredHint")}
               actions={actions}
               actionsHeaderName={t("common.actions")}
-              pageSize={10}
               height="100%"
+              serverSide
+              rowCount={rowCount}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onSortChange={handleSortChange}
+              onFilterChange={handleFilterChange}
+              sortModel={sortModel}
+              filterModel={filterModel}
             />
           </Paper>
         </Box>

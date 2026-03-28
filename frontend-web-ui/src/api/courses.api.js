@@ -1,7 +1,11 @@
 import { tasksHttp } from "./clients";
+import { toTasksListQuery } from "../utils/listQuery";
 
 export const coursesApi = {
-  list: (params) => tasksHttp.get("/courses", { params }).then((r) => r.data),
+  list: (uiParams) =>
+    tasksHttp
+      .get("/courses", { params: toTasksListQuery(uiParams) })
+      .then((r) => r.data),
   getById: (id) => tasksHttp.get(`/courses/${id}`).then((r) => r.data),
   create: (body) => tasksHttp.post("/courses", body).then((r) => r.data),
   update: (id, body) =>

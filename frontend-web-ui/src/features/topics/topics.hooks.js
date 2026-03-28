@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { topicsApi } from "../../api/topics.api";
 import i18n from "../../i18n";
 import { notifySuccess } from "../../app/notifications";
@@ -7,6 +12,7 @@ export function useTopics(params) {
   return useQuery({
     queryKey: ["topics", params],
     queryFn: () => topicsApi.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
