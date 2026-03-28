@@ -16,14 +16,59 @@ paths:
     get:
       summary: Get all courses (Paginated)
       # Durch operationId generiert er schöne Namen wie 'getCourses' statt 'apiCoursesGet'
-      operationId: getCourses 
+      operationId: getCourses
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Alias for pageSize.
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Case-insensitive search on title and shortName.
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: Comma-separated field:direction values, e.g. createdAt:desc,title:asc
+        - in: query
+          name: filter
+          schema:
+            type: string
+          description: Repeated field:op:value filter (eq, ne, lt, lte, gt, gte, in, nin, regex)
       responses:
-        '200':
+        "200":
           description: A paginated list of courses
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedCoursesDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/CourseDto"
+                      meta:
+                        allOf:
+                          - $ref: "#/components/schemas/ResponseMeta"
+                          - $ref: "#/components/schemas/PaginationMeta"
     post:
       summary: Create a new course
       operationId: createCourse
@@ -32,14 +77,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateCourseDto'
+              $ref: "#/components/schemas/CreateCourseDto"
       responses:
-        '201':
+        "201":
           description: Course successfully created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CourseDto"
 
   /api/courses/{id}:
     parameters:
@@ -52,12 +102,17 @@ paths:
       summary: Get course by ID
       operationId: getCourseById
       responses:
-        '200':
+        "200":
           description: Course details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CourseDto"
     put:
       summary: Update a course
       operationId: updateCourse
@@ -66,23 +121,73 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateCourseDto'
+              $ref: "#/components/schemas/UpdateCourseDto"
       responses:
-        '200':
+        "200":
           description: Course successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CourseDto"
     delete:
       summary: Delete a course
       operationId: deleteCourse
       responses:
-        '204':
+        "204":
           description: Course successfully deleted
 
 components:
   schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        requestId:
+          type: string
+          nullable: true
+        path:
+          type: string
+          nullable: true
+        method:
+          type: string
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 3
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        totalPages:
+          type: integer
+          example: 1
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
     # ----------------------------------------
     # PAGINATION WRAPPERS
     # ----------------------------------------
@@ -105,9 +210,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/CourseDto'
+            $ref: "#/components/schemas/CourseDto"
         meta:
-          $ref: '#/components/schemas/MetaDto'
+          $ref: "#/components/schemas/MetaDto"
 
     PaginatedTopicsDto:
       type: object
@@ -115,9 +220,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/TopicDto' # (Angenommen, du hast ein TopicDto)
+            $ref: "#/components/schemas/TopicDto" # (Angenommen, du hast ein TopicDto)
         meta:
-          $ref: '#/components/schemas/MetaDto'
+          $ref: "#/components/schemas/MetaDto"
 
     PaginatedExamsDto:
       type: object
@@ -125,9 +230,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/ExamDto' # (Angenommen, du hast ein ExamDto)
+            $ref: "#/components/schemas/ExamDto" # (Angenommen, du hast ein ExamDto)
         meta:
-          $ref: '#/components/schemas/MetaDto'
+          $ref: "#/components/schemas/MetaDto"
 
     # ----------------------------------------
     # ENTITY DTOs

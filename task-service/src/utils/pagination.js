@@ -1,19 +1,17 @@
-function normalizePagination(page = 1, limit = 20) {
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+const { toNumberOrFallback, clamp } = require("./helpers/numberHelpers");
 
-  return {
-    page: safePage,
-    limit: safeLimit,
-  };
+function normalizePagination(page, limit) {
+  const p = Math.max(1, toNumberOrFallback(page, 1));
+  const l = clamp(toNumberOrFallback(limit, 20), 1, 100);
+  return { page: p, limit: l };
 }
 
-function buildPaginationMeta({ page, limit, total }) {
+function buildMeta({ total, page, limit }) {
   const totalPages = Math.ceil(total / limit) || 1;
   return {
+    total,
     page,
     limit,
-    total,
     totalPages,
     hasNextPage: page < totalPages,
     hasPreviousPage: page > 1,
@@ -22,5 +20,6 @@ function buildPaginationMeta({ page, limit, total }) {
 
 module.exports = {
   normalizePagination,
-  buildPaginationMeta,
+  buildMeta,
+  buildPaginationMeta: buildMeta,
 };

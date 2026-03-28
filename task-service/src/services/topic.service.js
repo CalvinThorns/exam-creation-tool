@@ -1,4 +1,10 @@
 const { badRequest, notFound } = require("./helpers/serviceErrors");
+const { normalizePagination, buildMeta } = require("../utils/pagination");
+const {
+  parseFilters,
+  parseSort,
+  buildTopicSearchFilter,
+} = require("../utils/query");
 const {
   isValidObjectId,
   parseImageInput,
@@ -42,12 +48,32 @@ function createTopicService({ topicRepo }) {
     },
 
     async listTopics(query) {
+      const { page, limit } = normalizePagination(
+        query.page,
+        query.pageSize || query.limit,
+      );
+
       const courseId = query.courseId
         ? String(query.courseId).trim()
         : undefined;
       if (courseId && !isValidObjectId(courseId))
         throw badRequest("courseId must be a valid id");
-      return topicRepo.findAll({ ...query, courseId });
+
+      const filters = parseFilters(query.filter);
+      const q = String(query.q || "").trim();
+      Object.assign(filters, buildTopicSearchFilter({ q, courseId }));
+
+      const sort = parseSort(query.sort);
+
+      const { items, total } = await topicRepo.findAll({
+        page,
+        limit,
+        filter: filters,
+        sort,
+      });
+
+      const meta = buildMeta({ total, page, limit });
+      return { items, ...meta };
     },
 
     async getTopic(id) {

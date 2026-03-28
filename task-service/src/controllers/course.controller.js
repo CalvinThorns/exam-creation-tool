@@ -1,11 +1,11 @@
-const { buildPaginationMeta } = require("../utils/pagination");
+const { sendSuccess } = require("../utils/response");
 
 function createCourseController({ courseService }) {
   return {
     create: async (req, res, next) => {
       try {
         const course = await courseService.createCourse(req.body);
-        res.status(201).json({ data: course });
+        return sendSuccess(res, { req, data: course, status: 201 });
       } catch (err) {
         next(err);
       }
@@ -14,9 +14,10 @@ function createCourseController({ courseService }) {
     list: async (req, res, next) => {
       try {
         const result = await courseService.listCourses(req.query);
-        const meta = buildPaginationMeta(result);
-        res.json({
-          data: result.items,
+        const { items, ...meta } = result;
+        return sendSuccess(res, {
+          req,
+          data: items,
           meta,
         });
       } catch (err) {
@@ -27,7 +28,7 @@ function createCourseController({ courseService }) {
     getById: async (req, res, next) => {
       try {
         const course = await courseService.getCourse(req.params.id);
-        res.json({ data: course });
+        return sendSuccess(res, { req, data: course });
       } catch (err) {
         next(err);
       }
@@ -39,7 +40,7 @@ function createCourseController({ courseService }) {
           req.params.id,
           req.body,
         );
-        res.json({ data: course });
+        return sendSuccess(res, { req, data: course });
       } catch (err) {
         next(err);
       }

@@ -1,6 +1,5 @@
 const { Topic } = require("../models/topic.model");
-const { normalizePagination } = require("../utils/pagination");
-const { buildTopicSearchFilter } = require("../utils/query");
+const { applySort } = require("./helpers/queryHelpers");
 
 function createTopicRepo() {
   return {
@@ -8,26 +7,17 @@ function createTopicRepo() {
       return Topic.create(data);
     },
 
-    async findAll({ page = 1, limit = 20, q = "", courseId }) {
-      const { page: safePage, limit: safeLimit } = normalizePagination(
-        page,
-        limit,
-      );
-
-      const filter = {
-        ...buildTopicSearchFilter({ q, courseId }),
-        isDeleted: { $ne: true },
-      };
+    async findAll({ page = 1, limit = 20, filter = {}, sort }) {
+      const qfilter = { ...filter, isDeleted: { $ne: true } };
+      const query = Topic.find(qfilter);
+      applySort(query, sort);
 
       const [items, total] = await Promise.all([
-        Topic.find(filter)
-          .sort({ createdAt: -1 })
-          .skip((safePage - 1) * safeLimit)
-          .limit(safeLimit),
-        Topic.countDocuments(filter),
+        query.skip((page - 1) * limit).limit(limit),
+        Topic.countDocuments(qfilter),
       ]);
 
-      return { items, total, page: safePage, limit: safeLimit };
+      return { items, total };
     },
 
     async findById(id) {

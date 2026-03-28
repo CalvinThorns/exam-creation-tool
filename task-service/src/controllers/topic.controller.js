@@ -1,11 +1,11 @@
-const { buildPaginationMeta } = require("../utils/pagination");
+const { sendSuccess } = require("../utils/response");
 
 function createTopicController({ topicService }) {
   return {
     create: async (req, res, next) => {
       try {
         const topic = await topicService.createTopic(req.body);
-        res.status(201).json({ data: topic });
+        return sendSuccess(res, { req, data: topic, status: 201 });
       } catch (err) {
         next(err);
       }
@@ -14,9 +14,10 @@ function createTopicController({ topicService }) {
     list: async (req, res, next) => {
       try {
         const result = await topicService.listTopics(req.query);
-        const meta = buildPaginationMeta(result);
-        res.json({
-          data: result.items,
+        const { items, ...meta } = result;
+        return sendSuccess(res, {
+          req,
+          data: items,
           meta,
         });
       } catch (err) {
@@ -27,7 +28,7 @@ function createTopicController({ topicService }) {
     getById: async (req, res, next) => {
       try {
         const topic = await topicService.getTopic(req.params.id);
-        res.json({ data: topic });
+        return sendSuccess(res, { req, data: topic });
       } catch (err) {
         next(err);
       }
@@ -36,7 +37,7 @@ function createTopicController({ topicService }) {
     updateById: async (req, res, next) => {
       try {
         const topic = await topicService.updateTopic(req.params.id, req.body);
-        res.json({ data: topic });
+        return sendSuccess(res, { req, data: topic });
       } catch (err) {
         next(err);
       }

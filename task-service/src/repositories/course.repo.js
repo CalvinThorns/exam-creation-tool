@@ -1,6 +1,5 @@
 const { Course } = require("../models/course.model");
-const { normalizePagination } = require("../utils/pagination");
-const { buildCourseSearchFilter } = require("../utils/query");
+const { applySort } = require("./helpers/queryHelpers");
 
 function createCourseRepo() {
   return {
@@ -8,26 +7,17 @@ function createCourseRepo() {
       return Course.create(data);
     },
 
-    async findAll({ page = 1, limit = 20, q = "" }) {
-      const { page: safePage, limit: safeLimit } = normalizePagination(
-        page,
-        limit,
-      );
-
-      const filter = {
-        ...buildCourseSearchFilter(q),
-        isDeleted: { $ne: true },
-      };
+    async findAll({ page = 1, limit = 20, filter = {}, sort }) {
+      const qfilter = { ...filter, isDeleted: { $ne: true } };
+      const query = Course.find(qfilter);
+      applySort(query, sort);
 
       const [items, total] = await Promise.all([
-        Course.find(filter)
-          .sort({ createdAt: -1 })
-          .skip((safePage - 1) * safeLimit)
-          .limit(safeLimit),
-        Course.countDocuments(filter),
+        query.skip((page - 1) * limit).limit(limit),
+        Course.countDocuments(qfilter),
       ]);
 
-      return { items, total, page: safePage, limit: safeLimit };
+      return { items, total };
     },
 
     async findById(id) {

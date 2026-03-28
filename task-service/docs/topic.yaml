@@ -11,19 +11,61 @@ paths:
       tags: [Topics]
       parameters:
         - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Alias for pageSize.
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Case-insensitive search on topic and description.
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: Comma-separated field:direction values, e.g. createdAt:desc,points:asc
+        - in: query
+          name: filter
+          schema:
+            type: string
+          description: Repeated field:op:value filter (eq, ne, lt, lte, gt, gte, in, nin, regex)
+        - in: query
           name: courseId
           schema:
             type: string
           description: Filter topics by a specific course ID
       responses:
-        '200':
-          description: A list of all topics
+        "200":
+          description: A paginated list of topics
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TopicDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/TopicDto"
+                      meta:
+                        allOf:
+                          - $ref: "#/components/schemas/ResponseMeta"
+                          - $ref: "#/components/schemas/PaginationMeta"
     post:
       summary: Create a new topic
       tags: [Topics]
@@ -32,14 +74,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateTopicDto'
+              $ref: "#/components/schemas/CreateTopicDto"
       responses:
-        '201':
+        "201":
           description: Topic successfully created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopicDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TopicDto"
 
   /api/topics/{id}:
     get:
@@ -52,13 +99,18 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Topic details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopicDto'
-        '404':
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TopicDto"
+        "404":
           description: Topic not found
     put:
       summary: Update a topic by ID
@@ -74,14 +126,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateTopicDto'
+              $ref: "#/components/schemas/UpdateTopicDto"
       responses:
-        '200':
+        "200":
           description: Topic successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopicDto'
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TopicDto"
     delete:
       summary: Delete a topic by ID
       tags: [Topics]
@@ -92,7 +149,7 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        "204":
           description: Topic successfully deleted
 
   /api/topics/{id}/images:
@@ -115,11 +172,52 @@ paths:
                   type: string
                   format: binary
       responses:
-        '200':
+        "200":
           description: Image uploaded successfully
 
 components:
   schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        requestId:
+          type: string
+          nullable: true
+        path:
+          type: string
+          nullable: true
+        method:
+          type: string
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
     ImageMetaDto:
       type: object
       description: Transformed metadata of an uploaded image
@@ -141,7 +239,7 @@ components:
         points:
           type: number
         question_img:
-          $ref: '#/components/schemas/ImageMetaDto'
+          $ref: "#/components/schemas/ImageMetaDto"
         solution:
           type: string
         isRelatedToTopic:
@@ -191,11 +289,11 @@ components:
         points:
           type: number
         description_img:
-          $ref: '#/components/schemas/ImageMetaDto'
+          $ref: "#/components/schemas/ImageMetaDto"
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/TaskDto'
+            $ref: "#/components/schemas/TaskDto"
         createdAt:
           type: string
           format: date-time
@@ -222,7 +320,7 @@ components:
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/CreateTaskDto'
+            $ref: "#/components/schemas/CreateTaskDto"
 
     UpdateTopicDto:
       type: object
@@ -237,4 +335,4 @@ components:
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/UpdateTaskDto'
+            $ref: "#/components/schemas/UpdateTaskDto"

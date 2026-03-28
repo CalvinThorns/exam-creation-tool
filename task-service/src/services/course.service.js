@@ -1,4 +1,10 @@
 const { notFound, conflict } = require("./helpers/serviceErrors");
+const { normalizePagination, buildMeta } = require("../utils/pagination");
+const {
+  parseFilters,
+  parseSort,
+  buildCourseSearchFilter,
+} = require("../utils/query");
 const {
   normalizeCourseInput,
   validateCreateCoursePayload,
@@ -20,7 +26,28 @@ function createCourseService({ courseRepo }) {
     },
 
     async listCourses(query) {
-      return courseRepo.findAll(query);
+      const { page, limit } = normalizePagination(
+        query.page,
+        query.pageSize || query.limit,
+      );
+
+      const filters = parseFilters(query.filter);
+      const q = String(query.q || "").trim();
+      if (q) {
+        Object.assign(filters, buildCourseSearchFilter(q));
+      }
+
+      const sort = parseSort(query.sort);
+
+      const { items, total } = await courseRepo.findAll({
+        page,
+        limit,
+        filter: filters,
+        sort,
+      });
+
+      const meta = buildMeta({ total, page, limit });
+      return { items, ...meta };
     },
 
     async getCourse(id) {
