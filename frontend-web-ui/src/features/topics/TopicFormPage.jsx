@@ -90,6 +90,8 @@ export function TopicFormPage() {
   });
   const splitContainerRef = useRef(null);
   const blockerRef = useRef(null);
+  const blockedLocationRef = useRef(null);
+  const isIntentionalNavigationRef = useRef(false);
   const initialValuesRef = useRef({
     courseId: "",
     topic: "",
@@ -239,6 +241,15 @@ export function TopicFormPage() {
   const submit = handleSubmit(async (values) => {
     if (isEditMode) await updateM.mutateAsync({ id, body: values });
     else await createM.mutateAsync(values);
+    // After successful save, sync initial state to prevent blocker dialog on nav
+    initialValuesRef.current = {
+      courseId: values.courseId,
+      topic: values.topic,
+      description: values.description,
+      points: values.points,
+      description_img: values.description_img,
+      tasks: values.tasks,
+    };
     nav("/tasks/list");
   });
 
@@ -355,12 +366,26 @@ export function TopicFormPage() {
   useEffect(() => {
     blockerRef.current = blocker;
     if (blocker.state === "blocked") {
-      setConfirmDialog({
-        open: true,
-        action: "navigate",
-      });
+      // Skip if this is an intentional navigation from dialog
+      if (isIntentionalNavigationRef.current) {
+        isIntentionalNavigationRef.current = false;
+        blockerRef.current.proceed();
+        return;
+      }
+
+      // Only open dialog if this is a new blocked state (different location)
+      const currentLocation = blocker.location.pathname;
+      if (blockedLocationRef.current !== currentLocation && !confirmDialog.open) {
+        blockedLocationRef.current = currentLocation;
+        setConfirmDialog({
+          open: true,
+          action: "navigate",
+        });
+      }
+    } else if (blocker.state === "unblocked") {
+      blockedLocationRef.current = null;
     }
-  }, [blocker.state]);
+  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
 
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
@@ -375,6 +400,7 @@ export function TopicFormPage() {
     setConfirmDialog({ open: false, action: null });
 
     if (action === "cancel") {
+      isIntentionalNavigationRef.current = true;
       nav("/tasks/list");
     } else if (action === "navigate" && blockerRef.current) {
       blockerRef.current.proceed();

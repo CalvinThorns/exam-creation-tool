@@ -248,6 +248,8 @@ export function GenerateExamPage() {
   });
   const splitContainerRef = useRef(null);
   const blockerRef = useRef(null);
+  const blockedLocationRef = useRef(null);
+  const isIntentionalNavigationRef = useRef(false);
   const initialStateRef = useRef({
     courseId: "",
     semesterYear: "",
@@ -610,10 +612,28 @@ export function GenerateExamPage() {
 
     if (isEditMode) {
       await updateM.mutateAsync({ id: examId, body });
+      // After successful update, sync initial state to prevent blocker dialog on nav
+      initialStateRef.current = {
+        courseId: draft.course?.id || courseId,
+        semesterYear,
+        semesterType,
+        targetPoints,
+        selectedTopics,
+        draft,
+      };
       return;
     }
 
     await saveM.mutateAsync(body);
+    // After successful create, sync initial state to prevent blocker dialog on nav
+    initialStateRef.current = {
+      courseId: draft.course?.id || courseId,
+      semesterYear,
+      semesterType,
+      targetPoints,
+      selectedTopics,
+      draft,
+    };
     nav("/exams/list");
   };
 
@@ -668,12 +688,26 @@ export function GenerateExamPage() {
   useEffect(() => {
     blockerRef.current = blocker;
     if (blocker.state === "blocked") {
-      setConfirmDialog({
-        open: true,
-        action: "navigate",
-      });
+      // Skip if this is an intentional navigation from dialog
+      if (isIntentionalNavigationRef.current) {
+        isIntentionalNavigationRef.current = false;
+        blockerRef.current.proceed();
+        return;
+      }
+
+      // Only open dialog if this is a new blocked state (different location)
+      const currentLocation = blocker.location.pathname;
+      if (blockedLocationRef.current !== currentLocation && !confirmDialog.open) {
+        blockedLocationRef.current = currentLocation;
+        setConfirmDialog({
+          open: true,
+          action: "navigate",
+        });
+      }
+    } else if (blocker.state === "unblocked") {
+      blockedLocationRef.current = null;
     }
-  }, [blocker.state]);
+  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
 
   const handleResetClick = () => {
     resetExamForm();
@@ -684,6 +718,7 @@ export function GenerateExamPage() {
     setConfirmDialog({ open: false, action: null });
 
     if (action === "cancel") {
+      isIntentionalNavigationRef.current = true;
       nav("/exams/list");
     } else if (action === "navigate" && blockerRef.current) {
       blockerRef.current.proceed();
