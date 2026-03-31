@@ -77,6 +77,8 @@ export function CourseFormPage() {
   const initialValuesRef = useRef({ title: "", shortName: "", coverPage: "" });
   const splitContainerRef = useRef(null);
   const blockerRef = useRef(null);
+  const blockedLocationRef = useRef(null);
+  const isIntentionalNavigationRef = useRef(false);
   const { pdfUrl, setPdfFromBase64, clearPdf } =
     usePdfPreview("cover-page.pdf");
 
@@ -232,6 +234,12 @@ export function CourseFormPage() {
     } else {
       await createM.mutateAsync(values);
     }
+    // After successful save, sync initial state to prevent blocker dialog on nav
+    initialValuesRef.current = {
+      title: values.title,
+      shortName: values.shortName,
+      coverPage: values.coverPage,
+    };
     nav("/courses/list");
   });
 
@@ -256,12 +264,29 @@ export function CourseFormPage() {
   useEffect(() => {
     blockerRef.current = blocker;
     if (blocker.state === "blocked") {
-      setConfirmDialog({
-        open: true,
-        action: "navigate",
-      });
+      // Skip if this is an intentional navigation from dialog
+      if (isIntentionalNavigationRef.current) {
+        isIntentionalNavigationRef.current = false;
+        blockerRef.current.proceed();
+        return;
+      }
+
+      // Only open dialog if this is a new blocked state (different location)
+      const currentLocation = blocker.location.pathname;
+      if (
+        blockedLocationRef.current !== currentLocation &&
+        !confirmDialog.open
+      ) {
+        blockedLocationRef.current = currentLocation;
+        setConfirmDialog({
+          open: true,
+          action: "navigate",
+        });
+      }
+    } else if (blocker.state === "unblocked") {
+      blockedLocationRef.current = null;
     }
-  }, [blocker.state]);
+  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
 
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
@@ -276,6 +301,7 @@ export function CourseFormPage() {
     setConfirmDialog({ open: false, action: null });
 
     if (action === "cancel") {
+      isIntentionalNavigationRef.current = true;
       nav("/courses/list");
     } else if (action === "navigate" && blockerRef.current) {
       blockerRef.current.proceed();

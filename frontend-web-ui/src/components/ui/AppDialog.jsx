@@ -18,6 +18,7 @@ export function AppDialog({
   actionsSx,
   titleSx,
   PaperProps,
+  disableEscapeKeyDown = true,
   ...dialogProps
 }) {
   return (
@@ -26,6 +27,8 @@ export function AppDialog({
       onClose={onClose}
       maxWidth={maxWidth}
       fullWidth={fullWidth}
+      disableEscapeKeyDown={disableEscapeKeyDown}
+      onBackdropClick={() => {}}
       PaperProps={PaperProps}
       {...dialogProps}
     >

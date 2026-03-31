@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import {
   alpha,
+  Autocomplete,
   CircularProgress,
   Button,
   TextField,
+  Menu,
   MenuItem,
+  ListItemIcon,
+  ListItemText,
   Box,
   Typography,
   IconButton,
@@ -16,13 +20,16 @@ import {
 } from "@mui/material";
 // import UploadIcon from "@mui/icons-material/Upload";
 import AddIcon from "@mui/icons-material/Add";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import BuildIcon from "@mui/icons-material/Build";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import { useForm, useWatch } from "react-hook-form";
+import SchoolIcon from "@mui/icons-material/School";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
 // import { fileToBase64 } from "../../utils/fileToBase64";
@@ -58,15 +65,119 @@ function getDefaultTask() {
   };
 }
 
+function CompileButton({ disabled, loading, onCompile }) {
+  const { t } = useTranslation();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleOpen = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
+
+  const handleSelect = (version) => {
+    handleClose();
+    onCompile(version);
+  };
+
+  return (
+    <>
+      <Button
+        variant="contained"
+        color="secondary"
+        size="small"
+        disabled={disabled || loading}
+        endIcon={<ArrowDropDownIcon />}
+        startIcon={
+          loading ? (
+            <CircularProgress size={14} color="inherit" />
+          ) : (
+            <BuildIcon />
+          )
+        }
+        onClick={handleOpen}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        {loading ? t("common.compiling") : t("common.compile")}
+      </Button>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            elevation: 3,
+            sx: { mt: 0.5, minWidth: 180, borderRadius: 2 },
+          },
+        }}
+      >
+        <MenuItem onClick={() => handleSelect("STUDENT")} sx={{ py: 1.25 }}>
+          <ListItemIcon>
+            <SchoolIcon fontSize="small" color="primary" />
+          </ListItemIcon>
+          <ListItemText
+            primary={t("exams.studentVersion")}
+            secondary={t("exams.studentVersionHint")}
+            primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
+            secondaryTypographyProps={{ fontSize: 12 }}
+          />
+        </MenuItem>
+
+        <MenuItem onClick={() => handleSelect("TEACHER")} sx={{ py: 1.25 }}>
+          <ListItemIcon>
+            <MenuBookIcon fontSize="small" color="secondary" />
+          </ListItemIcon>
+          <ListItemText
+            primary={t("exams.teacherVersion")}
+            secondary={t("exams.teacherVersionHint")}
+            primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
+            secondaryTypographyProps={{ fontSize: 12 }}
+          />
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
+
 export function TopicFormPage() {
   const { t } = useTranslation();
   const theme = useTheme();
   const nav = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const dropdownPaperBg =
+    theme.palette.mode === "light"
+      ? theme.palette.grey[50]
+      : theme.palette.grey[900];
+  const dropdownPaperColor = theme.palette.getContrastText(dropdownPaperBg);
+  const dropdownHoverBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.hoverOpacity + 0.1,
+  );
+  const dropdownSelectedBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.selectedOpacity + 0.16,
+  );
 
-  const { data: coursesData } = useCourses({ page: 1, limit: 200 });
-  const courses = coursesData?.data || [];
+  const [courseQuery, setCourseQuery] = useState("");
+  const [debouncedCourseQuery, setDebouncedCourseQuery] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedCourseQuery(courseQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [courseQuery]);
+
+  const { data: coursesData, isFetching: isCoursesLoading } = useCourses({
+    page: 1,
+    limit: 20,
+    q: debouncedCourseQuery || undefined,
+  });
+  const courses = useMemo(() => coursesData?.data || [], [coursesData]);
 
   const {
     data: topicData,
@@ -83,6 +194,7 @@ export function TopicFormPage() {
   const [collapsedPane, setCollapsedPane] = useState(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [compiledVersion, setCompiledVersion] = useState(null);
   const [compilerMessages, setCompilerMessages] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -90,6 +202,8 @@ export function TopicFormPage() {
   });
   const splitContainerRef = useRef(null);
   const blockerRef = useRef(null);
+  const blockedLocationRef = useRef(null);
+  const isIntentionalNavigationRef = useRef(false);
   const initialValuesRef = useRef({
     courseId: "",
     topic: "",
@@ -216,7 +330,29 @@ export function TopicFormPage() {
 
   const { register, handleSubmit, formState, setValue, control, getValues } =
     form;
+  const selectedCourseId = useWatch({ control, name: "courseId" }) || "";
   const descriptionValue = useWatch({ control, name: "description" }) || "";
+
+  const selectedCourseOption = useMemo(() => {
+    const matchedCourse = (courses || []).find(
+      (c) => c.id === selectedCourseId,
+    );
+    if (matchedCourse) {
+      return matchedCourse;
+    }
+
+    const resolved = topicData?.data ?? topicData;
+    const course = resolved?.courseId;
+    if (selectedCourseId && typeof course === "object" && course) {
+      return {
+        id: selectedCourseId,
+        title: course.title || "",
+        shortName: course.shortName || "",
+      };
+    }
+
+    return null;
+  }, [courses, selectedCourseId, topicData]);
 
   // const setDescriptionImage = async (file) => {
   //   if (!file) {
@@ -239,10 +375,19 @@ export function TopicFormPage() {
   const submit = handleSubmit(async (values) => {
     if (isEditMode) await updateM.mutateAsync({ id, body: values });
     else await createM.mutateAsync(values);
+    // After successful save, sync initial state to prevent blocker dialog on nav
+    initialValuesRef.current = {
+      courseId: values.courseId,
+      topic: values.topic,
+      description: values.description,
+      points: values.points,
+      description_img: values.description_img,
+      tasks: values.tasks,
+    };
     nav("/tasks/list");
   });
 
-  const buildCombinedLatex = () => {
+  const buildCombinedLatex = (version = "STUDENT") => {
     const values = getValues();
     const selectedCourse = (courses || []).find(
       (c) => c.id === values.courseId,
@@ -265,8 +410,10 @@ export function TopicFormPage() {
         `\\subsection*{${t("topics.taskLabel", { index: index + 1 })}}`,
       );
       sections.push(task?.question || "");
-      sections.push(`\\paragraph{${t("common.solution")}}`);
-      sections.push(task?.solution || "");
+      if (version === "TEACHER") {
+        sections.push(`\\paragraph{${t("common.solution")}}`);
+        sections.push(task?.solution || "");
+      }
       sections.push(
         `\\textbf{${t("common.points")}:} ${Number(task?.points || 0)}\\\\`,
       );
@@ -275,11 +422,12 @@ export function TopicFormPage() {
     return sections.filter(Boolean).join("\n\n");
   };
 
-  const compilePreview = async () => {
-    const latexContent = buildCombinedLatex();
+  const compilePreview = async (version) => {
+    const latexContent = buildCombinedLatex(version);
 
     clearPdf();
     setCompilerMessages(null);
+    setCompiledVersion(version);
     setIsCompiling(true);
 
     try {
@@ -320,6 +468,7 @@ export function TopicFormPage() {
 
   const resetForm = () => {
     form.reset(initialValuesRef.current);
+    setCompiledVersion(null);
     setCompilerMessages(null);
     clearPdf();
     setIsEditable(true);
@@ -355,12 +504,29 @@ export function TopicFormPage() {
   useEffect(() => {
     blockerRef.current = blocker;
     if (blocker.state === "blocked") {
-      setConfirmDialog({
-        open: true,
-        action: "navigate",
-      });
+      // Skip if this is an intentional navigation from dialog
+      if (isIntentionalNavigationRef.current) {
+        isIntentionalNavigationRef.current = false;
+        blockerRef.current.proceed();
+        return;
+      }
+
+      // Only open dialog if this is a new blocked state (different location)
+      const currentLocation = blocker.location.pathname;
+      if (
+        blockedLocationRef.current !== currentLocation &&
+        !confirmDialog.open
+      ) {
+        blockedLocationRef.current = currentLocation;
+        setConfirmDialog({
+          open: true,
+          action: "navigate",
+        });
+      }
+    } else if (blocker.state === "unblocked") {
+      blockedLocationRef.current = null;
     }
-  }, [blocker.state]);
+  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
 
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
@@ -375,6 +541,7 @@ export function TopicFormPage() {
     setConfirmDialog({ open: false, action: null });
 
     if (action === "cancel") {
+      isIntentionalNavigationRef.current = true;
       nav("/tasks/list");
     } else if (action === "navigate" && blockerRef.current) {
       blockerRef.current.proceed();
@@ -525,23 +692,11 @@ export function TopicFormPage() {
                       variant="subtitle2"
                       color="text.secondary"
                     ></Typography>
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      size="small"
-                      startIcon={
-                        isCompiling ? (
-                          <CircularProgress size={14} color="inherit" />
-                        ) : (
-                          <BuildIcon />
-                        )
-                      }
-                      onClick={compilePreview}
-                    >
-                      {isCompiling
-                        ? t("common.compiling")
-                        : t("common.compilePreview")}
-                    </Button>
+                    <CompileButton
+                      disabled={!isEditable}
+                      loading={isCompiling}
+                      onCompile={compilePreview}
+                    />
                   </Stack>
 
                   <Box
@@ -564,23 +719,89 @@ export function TopicFormPage() {
                         mb: 2,
                       }}
                     >
-                      <TextField
-                        select
-                        label={<RequiredLabel label={t("common.course")} />}
-                        fullWidth
-                        size="small"
-                        {...register("courseId")}
-                        error={!!formState.errors.courseId}
-                        helperText={formState.errors.courseId?.message}
-                        disabled={!isEditable}
-                      >
-                        <MenuItem value="">{t("common.selectCourse")}</MenuItem>
-                        {(courses || []).map((c) => (
-                          <MenuItem key={c.id} value={c.id}>
-                            {c.title} ({c.shortName})
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                      <Controller
+                        name="courseId"
+                        control={control}
+                        render={({ field }) => (
+                          <Autocomplete
+                            options={courses || []}
+                            value={selectedCourseOption}
+                            onChange={(_, option) => {
+                              field.onChange(option?.id || "");
+                            }}
+                            onInputChange={(_, value, reason) => {
+                              if (reason === "clear") {
+                                setCourseQuery("");
+                                return;
+                              }
+                              if (reason === "input") {
+                                setCourseQuery(value);
+                              }
+                            }}
+                            loading={isCoursesLoading}
+                            fullWidth
+                            size="small"
+                            disabled={!isEditable}
+                            slotProps={{
+                              paper: {
+                                elevation: 8,
+                                sx: {
+                                  bgcolor: dropdownPaperBg,
+                                  color: dropdownPaperColor,
+                                  border: 1,
+                                  borderColor: "divider",
+                                },
+                              },
+                              listbox: {
+                                sx: {
+                                  maxHeight: 200,
+                                  overflowY: "auto",
+                                  bgcolor: dropdownPaperBg,
+                                  color: dropdownPaperColor,
+                                  "& .MuiAutocomplete-option": {
+                                    minHeight: 40,
+                                    color: dropdownPaperColor,
+                                  },
+                                  "& .MuiAutocomplete-option.Mui-focused": {
+                                    bgcolor: dropdownHoverBg,
+                                  },
+                                  '& .MuiAutocomplete-option[aria-selected="true"]':
+                                    {
+                                      bgcolor: dropdownSelectedBg,
+                                      color: dropdownPaperColor,
+                                    },
+                                  '& .MuiAutocomplete-option[aria-selected="true"].Mui-focused':
+                                    {
+                                      bgcolor: dropdownSelectedBg,
+                                    },
+                                },
+                              },
+                            }}
+                            isOptionEqualToValue={(option, value) =>
+                              option.id === value.id
+                            }
+                            getOptionLabel={(option) => {
+                              if (!option) return "";
+                              const title = option.title || "";
+                              const shortName = option.shortName
+                                ? ` (${option.shortName})`
+                                : "";
+                              return `${title}${shortName}`.trim();
+                            }}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label={
+                                  <RequiredLabel label={t("common.course")} />
+                                }
+                                error={!!formState.errors.courseId}
+                                helperText={formState.errors.courseId?.message}
+                                placeholder={t("common.selectCourse")}
+                              />
+                            )}
+                          />
+                        )}
+                      />
 
                       <TextField
                         label={<RequiredLabel label={t("common.topic")} />}
@@ -811,6 +1032,16 @@ export function TopicFormPage() {
                   hideDownload
                   isLoading={isCompiling}
                   compilerMessages={compilerMessages}
+                  title={
+                    compiledVersion
+                      ? t("common.preview", {
+                          name:
+                            compiledVersion === "STUDENT"
+                              ? t("exams.student")
+                              : t("exams.teacher"),
+                        })
+                      : undefined
+                  }
                   loadingText={t("courses.compilingPreview")}
                   emptyText={t("courses.emptyPreview")}
                 />
