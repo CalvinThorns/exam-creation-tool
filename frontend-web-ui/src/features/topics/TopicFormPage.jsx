@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import {
   alpha,
+  Autocomplete,
   CircularProgress,
   Button,
   TextField,
@@ -28,7 +29,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SchoolIcon from "@mui/icons-material/School";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
 // import { fileToBase64 } from "../../utils/fileToBase64";
@@ -146,9 +147,37 @@ export function TopicFormPage() {
   const nav = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const dropdownPaperBg =
+    theme.palette.mode === "light"
+      ? theme.palette.grey[50]
+      : theme.palette.grey[900];
+  const dropdownPaperColor = theme.palette.getContrastText(dropdownPaperBg);
+  const dropdownHoverBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.hoverOpacity + 0.1,
+  );
+  const dropdownSelectedBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.selectedOpacity + 0.16,
+  );
 
-  const { data: coursesData } = useCourses({ page: 1, limit: 200 });
-  const courses = coursesData?.data || [];
+  const [courseQuery, setCourseQuery] = useState("");
+  const [debouncedCourseQuery, setDebouncedCourseQuery] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedCourseQuery(courseQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [courseQuery]);
+
+  const { data: coursesData, isFetching: isCoursesLoading } = useCourses({
+    page: 1,
+    limit: 20,
+    q: debouncedCourseQuery || undefined,
+  });
+  const courses = useMemo(() => coursesData?.data || [], [coursesData]);
 
   const {
     data: topicData,
@@ -301,7 +330,29 @@ export function TopicFormPage() {
 
   const { register, handleSubmit, formState, setValue, control, getValues } =
     form;
+  const selectedCourseId = useWatch({ control, name: "courseId" }) || "";
   const descriptionValue = useWatch({ control, name: "description" }) || "";
+
+  const selectedCourseOption = useMemo(() => {
+    const matchedCourse = (courses || []).find(
+      (c) => c.id === selectedCourseId,
+    );
+    if (matchedCourse) {
+      return matchedCourse;
+    }
+
+    const resolved = topicData?.data ?? topicData;
+    const course = resolved?.courseId;
+    if (selectedCourseId && typeof course === "object" && course) {
+      return {
+        id: selectedCourseId,
+        title: course.title || "",
+        shortName: course.shortName || "",
+      };
+    }
+
+    return null;
+  }, [courses, selectedCourseId, topicData]);
 
   // const setDescriptionImage = async (file) => {
   //   if (!file) {
@@ -668,23 +719,89 @@ export function TopicFormPage() {
                         mb: 2,
                       }}
                     >
-                      <TextField
-                        select
-                        label={<RequiredLabel label={t("common.course")} />}
-                        fullWidth
-                        size="small"
-                        {...register("courseId")}
-                        error={!!formState.errors.courseId}
-                        helperText={formState.errors.courseId?.message}
-                        disabled={!isEditable}
-                      >
-                        <MenuItem value="">{t("common.selectCourse")}</MenuItem>
-                        {(courses || []).map((c) => (
-                          <MenuItem key={c.id} value={c.id}>
-                            {c.title} ({c.shortName})
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                      <Controller
+                        name="courseId"
+                        control={control}
+                        render={({ field }) => (
+                          <Autocomplete
+                            options={courses || []}
+                            value={selectedCourseOption}
+                            onChange={(_, option) => {
+                              field.onChange(option?.id || "");
+                            }}
+                            onInputChange={(_, value, reason) => {
+                              if (reason === "clear") {
+                                setCourseQuery("");
+                                return;
+                              }
+                              if (reason === "input") {
+                                setCourseQuery(value);
+                              }
+                            }}
+                            loading={isCoursesLoading}
+                            fullWidth
+                            size="small"
+                            disabled={!isEditable}
+                            slotProps={{
+                              paper: {
+                                elevation: 8,
+                                sx: {
+                                  bgcolor: dropdownPaperBg,
+                                  color: dropdownPaperColor,
+                                  border: 1,
+                                  borderColor: "divider",
+                                },
+                              },
+                              listbox: {
+                                sx: {
+                                  maxHeight: 200,
+                                  overflowY: "auto",
+                                  bgcolor: dropdownPaperBg,
+                                  color: dropdownPaperColor,
+                                  "& .MuiAutocomplete-option": {
+                                    minHeight: 40,
+                                    color: dropdownPaperColor,
+                                  },
+                                  "& .MuiAutocomplete-option.Mui-focused": {
+                                    bgcolor: dropdownHoverBg,
+                                  },
+                                  '& .MuiAutocomplete-option[aria-selected="true"]':
+                                    {
+                                      bgcolor: dropdownSelectedBg,
+                                      color: dropdownPaperColor,
+                                    },
+                                  '& .MuiAutocomplete-option[aria-selected="true"].Mui-focused':
+                                    {
+                                      bgcolor: dropdownSelectedBg,
+                                    },
+                                },
+                              },
+                            }}
+                            isOptionEqualToValue={(option, value) =>
+                              option.id === value.id
+                            }
+                            getOptionLabel={(option) => {
+                              if (!option) return "";
+                              const title = option.title || "";
+                              const shortName = option.shortName
+                                ? ` (${option.shortName})`
+                                : "";
+                              return `${title}${shortName}`.trim();
+                            }}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label={
+                                  <RequiredLabel label={t("common.course")} />
+                                }
+                                error={!!formState.errors.courseId}
+                                helperText={formState.errors.courseId?.message}
+                                placeholder={t("common.selectCourse")}
+                              />
+                            )}
+                          />
+                        )}
+                      />
 
                       <TextField
                         label={<RequiredLabel label={t("common.topic")} />}

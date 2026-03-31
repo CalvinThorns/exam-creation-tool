@@ -210,8 +210,46 @@ export function GenerateExamPage() {
   const nav = useNavigate();
   const { id: examId } = useParams(); // present only in edit mode (/exams/:id/edit)
   const isEditMode = Boolean(examId);
+  const dropdownPaperBg =
+    theme.palette.mode === "light"
+      ? theme.palette.grey[50]
+      : theme.palette.grey[900];
+  const dropdownPaperColor = theme.palette.getContrastText(dropdownPaperBg);
+  const dropdownHoverBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.hoverOpacity + 0.1,
+  );
+  const dropdownSelectedBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.selectedOpacity + 0.16,
+  );
 
-  const { data: coursesData } = useCourses({ page: 1, limit: 200 });
+  const [courseQuery, setCourseQuery] = useState("");
+  const [debouncedCourseQuery, setDebouncedCourseQuery] = useState("");
+  const [topicQuery, setTopicQuery] = useState("");
+  const [debouncedTopicQuery, setDebouncedTopicQuery] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedCourseQuery(courseQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [courseQuery]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedTopicQuery(topicQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [topicQuery]);
+
+  const { data: coursesData, isFetching: isCoursesLoading } = useCourses({
+    page: 1,
+    limit: 20,
+    q: debouncedCourseQuery || undefined,
+  });
   const courses = useMemo(
     () => coursesData?.data || coursesData || [],
     [coursesData],
@@ -330,10 +368,11 @@ export function GenerateExamPage() {
     }
   }, [isEditMode]);
 
-  const { data: topicsData } = useTopics({
+  const { data: topicsData, isFetching: isTopicsLoading } = useTopics({
     page: 1,
-    limit: 500,
+    limit: 20,
     courseId: courseId || undefined,
+    q: debouncedTopicQuery || undefined,
   });
 
   const topics = useMemo(() => topicsData?.data || [], [topicsData?.data]);
@@ -370,9 +409,27 @@ export function GenerateExamPage() {
     return courseId || "";
   }, [draft, courses, courseId, examData]);
 
-  const handleCourseChange = (e) => {
-    setCourseId(e.target.value);
+  const selectedCourseOption = useMemo(() => {
+    const matchedCourse = courses.find((course) => course.id === courseId);
+    if (matchedCourse) {
+      return matchedCourse;
+    }
+
+    if (courseId && courseLabel) {
+      return {
+        id: courseId,
+        title: courseLabel,
+        shortName: "",
+      };
+    }
+
+    return null;
+  }, [courses, courseId, courseLabel]);
+
+  const handleCourseChange = (nextCourse) => {
+    setCourseId(nextCourse?.id || "");
     setSelectedTopics([]);
+    setTopicQuery("");
     setDraft(null);
   };
 
@@ -998,27 +1055,76 @@ export function GenerateExamPage() {
                   gap: 2,
                 }}
               >
-                <TextField
-                  select
-                  label={t("common.course")}
-                  value={courseId}
-                  onChange={handleCourseChange}
+                <Autocomplete
+                  options={courses}
+                  value={selectedCourseOption}
+                  onChange={(_, value) => handleCourseChange(value)}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "clear") {
+                      setCourseQuery("");
+                      return;
+                    }
+                    if (reason === "input") {
+                      setCourseQuery(value);
+                    }
+                  }}
+                  loading={isCoursesLoading}
+                  disabled={isEditMode || !isEditable}
                   fullWidth
                   size="small"
-                  disabled={isEditMode || !isEditable}
-                >
-                  <MenuItem value="">{t("common.selectCourse")}</MenuItem>
-                  {courses.map((c) => (
-                    <MenuItem key={c.id} value={c.id}>
-                      {c.title} ({c.shortName})
-                    </MenuItem>
-                  ))}
-                  {isEditMode &&
-                    courseId &&
-                    !courses.some((c) => c.id === courseId) && (
-                      <MenuItem value={courseId}>{courseLabel}</MenuItem>
-                    )}
-                </TextField>
+                  slotProps={{
+                    paper: {
+                      elevation: 8,
+                      sx: {
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        border: 1,
+                        borderColor: "divider",
+                      },
+                    },
+                    listbox: {
+                      sx: {
+                        maxHeight: 200,
+                        overflowY: "auto",
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        "& .MuiAutocomplete-option": {
+                          minHeight: 40,
+                          color: dropdownPaperColor,
+                        },
+                        "& .MuiAutocomplete-option.Mui-focused": {
+                          bgcolor: dropdownHoverBg,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"]': {
+                          bgcolor: dropdownSelectedBg,
+                          color: dropdownPaperColor,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"].Mui-focused':
+                          {
+                            bgcolor: dropdownSelectedBg,
+                          },
+                      },
+                    },
+                  }}
+                  isOptionEqualToValue={(option, value) =>
+                    option.id === value.id
+                  }
+                  getOptionLabel={(option) => {
+                    if (!option) return "";
+                    const title = option.title || "";
+                    const shortName = option.shortName
+                      ? ` (${option.shortName})`
+                      : "";
+                    return `${title}${shortName}`.trim();
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t("common.course")}
+                      placeholder={t("common.selectCourse")}
+                    />
+                  )}
+                />
 
                 <Stack direction="row" spacing={1}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -1085,10 +1191,22 @@ export function GenerateExamPage() {
                   options={topicNames}
                   value={selectedTopics}
                   onChange={(_, value) => setSelectedTopics(value)}
+                  inputValue={topicQuery}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "clear") {
+                      setTopicQuery("");
+                      return;
+                    }
+                    if (reason === "input") {
+                      setTopicQuery(value);
+                    }
+                  }}
+                  loading={isTopicsLoading}
                   disabled={!courseId || !isEditable}
                   fullWidth
                   size="small"
                   filterSelectedOptions
+                  filterOptions={(options) => options}
                   sx={{
                     "& .MuiAutocomplete-inputRoot": {
                       flexWrap: "nowrap",
@@ -1104,10 +1222,36 @@ export function GenerateExamPage() {
                     },
                   }}
                   slotProps={{
+                    paper: {
+                      elevation: 8,
+                      sx: {
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        border: 1,
+                        borderColor: "divider",
+                      },
+                    },
                     listbox: {
                       sx: {
-                        maxHeight: 240,
+                        maxHeight: 200,
                         overflowY: "auto",
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        "& .MuiAutocomplete-option": {
+                          minHeight: 40,
+                          color: dropdownPaperColor,
+                        },
+                        "& .MuiAutocomplete-option.Mui-focused": {
+                          bgcolor: dropdownHoverBg,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"]': {
+                          bgcolor: dropdownSelectedBg,
+                          color: dropdownPaperColor,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"].Mui-focused':
+                          {
+                            bgcolor: dropdownSelectedBg,
+                          },
                       },
                     },
                   }}
