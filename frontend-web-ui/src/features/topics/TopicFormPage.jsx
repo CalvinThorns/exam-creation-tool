@@ -5,7 +5,10 @@ import {
   CircularProgress,
   Button,
   TextField,
+  Menu,
   MenuItem,
+  ListItemIcon,
+  ListItemText,
   Box,
   Typography,
   IconButton,
@@ -16,12 +19,15 @@ import {
 } from "@mui/material";
 // import UploadIcon from "@mui/icons-material/Upload";
 import AddIcon from "@mui/icons-material/Add";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import BuildIcon from "@mui/icons-material/Build";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import SchoolIcon from "@mui/icons-material/School";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
@@ -58,6 +64,82 @@ function getDefaultTask() {
   };
 }
 
+function CompileButton({ disabled, loading, onCompile }) {
+  const { t } = useTranslation();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleOpen = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
+
+  const handleSelect = (version) => {
+    handleClose();
+    onCompile(version);
+  };
+
+  return (
+    <>
+      <Button
+        variant="contained"
+        color="secondary"
+        size="small"
+        disabled={disabled || loading}
+        endIcon={<ArrowDropDownIcon />}
+        startIcon={
+          loading ? (
+            <CircularProgress size={14} color="inherit" />
+          ) : (
+            <BuildIcon />
+          )
+        }
+        onClick={handleOpen}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        {loading ? t("common.compiling") : t("common.compile")}
+      </Button>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            elevation: 3,
+            sx: { mt: 0.5, minWidth: 180, borderRadius: 2 },
+          },
+        }}
+      >
+        <MenuItem onClick={() => handleSelect("STUDENT")} sx={{ py: 1.25 }}>
+          <ListItemIcon>
+            <SchoolIcon fontSize="small" color="primary" />
+          </ListItemIcon>
+          <ListItemText
+            primary={t("exams.studentVersion")}
+            secondary={t("exams.studentVersionHint")}
+            primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
+            secondaryTypographyProps={{ fontSize: 12 }}
+          />
+        </MenuItem>
+
+        <MenuItem onClick={() => handleSelect("TEACHER")} sx={{ py: 1.25 }}>
+          <ListItemIcon>
+            <MenuBookIcon fontSize="small" color="secondary" />
+          </ListItemIcon>
+          <ListItemText
+            primary={t("exams.teacherVersion")}
+            secondary={t("exams.teacherVersionHint")}
+            primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
+            secondaryTypographyProps={{ fontSize: 12 }}
+          />
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
+
 export function TopicFormPage() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -83,6 +165,7 @@ export function TopicFormPage() {
   const [collapsedPane, setCollapsedPane] = useState(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [compiledVersion, setCompiledVersion] = useState(null);
   const [compilerMessages, setCompilerMessages] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -253,7 +336,7 @@ export function TopicFormPage() {
     nav("/tasks/list");
   });
 
-  const buildCombinedLatex = () => {
+  const buildCombinedLatex = (version = "STUDENT") => {
     const values = getValues();
     const selectedCourse = (courses || []).find(
       (c) => c.id === values.courseId,
@@ -276,8 +359,10 @@ export function TopicFormPage() {
         `\\subsection*{${t("topics.taskLabel", { index: index + 1 })}}`,
       );
       sections.push(task?.question || "");
-      sections.push(`\\paragraph{${t("common.solution")}}`);
-      sections.push(task?.solution || "");
+      if (version === "TEACHER") {
+        sections.push(`\\paragraph{${t("common.solution")}}`);
+        sections.push(task?.solution || "");
+      }
       sections.push(
         `\\textbf{${t("common.points")}:} ${Number(task?.points || 0)}\\\\`,
       );
@@ -286,11 +371,12 @@ export function TopicFormPage() {
     return sections.filter(Boolean).join("\n\n");
   };
 
-  const compilePreview = async () => {
-    const latexContent = buildCombinedLatex();
+  const compilePreview = async (version) => {
+    const latexContent = buildCombinedLatex(version);
 
     clearPdf();
     setCompilerMessages(null);
+    setCompiledVersion(version);
     setIsCompiling(true);
 
     try {
@@ -331,6 +417,7 @@ export function TopicFormPage() {
 
   const resetForm = () => {
     form.reset(initialValuesRef.current);
+    setCompiledVersion(null);
     setCompilerMessages(null);
     clearPdf();
     setIsEditable(true);
@@ -554,23 +641,11 @@ export function TopicFormPage() {
                       variant="subtitle2"
                       color="text.secondary"
                     ></Typography>
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      size="small"
-                      startIcon={
-                        isCompiling ? (
-                          <CircularProgress size={14} color="inherit" />
-                        ) : (
-                          <BuildIcon />
-                        )
-                      }
-                      onClick={compilePreview}
-                    >
-                      {isCompiling
-                        ? t("common.compiling")
-                        : t("common.compilePreview")}
-                    </Button>
+                    <CompileButton
+                      disabled={!isEditable}
+                      loading={isCompiling}
+                      onCompile={compilePreview}
+                    />
                   </Stack>
 
                   <Box
@@ -840,6 +915,16 @@ export function TopicFormPage() {
                   hideDownload
                   isLoading={isCompiling}
                   compilerMessages={compilerMessages}
+                  title={
+                    compiledVersion
+                      ? t("common.preview", {
+                          name:
+                            compiledVersion === "STUDENT"
+                              ? t("exams.student")
+                              : t("exams.teacher"),
+                        })
+                      : undefined
+                  }
                   loadingText={t("courses.compilingPreview")}
                   emptyText={t("courses.emptyPreview")}
                 />
