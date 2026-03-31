@@ -273,7 +273,10 @@ export function CourseFormPage() {
 
       // Only open dialog if this is a new blocked state (different location)
       const currentLocation = blocker.location.pathname;
-      if (blockedLocationRef.current !== currentLocation && !confirmDialog.open) {
+      if (
+        blockedLocationRef.current !== currentLocation &&
+        !confirmDialog.open
+      ) {
         blockedLocationRef.current = currentLocation;
         setConfirmDialog({
           open: true,
