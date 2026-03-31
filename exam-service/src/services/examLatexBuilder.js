@@ -102,22 +102,25 @@ function buildMarksTableLatex(topics) {
   // widths:
   // - first column fixed
   // - sum column fixed (a bit wider)
-  // - each task column = (linewidth - first - sum) / n
+  // - task columns use tabularx X-columns so total width stays within \linewidth
   const firstW = "2.0cm";
   const sumW = "2.5cm";
 
-  const taskW = `\\dimexpr(\\linewidth-${firstW}-${sumW})/${n}\\relax`;
+  const tableFont = n >= 12 ? "\\scriptsize" : n >= 9 ? "\\footnotesize" : "";
+  const tabColSep = n >= 12 ? "2pt" : n >= 9 ? "3pt" : "4pt";
+  const arrayStretch = n >= 12 ? "1.1" : "1.2";
 
-  const taskCols = Array(n).fill(`C{${taskW}}|`).join("");
+  const taskCols = `*{${n}}{>{\\centering\\arraybackslash}X|}`;
 
   const colSpec = `|L{${firstW}}||${taskCols}C{${sumW}}|`;
 
   return String.raw`
     \vspace{0.5cm}
 
-    {\renewcommand{\arraystretch}{1.2}
-    \setlength{\tabcolsep}{6pt}
-    \begin{tabular}{${colSpec}}
+    {${tableFont}
+    \renewcommand{\arraystretch}{${arrayStretch}}
+    \setlength{\tabcolsep}{${tabColSep}}
+    \begin{tabularx}{\linewidth}{${colSpec}}
     \hline
     ${headerRow}
     \hline
@@ -125,7 +128,7 @@ function buildMarksTableLatex(topics) {
     \hline
     ${reachedRow}
     \hline
-    \end{tabular}
+    \end{tabularx}
     }
   `;
 }
