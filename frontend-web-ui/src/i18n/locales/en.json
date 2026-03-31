@@ -6,6 +6,7 @@
   },
   "common": {
     "addNew": "Add New",
+    "add": "Add",
     "actions": "Actions",
     "edit": "Edit",
     "delete": "Delete",
@@ -36,7 +37,10 @@
     "title": "Title",
     "selectCourse": "Select course",
     "selectTopics": "Select topics",
-    "selectCourseFirst": "Select course first"
+    "selectCourseFirst": "Select course first",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email"
   },
   "sidebar": {
     "exams": "Exams",
@@ -130,7 +134,10 @@
     "compileFailed": "Failed to compile cover page preview.",
     "confirmCancelTitle": "Discard Changes?",
     "confirmYes": "Yes",
-    "unsavedChangesMessage": "You have unsaved changes. Do you want to discard them?"
+    "unsavedChangesMessage": "You have unsaved changes. Do you want to discard them?",
+    "createdBy": "Created By",
+    "collaborators": "Collaborators",
+    "addCollaborators": "Add Collaborators"
   },
   "topics": {
     "pageTitle": "Tasks",
@@ -250,6 +257,10 @@
     "noMatchingResults": "No matching results",
     "noFilteredHint": "Try adjusting or clearing filters."
   },
+  "users": {
+    "noRows": "No users",
+    "noRowsHint": "No users available."
+  },
   "confirmDialog": {
     "confirm": "Confirm"
   },
@@ -257,6 +268,8 @@
     "courseCreated": "Course created successfully",
     "courseUpdated": "Course updated successfully",
     "courseDeleted": "Course deleted successfully",
+    "collaboratorAdded": "Collaborator added successfully",
+    "collaboratorRemoved": "Collaborator removed successfully",
     "topicCreated": "Task created successfully",
     "topicUpdated": "Task updated successfully",
     "topicDeleted": "Task deleted successfully",

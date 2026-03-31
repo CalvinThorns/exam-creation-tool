@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { usersApi } from "../../api/users.api";
 
 export function useUsers(params) {
@@ -8,6 +8,7 @@ export function useUsers(params) {
       const response = await usersApi.list(params);
       return response;
     },
+    placeholderData: keepPreviousData,
   });
 }
 

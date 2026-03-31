@@ -3,12 +3,14 @@ import { Box, Button, Paper } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
 import { useCourses, useDeleteCourse } from "./courses.hooks";
+import { AddCollaboratorsDialog } from "./AddCollaboratorsDialog";
 import { useTranslation } from "react-i18next";
 
 export function CoursesPage() {
@@ -18,18 +20,54 @@ export function CoursesPage() {
   const deleteM = useDeleteCourse();
 
   const [confirm, setConfirm] = useState({ open: false, id: null });
+  const [collaboratorDialog, setCollaboratorDialog] = useState({
+    open: false,
+    course: null,
+  });
   const rows = useMemo(() => data?.data || [], [data]);
+
+  const fullNameOrDash = (user) => {
+    if (!user) return "-";
+    const first = user.firstName || "";
+    const last = user.lastName || "";
+    const full = `${first} ${last}`.trim();
+    return full || user.email || "-";
+  };
 
   const columns = useMemo(
     () => [
       { headerName: t("common.name"), field: "title" },
       { headerName: t("common.shortName"), field: "shortName" },
+      {
+        headerName: t("courses.createdBy"),
+        field: "createdBy",
+        valueGetter: (params) => fullNameOrDash(params.data?.createdBy),
+      },
+      {
+        headerName: t("courses.collaborators"),
+        field: "collaborators",
+        valueGetter: (params) => {
+          const collaborators = params.data?.collaborators || [];
+          if (!Array.isArray(collaborators) || collaborators.length === 0) {
+            return "-";
+          }
+          return collaborators.map((c) => fullNameOrDash(c)).join(", ");
+        },
+      },
     ],
     [t],
   );
 
   const actions = useMemo(
     () => [
+      {
+        id: "addCollaborators",
+        label: t("courses.addCollaborators"),
+        icon: PersonAddIcon,
+        onClick: (row) => {
+          setCollaboratorDialog({ open: true, course: row });
+        },
+      },
       {
         id: "edit",
         label: t("common.edit"),
@@ -101,6 +139,14 @@ export function CoursesPage() {
         message={t("courses.deleteMessage")}
         onCancel={() => setConfirm({ open: false, id: null })}
         onConfirm={remove}
+      />
+
+      <AddCollaboratorsDialog
+        open={collaboratorDialog.open}
+        courseId={collaboratorDialog.course?.id}
+        existingCollaborators={collaboratorDialog.course?.collaborators || []}
+        createdBy={collaboratorDialog.course?.createdBy || null}
+        onClose={() => setCollaboratorDialog({ open: false, course: null })}
       />
     </Box>
   );

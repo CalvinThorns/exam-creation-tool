@@ -81,3 +81,29 @@ export function useDeleteCourse() {
     },
   });
 }
+
+export function useAddCollaborator() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ courseId, userId }) => {
+      return await coursesApi.addCollaborator(courseId, userId);
+    },
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.collaboratorAdded"));
+      return queryClient.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
+}
+
+export function useRemoveCollaborator() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ courseId, userId }) => {
+      return await coursesApi.removeCollaborator(courseId, userId);
+    },
+    onSuccess: () => {
+      notifySuccess(i18n.t("notifications.collaboratorRemoved"));
+      return queryClient.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
+}

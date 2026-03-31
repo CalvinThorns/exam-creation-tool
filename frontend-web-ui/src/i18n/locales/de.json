@@ -6,6 +6,7 @@
   },
   "common": {
     "addNew": "Neu hinzufügen",
+    "add": "Hinzufügen",
     "actions": "Aktionen",
     "edit": "Bearbeiten",
     "delete": "Löschen",
@@ -36,7 +37,10 @@
     "title": "Titel",
     "selectCourse": "Kurs auswählen",
     "selectTopics": "Themen auswählen",
-    "selectCourseFirst": "Zuerst Kurs auswählen"
+    "selectCourseFirst": "Zuerst Kurs auswählen",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail"
   },
   "sidebar": {
     "exams": "Prüfungen",
@@ -130,7 +134,10 @@
     "compileFailed": "Deckblatt-Vorschau konnte nicht kompiliert werden.",
     "confirmCancelTitle": "Änderungen verwerfen?",
     "confirmYes": "Ja",
-    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?",
+    "createdBy": "Erstellt von",
+    "collaborators": "Mitarbeiter",
+    "addCollaborators": "Mitarbeiter hinzufügen"
   },
   "topics": {
     "pageTitle": "Aufgaben",
@@ -250,6 +257,10 @@
     "noMatchingResults": "Keine passenden Ergebnisse",
     "noFilteredHint": "Versuchen Sie, Filter anzupassen oder zu löschen."
   },
+  "users": {
+    "noRows": "Keine Benutzer",
+    "noRowsHint": "Keine Benutzer verfügbar."
+  },
   "confirmDialog": {
     "confirm": "Bestätigen"
   },
@@ -257,6 +268,8 @@
     "courseCreated": "Kurs erfolgreich erstellt",
     "courseUpdated": "Kurs erfolgreich aktualisiert",
     "courseDeleted": "Kurs erfolgreich gelöscht",
+    "collaboratorAdded": "Mitarbeiter erfolgreich hinzugefügt",
+    "collaboratorRemoved": "Mitarbeiter erfolgreich entfernt",
     "topicCreated": "Aufgabe erfolgreich erstellt",
     "topicUpdated": "Aufgabe erfolgreich aktualisiert",
     "topicDeleted": "Aufgabe erfolgreich gelöscht",

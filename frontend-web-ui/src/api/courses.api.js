@@ -7,4 +7,12 @@ export const coursesApi = {
   update: (id, body) =>
     tasksHttp.patch(`/courses/${id}`, body).then((r) => r.data),
   remove: (id) => tasksHttp.delete(`/courses/${id}`).then((r) => r.data),
+  addCollaborator: (courseId, userId) =>
+    tasksHttp
+      .post(`/courses/${courseId}/collaborators`, { userId })
+      .then((r) => r.data),
+  removeCollaborator: (courseId, userId) =>
+    tasksHttp
+      .delete(`/courses/${courseId}/collaborators`, { data: { userId } })
+      .then((r) => r.data),
 };
