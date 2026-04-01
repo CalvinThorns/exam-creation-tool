@@ -678,6 +678,7 @@ export function GenerateExamPage() {
         selectedTopics,
         draft,
       };
+      nav("/exams/list");
       return;
     }
 
@@ -1069,7 +1070,7 @@ export function GenerateExamPage() {
                     }
                   }}
                   loading={isCoursesLoading}
-                  disabled={isEditMode || !isEditable}
+                  disabled={!isEditable}
                   fullWidth
                   size="small"
                   slotProps={{
@@ -1147,13 +1148,13 @@ export function GenerateExamPage() {
                         textField: {
                           fullWidth: true,
                           size: "small",
-                          disabled: isEditMode || !isEditable,
+                          disabled: !isEditable,
                         },
                       }}
                       format="YYYY"
                       yearsOrder="asc"
-                      minDate={dayjs(`${new Date().getFullYear()}-01-01`)}
-                      maxDate={dayjs(`${new Date().getFullYear() + 10}-12-31`)}
+                      minDate={dayjs(`${new Date().getFullYear() - 25}-01-01`)}
+                      maxDate={dayjs(`${new Date().getFullYear() + 25}-12-31`)}
                     />
                   </LocalizationProvider>
 
@@ -1164,7 +1165,7 @@ export function GenerateExamPage() {
                     onChange={handleSemesterTypeChange}
                     fullWidth
                     size="small"
-                    disabled={isEditMode || !isEditable}
+                    disabled={!isEditable}
                   >
                     <MenuItem value="">{t("exams.selectSemester")}</MenuItem>
                     {SEMESTER_OPTIONS.map((option) => (
