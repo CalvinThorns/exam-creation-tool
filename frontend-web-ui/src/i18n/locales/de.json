@@ -36,7 +36,12 @@
     "title": "Titel",
     "selectCourse": "Kurs auswählen",
     "selectTopics": "Themen auswählen",
-    "selectCourseFirst": "Zuerst Kurs auswählen"
+    "selectCourseFirst": "Zuerst Kurs auswählen",
+    "validationError": "Validierungsfehler",
+    "sumOfTaskPoints": "Summe der Aufgabenpunkte",
+    "topicPointsLabel": "Themenpunkte",
+    "mustEqual": "muessen",
+    "pointsMismatchPrefix": "Punktemismatch:"
   },
   "sidebar": {
     "exams": "Prüfungen",
@@ -116,6 +121,7 @@
     "remove": "Entfernen",
     "taskLatex": "Aufgabe LaTeX",
     "solutionLatex": "Lösung LaTeX",
+    "pointsValidationErrorDetailed": "Aufgabenpunkte {{taskPoints}} muessen Themenpunkte {{topicPoints}} sein",
     "uploadTaskImage": "Aufgabenbild hochladen",
     "relatedToTopic": "Zum Thema gehörend",
     "confirmCancelTitle": "Änderungen verwerfen?",
@@ -163,6 +169,10 @@
     "tasksCount": "Aufgaben ({{count}})",
     "pts": "Pkt",
     "confirmCancelTitle": "Änderungen verwerfen?",
+    "pointsValidationError": "Aufgabenpunkte muessen den Themenpunkten entsprechen",
+    "pointsValidationErrorDetailed": "{{topic}}: Aufgabenpunkte {{taskPoints}} muessen Themenpunkte {{topicPoints}} sein",
+    "pointsValidationErrorTopics": "Punktemismatch in Themen: {{topics}}",
+    "pointsValidationErrorTopicDetails": "Punktemismatch: Aufgabensumme {{taskPoints}} Pkt, Thema {{topicPoints}} Pkt",
     "confirmYes": "Ja",
     "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },

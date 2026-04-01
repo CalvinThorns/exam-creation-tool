@@ -36,7 +36,12 @@
     "title": "Title",
     "selectCourse": "Select course",
     "selectTopics": "Select topics",
-    "selectCourseFirst": "Select course first"
+    "selectCourseFirst": "Select course first",
+    "validationError": "Validation Error",
+    "sumOfTaskPoints": "Sum of task points",
+    "topicPointsLabel": "topic points",
+    "mustEqual": "must equal",
+    "pointsMismatchPrefix": "Points mismatch:"
   },
   "sidebar": {
     "exams": "Exams",
@@ -116,6 +121,7 @@
     "remove": "Remove",
     "taskLatex": "Task LaTeX",
     "solutionLatex": "Solution LaTeX",
+    "pointsValidationErrorDetailed": "Task points {{taskPoints}} must equal topic points {{topicPoints}}",
     "uploadTaskImage": "Upload task image",
     "relatedToTopic": "Related to topic",
     "confirmCancelTitle": "Discard Changes?",
@@ -161,6 +167,10 @@
     "addTask": "Add task",
     "regenerate": "Regenerate",
     "tasksCount": "Tasks ({{count}})",
+    "pointsValidationError": "Task points must equal topic points",
+    "pointsValidationErrorDetailed": "{{topic}}: task points {{taskPoints}} must equal topic points {{topicPoints}}",
+    "pointsValidationErrorTopics": "Points mismatch in topics: {{topics}}",
+    "pointsValidationErrorTopicDetails": "Points mismatch: task total {{taskPoints}} pts, topic {{topicPoints}} pts",
     "pts": "pts",
     "confirmCancelTitle": "Discard Changes?",
     "confirmYes": "Yes",

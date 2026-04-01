@@ -51,6 +51,7 @@ import {
   notifyCompileOutcome,
   toCompilerMessages,
 } from "../../utils/compileDiagnostics";
+import { validateTopicFormPoints } from "../exams/utils/validation";
 
 const DEFAULT_SPLIT_PERCENT = 65;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
@@ -332,6 +333,18 @@ export function TopicFormPage() {
     form;
   const selectedCourseId = useWatch({ control, name: "courseId" }) || "";
   const descriptionValue = useWatch({ control, name: "description" }) || "";
+  const topicPointsValue = useWatch({ control, name: "points" });
+  const tasksValue = useWatch({
+    control,
+    name: "tasks",
+    defaultValue: [getDefaultTask()],
+  });
+
+  const topicPointsValidation = useMemo(
+    () => validateTopicFormPoints(topicPointsValue, tasksValue),
+    [topicPointsValue, tasksValue],
+  );
+  const hasPointsValidationError = !topicPointsValidation.isValid;
 
   const selectedCourseOption = useMemo(() => {
     const matchedCourse = (courses || []).find(
@@ -373,6 +386,7 @@ export function TopicFormPage() {
   };
 
   const submit = handleSubmit(async (values) => {
+    if (hasPointsValidationError) return;
     if (isEditMode) await updateM.mutateAsync({ id, body: values });
     else await createM.mutateAsync(values);
     // After successful save, sync baseline from live form state used by blocker.
@@ -427,6 +441,7 @@ export function TopicFormPage() {
   };
 
   const compilePreview = async (version) => {
+    if (hasPointsValidationError) return;
     const latexContent = buildCombinedLatex(version);
 
     clearPdf();
@@ -530,7 +545,7 @@ export function TopicFormPage() {
     } else if (blocker.state === "unblocked") {
       blockedLocationRef.current = null;
     }
-  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
+  }, [blocker, blocker.state, blocker.location?.pathname, confirmDialog.open]);
 
   const handleCancelClick = () => {
     if (hasUnsavedChanges()) {
@@ -584,7 +599,28 @@ export function TopicFormPage() {
       }}
     >
       <PageHeader
-        title={isEditMode ? t("topics.editTitle") : t("topics.createTitle")}
+        title={
+          <>
+            {isEditMode ? t("topics.editTitle") : t("topics.createTitle")}
+            {hasPointsValidationError && (
+              <Box
+                component="span"
+                sx={{ ml: 2, color: "error.main", fontSize: 14 }}
+              >
+                {t("common.sumOfTaskPoints")}{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {topicPointsValidation.taskPoints}
+                </Box>{" "}
+                {t("exams.pts")} {t("common.mustEqual")}{" "}
+                {t("common.topicPointsLabel")}{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {topicPointsValidation.topicPoints}
+                </Box>{" "}
+                {t("exams.pts")}
+              </Box>
+            )}
+          </>
+        }
         right={
           <Stack direction="row" spacing={1}>
             {!isEditMode ? (
@@ -605,7 +641,12 @@ export function TopicFormPage() {
               startIcon={<SaveIcon />}
               size="small"
               onClick={submit}
-              disabled={createM.isPending || updateM.isPending || !isEditable}
+              disabled={
+                createM.isPending ||
+                updateM.isPending ||
+                !isEditable ||
+                hasPointsValidationError
+              }
             >
               {t("common.save")}
             </Button>
@@ -697,7 +738,7 @@ export function TopicFormPage() {
                       color="text.secondary"
                     ></Typography>
                     <CompileButton
-                      disabled={!isEditable}
+                      disabled={!isEditable || hasPointsValidationError}
                       loading={isCompiling}
                       onCompile={compilePreview}
                     />
