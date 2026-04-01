@@ -7,4 +7,5 @@ export {
   useGenerateExam,
   useGenerateDraft,
   useRegenerateDraftTopic,
+  useExamValidation,
 } from "./exams.hooks";

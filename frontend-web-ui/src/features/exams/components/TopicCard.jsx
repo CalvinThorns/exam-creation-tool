@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 export function TopicCard({
   topic,
   topicIndex,
+  pointsValidation,
   solutionSpaceOptions,
   editable = true,
   onTopicField,
@@ -49,16 +50,35 @@ export function TopicCard({
           alignItems="center"
           sx={{ mb: 2 }}
         >
-          <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-            {topic.topic}
-          </Typography>
-          <Chip
-            label={`${topic.points} ${t("exams.pts")}`}
-            size="small"
-            color="primary"
-            variant="outlined"
-            sx={{ fontWeight: 700, mr: 1 }}
-          />
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Typography
+              variant="subtitle1"
+              fontWeight={700}
+              color="text.primary"
+            >
+              {topic.topic}
+            </Typography>
+            <Chip
+              label={`${topic.points} ${t("exams.pts")}`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 700 }}
+            />
+            {pointsValidation && !pointsValidation.isValid && (
+              <Typography variant="caption" color="error.main">
+                {t("common.pointsMismatchPrefix")} {t("common.sumOfTaskPoints")}{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {pointsValidation.taskPoints}
+                </Box>{" "}
+                {t("exams.pts")}, {t("common.topicPointsLabel")}{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {pointsValidation.topicPoints}
+                </Box>{" "}
+                {t("exams.pts")}
+              </Typography>
+            )}
+          </Stack>
           <Button
             variant="outlined"
             color="secondary"
@@ -112,6 +132,7 @@ export function TopicCard({
         >
           {t("common.description")}
         </Typography>
+
         <LatexEditor
           value={topic.description || ""}
           onChange={(value) => {

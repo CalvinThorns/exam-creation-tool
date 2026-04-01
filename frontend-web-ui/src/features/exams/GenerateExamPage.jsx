@@ -48,6 +48,7 @@ import { useTopics } from "../topics";
 import {
   useCreateExam,
   useExam,
+  useExamValidation,
   useGenerateDraft,
   useRegenerateDraftTopic,
   useUpdateExam,
@@ -386,6 +387,17 @@ export function GenerateExamPage() {
   const regenM = useRegenerateDraftTopic();
   const saveM = useCreateExam();
   const updateM = useUpdateExam();
+  const examValidation = useExamValidation(draft);
+  const hasPointsValidationError = Boolean(draft) && examValidation.hasErrors;
+  const mismatchedTopicNames = examValidation.invalidTopics || [];
+
+  const topicValidationByIndex = useMemo(() => {
+    const validationMap = new Map();
+    (examValidation.topicErrors || []).forEach((entry) => {
+      validationMap.set(entry.topicIndex, entry);
+    });
+    return validationMap;
+  }, [examValidation.topicErrors]);
 
   const courseLabel = useMemo(() => {
     const courseFromDraft = draft?.course;
@@ -458,7 +470,7 @@ export function GenerateExamPage() {
 
   // version: "STUDENT" | "TEACHER"
   const compileDraft = async (version) => {
-    if (!draft) return;
+    if (!draft || hasPointsValidationError) return;
     clearPdf();
     setCompileDiagnostics(null);
 
@@ -555,19 +567,6 @@ export function GenerateExamPage() {
     return nextDraft;
   };
 
-  const syncTopicPointsFromTasks = (nextDraft, topicIndex) => {
-    const tasks = nextDraft.topics?.[topicIndex]?.tasks || [];
-    if (tasks.length === 0) {
-      return nextDraft;
-    }
-
-    nextDraft.topics[topicIndex].points = tasks.reduce(
-      (acc, task) => acc + Number(task?.points || 0),
-      0,
-    );
-    return nextDraft;
-  };
-
   const generateDraft = async () => {
     const normalizedSemester = formatSemesterValue(semesterYear, semesterType);
     if (
@@ -604,7 +603,6 @@ export function GenerateExamPage() {
       if (!prev) return prev;
       const next = structuredClone(prev);
       next.topics[topicIndex].tasks[taskIndex][field] = value;
-      syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
     });
   };
@@ -620,7 +618,6 @@ export function GenerateExamPage() {
         solutionSpace: DEFAULT_SOLUTION_SPACE,
         points: "",
       });
-      syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
     });
   };
@@ -631,7 +628,6 @@ export function GenerateExamPage() {
       const next = structuredClone(prev);
       next.topics[topicIndex].tasks = next.topics[topicIndex].tasks || [];
       next.topics[topicIndex].tasks.splice(taskIndex, 1);
-      syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
     });
   };
@@ -656,7 +652,7 @@ export function GenerateExamPage() {
   };
 
   const saveExam = async () => {
-    if (!draft) return;
+    if (!draft || hasPointsValidationError) return;
     const normalizedSemester = formatSemesterValue(semesterYear, semesterType);
     if (!normalizedSemester) return;
 
@@ -678,6 +674,7 @@ export function GenerateExamPage() {
         selectedTopics,
         draft,
       };
+      nav("/exams/list");
       return;
     }
 
@@ -767,7 +764,7 @@ export function GenerateExamPage() {
     } else if (blocker.state === "unblocked") {
       blockedLocationRef.current = null;
     }
-  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
+  }, [blocker, blocker.state, blocker.location?.pathname, confirmDialog.open]);
 
   const handleResetClick = () => {
     resetExamForm();
@@ -920,7 +917,8 @@ export function GenerateExamPage() {
                 saveM.isPending ||
                 updateM.isPending ||
                 !isEditable ||
-                !formatSemesterValue(semesterYear, semesterType)
+                !formatSemesterValue(semesterYear, semesterType) ||
+                hasPointsValidationError
               }
             >
               {t("common.save")}
@@ -1069,7 +1067,7 @@ export function GenerateExamPage() {
                     }
                   }}
                   loading={isCoursesLoading}
-                  disabled={isEditMode || !isEditable}
+                  disabled={!isEditable}
                   fullWidth
                   size="small"
                   slotProps={{
@@ -1147,13 +1145,13 @@ export function GenerateExamPage() {
                         textField: {
                           fullWidth: true,
                           size: "small",
-                          disabled: isEditMode || !isEditable,
+                          disabled: !isEditable,
                         },
                       }}
                       format="YYYY"
                       yearsOrder="asc"
-                      minDate={dayjs(`${new Date().getFullYear()}-01-01`)}
-                      maxDate={dayjs(`${new Date().getFullYear() + 10}-12-31`)}
+                      minDate={dayjs(`${new Date().getFullYear() - 25}-01-01`)}
+                      maxDate={dayjs(`${new Date().getFullYear() + 25}-12-31`)}
                     />
                   </LocalizationProvider>
 
@@ -1164,7 +1162,7 @@ export function GenerateExamPage() {
                     onChange={handleSemesterTypeChange}
                     fullWidth
                     size="small"
-                    disabled={isEditMode || !isEditable}
+                    disabled={!isEditable}
                   >
                     <MenuItem value="">{t("exams.selectSemester")}</MenuItem>
                     {SEMESTER_OPTIONS.map((option) => (
@@ -1418,14 +1416,28 @@ export function GenerateExamPage() {
                     <Typography variant="h6">
                       {t("exams.exam")}{" "}
                       {draft && (
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          color="text.secondary"
-                        >
-                          ({draft.totalPoints} / {draft.targetPoints}{" "}
-                          {t("exams.pts")})
-                        </Typography>
+                        <>
+                          <Typography
+                            component="span"
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            ({draft.totalPoints} / {draft.targetPoints}{" "}
+                            {t("exams.pts")})
+                          </Typography>
+                          {hasPointsValidationError && (
+                            <Typography
+                              component="span"
+                              variant="body2"
+                              color="error.main"
+                              sx={{ ml: 2, fontWeight: 600 }}
+                            >
+                              {t("exams.pointsValidationErrorTopics", {
+                                topics: mismatchedTopicNames.join(", "),
+                              })}
+                            </Typography>
+                          )}
+                        </>
                       )}
                     </Typography>
 
@@ -1455,7 +1467,9 @@ export function GenerateExamPage() {
                         </Button>
                       ) : (
                         <CompileButton
-                          disabled={!draft || !isEditable}
+                          disabled={
+                            !draft || !isEditable || hasPointsValidationError
+                          }
                           onCompile={compileDraft}
                         />
                       )}
@@ -1503,6 +1517,7 @@ export function GenerateExamPage() {
                             key={`${topic.topic}-${i}`}
                             topic={topic}
                             topicIndex={i}
+                            pointsValidation={topicValidationByIndex.get(i)}
                             solutionSpaceOptions={SOLUTION_SPACE_OPTIONS}
                             editable={isEditable}
                             onTopicField={updateTopicField}
