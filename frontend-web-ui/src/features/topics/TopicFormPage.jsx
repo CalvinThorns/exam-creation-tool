@@ -375,15 +375,19 @@ export function TopicFormPage() {
   const submit = handleSubmit(async (values) => {
     if (isEditMode) await updateM.mutateAsync({ id, body: values });
     else await createM.mutateAsync(values);
-    // After successful save, sync initial state to prevent blocker dialog on nav
+    // After successful save, sync baseline from live form state used by blocker.
+    const currentFormValues = form.getValues();
     initialValuesRef.current = {
-      courseId: values.courseId,
-      topic: values.topic,
-      description: values.description,
-      points: values.points,
-      description_img: values.description_img,
-      tasks: values.tasks,
+      courseId: currentFormValues.courseId,
+      topic: currentFormValues.topic,
+      description: currentFormValues.description,
+      points: currentFormValues.points,
+      description_img: currentFormValues.description_img,
+      tasks: currentFormValues.tasks,
     };
+
+    // Mark post-save redirect as intentional so blocker won't show confirmation.
+    isIntentionalNavigationRef.current = true;
     nav("/tasks/list");
   });
 
