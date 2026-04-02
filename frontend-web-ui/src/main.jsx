@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./app/queryClient";
 import { ColorModeProvider } from "./app/colorMode";
 import { App } from "./app/App";
+import "./app/api"; 
 import "./i18n";
 import "./index.css";
 

@@ -1,10 +1,12 @@
 const { buildPaginationMeta } = require("../utils/pagination");
 
 function createTopicController({ topicService }) {
+  const getUserId = (req) => req.user?.userId || req.user?.id || req.user?._id;
+
   return {
     create: async (req, res, next) => {
       try {
-        const topic = await topicService.createTopic(req.body);
+        const topic = await topicService.createTopic(req.body, getUserId(req));
         res.status(201).json({ data: topic });
       } catch (err) {
         next(err);
@@ -13,7 +15,7 @@ function createTopicController({ topicService }) {
 
     list: async (req, res, next) => {
       try {
-        const result = await topicService.listTopics(req.query);
+        const result = await topicService.listTopics(req.query, getUserId(req));
         const meta = buildPaginationMeta(result);
         res.json({
           data: result.items,
@@ -26,7 +28,7 @@ function createTopicController({ topicService }) {
 
     getById: async (req, res, next) => {
       try {
-        const topic = await topicService.getTopic(req.params.id);
+        const topic = await topicService.getTopic(req.params.id, getUserId(req));
         res.json({ data: topic });
       } catch (err) {
         next(err);
@@ -35,7 +37,7 @@ function createTopicController({ topicService }) {
 
     updateById: async (req, res, next) => {
       try {
-        const topic = await topicService.updateTopic(req.params.id, req.body);
+        const topic = await topicService.updateTopic(req.params.id, req.body, getUserId(req));
         res.json({ data: topic });
       } catch (err) {
         next(err);
@@ -44,7 +46,7 @@ function createTopicController({ topicService }) {
 
     deleteById: async (req, res, next) => {
       try {
-        await topicService.deleteTopic(req.params.id);
+        await topicService.deleteTopic(req.params.id, getUserId(req));
         res.status(204).send();
       } catch (err) {
         next(err);

@@ -7,9 +7,18 @@ function createExamRepo() {
       return Exam.create(data);
     },
 
-    async findAll({ page = 1, limit = 20, filter = {}, sort, courseId }) {
+    async findAll({ page = 1, limit = 20, filter = {}, sort, courseId, allowedCourseIds }) {
       const qfilter = { ...filter, isDeleted: { $ne: true } };
-      if (courseId) qfilter.courseId = courseId;
+      
+      if (courseId) {
+        qfilter.courseId = courseId;
+      } else if (allowedCourseIds !== undefined) {
+        if (allowedCourseIds.length > 0) {
+          qfilter.courseId = { $in: allowedCourseIds };
+        } else {
+          qfilter.courseId = { $in: [] }; 
+        }
+      }
 
       const query = Exam.find(qfilter).populate("courseId");
       applySort(query, sort);

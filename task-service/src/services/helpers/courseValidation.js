@@ -5,6 +5,8 @@ function normalizeCourseInput(data) {
     title: String(data.title || "").trim(),
     shortName: String(data.shortName || "").trim(),
     coverPage: String(data.coverPage || "").trim(),
+    // NEU: Reiche den Creator an den Service/das Repo weiter!
+    creator: data.creator, 
   };
 }
 
@@ -12,6 +14,8 @@ function validateCreateCoursePayload(payload) {
   if (!payload.title) throw badRequest("title is required");
   if (!payload.shortName) throw badRequest("shortName is required");
   if (!payload.coverPage) throw badRequest("coverPage is required");
+  // OPTIONAL: Auch hier prüfen, ob der creator wirklich da ist
+  if (!payload.creator) throw badRequest("creator is required");
 }
 
 function validateNonEmptyCourseFields(update) {

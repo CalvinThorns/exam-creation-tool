@@ -16,6 +16,7 @@ import {
   ChevronRight,
   SchoolOutlined,
   TaskOutlined,
+  LogoutOutlined, 
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { SidebarCustomize } from "./SidebarCustomize";
@@ -23,20 +24,24 @@ import { SidebarCustomize } from "./SidebarCustomize";
 export function Sidebar({ isCollapsed, onToggle }) {
   const { t } = useTranslation();
   const theme = useTheme();
+  
   const sidebarBackground =
     theme.palette.mode === "dark"
       ? alpha(theme.palette.background.paper, 0.92)
       : theme.palette.primary.main;
+      
   const sidebarText = theme.palette.getContrastText(sidebarBackground);
+  
   const items = [
     { label: t("sidebar.exams"), to: "/exams", icon: AssignmentOutlined },
-    {
-      label: t("sidebar.courses"),
-      to: "/courses",
-      icon: SchoolOutlined,
-    },
+    { label: t("sidebar.courses"), to: "/courses", icon: SchoolOutlined },
     { label: t("sidebar.tasks"), to: "/tasks", icon: TaskOutlined },
   ];
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    window.location.href = "/login"; 
+  };
 
   return (
     <Box
@@ -112,8 +117,48 @@ export function Sidebar({ isCollapsed, onToggle }) {
           </NavLink>
         ))}
       </List>
+      <Box sx={{ mt: "auto" }}>
+        
+        <List disablePadding>
+          <Tooltip
+            title={t("sidebar.logout") || "Abmelden"} 
+            placement="right"
+            disableHoverListener={!isCollapsed}
+          >
+            <ListItemButton
+              onClick={handleLogout}
+              sx={{
+                minHeight: 48,
+                px: isCollapsed ? 1.5 : 2,
+                justifyContent: isCollapsed ? "center" : "flex-start",
+                color: "inherit",
+                "&:hover": {
+                  bgcolor: alpha(theme.palette.error.main, 0.12), 
+                  color: theme.palette.error.main, 
+                },
+                "&:hover .MuiListItemIcon-root": {
+                  color: theme.palette.error.main, 
+                }
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 0,
+                  mr: isCollapsed ? 0 : 1.5,
+                  justifyContent: "center",
+                  color: "inherit",
+                  transition: "color 0.2s"
+                }}
+              >
+                <LogoutOutlined fontSize="small" />
+              </ListItemIcon>
+              {!isCollapsed && <ListItemText primary={t("sidebar.logout") || "Abmelden"} />}
+            </ListItemButton>
+          </Tooltip>
+        </List>
 
-      <SidebarCustomize isCollapsed={isCollapsed} />
+        <SidebarCustomize isCollapsed={isCollapsed} />
+      </Box>
     </Box>
   );
 }

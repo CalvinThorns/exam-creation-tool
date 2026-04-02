@@ -6,4 +6,6 @@ export const coursesApi = {
   update: (id, body) =>
     tasksHttp.patch(`/courses/${id}`, body).then((r) => r.data),
   remove: (id) => tasksHttp.delete(`/courses/${id}`).then((r) => r.data),
+  addCollaborator: (id, email) => 
+    tasksHttp.post(`/courses/${id}/collaborators`, { email }).then((r) => r.data),
 };

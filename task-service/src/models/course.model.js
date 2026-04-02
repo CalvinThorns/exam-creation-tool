@@ -6,6 +6,17 @@ const courseSchema = new mongoose.Schema(
     shortName: { type: String, required: true, trim: true, unique: true },
     coverPage: { type: String, required: true, trim: true },
     isDeleted: { type: Boolean, default: false },
+    
+    creator: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
+      required: true 
+    },
+    
+    collaborators: [{ 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User" 
+    }],
   },
   {
     timestamps: true,

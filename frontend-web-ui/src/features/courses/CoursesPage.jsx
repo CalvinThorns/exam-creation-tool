@@ -13,8 +13,10 @@ import {
   useCreateCourse,
   useDeleteCourse,
   useUpdateCourse,
+  useAddCollaborator,
 } from "./courses.hooks";
 import { useTranslation } from "react-i18next";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 export function CoursesPage() {
   const { t } = useTranslation();
@@ -22,6 +24,7 @@ export function CoursesPage() {
   const createM = useCreateCourse();
   const updateM = useUpdateCourse();
   const deleteM = useDeleteCourse();
+  const addCollaboratorM = useAddCollaborator();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -37,7 +40,24 @@ export function CoursesPage() {
   );
 
   const actions = useMemo(
-    () => [
+  () => [
+    {
+      id: "add-collaborator",
+      label: t("courses.addCollaborator") || "Mitarbeiter hinzufügen",
+      icon: PersonAddIcon,
+      onClick: async (row) => {
+        const email = window.prompt("Bitte gib die E-Mail des neuen Mitarbeiters ein:");
+        
+        if (email && email.trim() !== "") {
+          try {
+            await addCollaboratorM.mutateAsync({ id: row.id, email: email.trim() });
+            alert("Mitarbeiter erfolgreich hinzugefügt!");
+          } catch (error) {
+            alert("Fehler: Nutzer nicht gefunden oder keine Berechtigung.");
+          }
+        }
+      },
+    },
       {
         id: "edit",
         label: t("common.edit"),

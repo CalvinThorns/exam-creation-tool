@@ -464,7 +464,7 @@ export function CourseFormDialog({
         </Button>
         <Button
           variant="contained"
-          onClick={handleSubmit(onSubmit)}
+          onClick={handleSubmit(onSubmit, (errors) => console.log("Form Validation Errors:", errors))}
           disabled={submitting}
         >
           {t("topics.saveUpper")}

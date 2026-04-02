@@ -8,7 +8,7 @@ function createTopicRepo() {
       return Topic.create(data);
     },
 
-    async findAll({ page = 1, limit = 20, q = "", courseId }) {
+    async findAll({ page = 1, limit = 20, q = "", courseId, allowedCourseIds }) {
       const { page: safePage, limit: safeLimit } = normalizePagination(
         page,
         limit,
@@ -18,6 +18,14 @@ function createTopicRepo() {
         ...buildTopicSearchFilter({ q, courseId }),
         isDeleted: { $ne: true },
       };
+
+      if (allowedCourseIds !== undefined) {
+        if (allowedCourseIds.length > 0) {
+          filter.courseId = { $in: allowedCourseIds }; 
+        } else {
+          filter.courseId = { $in: [] }; 
+        }
+      }
 
       const [items, total] = await Promise.all([
         Topic.find(filter)

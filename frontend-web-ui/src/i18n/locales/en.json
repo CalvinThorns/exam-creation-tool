@@ -43,7 +43,8 @@
     "tasks": "Tasks",
     "customize": "Customize",
     "expand": "Expand sidebar",
-    "collapse": "Collapse sidebar"
+    "collapse": "Collapse sidebar",
+    "logout": "Logout"
   },
   "customizeDialog": {
     "title": "Customize",

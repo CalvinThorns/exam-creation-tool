@@ -75,7 +75,7 @@ const DEFAULT_BASE_TEMPLATE = String.raw`\documentclass[a4paper,12pt]{article}
 \rfoot{Seite \thepage}
 
 \renewcommand{\thesubsection}{\alph{subsection})}
-  itleformat{\subsection}[runin]{\normalfont\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsection}[runin]{\normalfont\bfseries}{\thesubsection}{1em}{}
 \setlength{\parindent}{0pt}
 
 \newif\ifshowsolutions
@@ -103,6 +103,26 @@ ${BASE_TEMPLATE_PLACEHOLDER}
 \end{document}`;
 
 function createExamService({ examRepo, courseRepo }) {
+
+  const checkCourseAccess = async (courseId, userId) => {
+    if (!courseId) throw badRequest("courseId is required");
+
+    const course = await courseRepo.findById(courseId);
+    if (!course || course.isDeleted) throw notFound("Course not found");
+
+    const creatorId = course.creator || course.get?.("creator") || course._doc?.creator;
+    const collaborators = course.collaborators || course.get?.("collaborators") || course._doc?.collaborators || [];
+
+    const isCreator = String(creatorId) === String(userId);
+    const isCollaborator = collaborators.some(cId => String(cId) === String(userId));
+
+    if (!isCreator && !isCollaborator) {
+      const e = new Error("Access denied for this course");
+      e.status = 403;
+      throw e;
+    }
+  };
+
   async function ensureBaseTemplateFileExists() {
     try {
       await fs.access(BASE_TEMPLATE_PATH);
@@ -291,7 +311,7 @@ function createExamService({ examRepo, courseRepo }) {
     return null;
   }
 
-  async function compileDraftImpl(body, reqId) {
+  async function compileDraftImpl(body, reqId, userId) {
     const clsiUrl = String(process.env.CLSI_URL || "").trim();
     if (!clsiUrl) {
       const e = new Error("CLSI_URL is not configured");
@@ -310,6 +330,8 @@ function createExamService({ examRepo, courseRepo }) {
     if (!courseId) throw badRequest("courseId is required for compile");
     if (!isValidObjectId(courseId))
       throw badRequest("courseId must be a valid id");
+
+    await checkCourseAccess(courseId, userId);
 
     let courseDoc = null;
     if (courseRepo?.findById) courseDoc = await courseRepo.findById(courseId);
@@ -434,16 +456,14 @@ function createExamService({ examRepo, courseRepo }) {
         timings: result.compile.timings || {},
         errorCount: parsedErrors.length,
         warningCount: parsedWarnings.length,
-        errors: parsedErrors, // ALL errors
-        warnings: parsedWarnings, // optional
-        // keep full log snippet if you want, but it can be large
+        errors: parsedErrors, 
+        warnings: parsedWarnings, 
         log: logText ? logText.slice(0, 20000) : null,
         stdout: stdoutText ? stdoutText.slice(0, 20000) : null,
         stderr: stderrText ? stderrText.slice(0, 20000) : null,
       };
     }
 
-    // ALWAYS try to fetch the PDF (like before)
     const pdfFile =
       (result.compile.outputFiles || []).find((f) => f.type === "pdf") ||
       (result.compile.outputFiles || []).find(
@@ -478,9 +498,10 @@ function createExamService({ examRepo, courseRepo }) {
   }
 
   return {
-    async generateDraft(data) {
+    async generateDraft(data, userId) {
       const courseId = String(data.courseId || "").trim();
       await validateCourseId(courseId);
+      await checkCourseAccess(courseId, userId);
 
       const targetPoints = numOrZero(data.targetPoints);
       if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
@@ -519,9 +540,11 @@ function createExamService({ examRepo, courseRepo }) {
       };
     },
 
-    async regenerateDraftTopic(data) {
+    async regenerateDraftTopic(data, userId) {
       const courseId = String(data.courseId || "").trim();
       await validateCourseId(courseId);
+
+      await checkCourseAccess(courseId, userId);
 
       const topicName = String(data.topicName || "").trim();
       if (!topicName) throw badRequest("topicName is required");
@@ -593,10 +616,12 @@ function createExamService({ examRepo, courseRepo }) {
       };
     },
 
-    async createExam(data) {
+    async createExam(data, userId) {
       try {
         const courseId = String(data.courseId || "").trim();
         await validateCourseId(courseId);
+
+        await checkCourseAccess(courseId, userId);
 
         const targetPoints = numOrZero(data.targetPoints);
         if (targetPoints <= 0) throw badRequest("targetPoints must be > 0");
@@ -629,20 +654,35 @@ function createExamService({ examRepo, courseRepo }) {
       }
     },
 
-    async listExams(query) {
+    async listExams(query, userId) {
       const courseId = query.courseId
         ? String(query.courseId).trim()
         : undefined;
+      
       if (courseId && !isValidObjectId(courseId))
         throw badRequest("courseId must be a valid id");
+
+      const filters = parseFilters(query.filter);
+      let allowedCourseIds;
+
+      if (courseId) {
+        await checkCourseAccess(courseId, userId);
+        filters.courseId = courseId;
+      } else {
+        const { items: userCourses } = await courseRepo.findAll({
+          limit: 1000,
+          filter: { 
+            $or: [{ creator: userId }, { collaborators: userId }] 
+          }
+        });
+        allowedCourseIds = userCourses.map(c => String(c._id));
+      }
 
       const { page, limit } = normalizePagination(
         query.page,
         query.pageSize || query.limit,
       );
 
-      const filters = parseFilters(query.filter);
-      if (courseId) filters.courseId = courseId;
       const sort = parseSort(query.sort);
 
       const { items, total } = await examRepo.findAll({
@@ -650,18 +690,24 @@ function createExamService({ examRepo, courseRepo }) {
         limit,
         filter: filters,
         sort,
+        courseId,
+        allowedCourseIds 
       });
 
       const meta = buildMeta({ total, page, limit });
       return { items, ...meta };
     },
 
-    async getExam(id) {
+    async getExam(id, userId) {
       if (!isValidObjectId(id)) throw badRequest("id must be a valid id");
 
       try {
         const exam = await examRepo.findById(id);
         if (!exam) throw notFound("Exam not found");
+        
+        const cId = exam.courseId?._id || exam.courseId; 
+        await checkCourseAccess(cId, userId);
+
         return exam;
       } catch (err) {
         if (err.status && err.status < 500) {
@@ -674,17 +720,26 @@ function createExamService({ examRepo, courseRepo }) {
       }
     },
 
-    async updateExam(id, data) {
+    async updateExam(id, data, userId) {
       if (!isValidObjectId(id)) throw badRequest("id must be a valid id");
+
+      const existingExam = await examRepo.findById(id);
+      if (!existingExam) throw notFound("Exam not found");
+      const oldCourseId = existingExam.courseId?._id || existingExam.courseId;
+      await checkCourseAccess(oldCourseId, userId);
 
       const update = {};
 
       if (data.courseId !== undefined) {
-        const courseId = String(data.courseId).trim();
-        if (!courseId) throw badRequest("courseId cannot be empty");
-        if (!isValidObjectId(courseId))
+        const newCourseId = String(data.courseId).trim();
+        if (!newCourseId) throw badRequest("courseId cannot be empty");
+        if (!isValidObjectId(newCourseId))
           throw badRequest("courseId must be a valid id");
-        update.courseId = courseId;
+        
+        if (String(oldCourseId) !== newCourseId) {
+           await checkCourseAccess(newCourseId, userId);
+        }
+        update.courseId = newCourseId;
       }
 
       if (data.targetPoints !== undefined) {
@@ -716,14 +771,20 @@ function createExamService({ examRepo, courseRepo }) {
       return updated;
     },
 
-    async deleteExam(id) {
+    async deleteExam(id, userId) {
       if (!isValidObjectId(id)) throw badRequest("id must be a valid id");
+      
+      const existingExam = await examRepo.findById(id);
+      if (!existingExam) throw notFound("Exam not found");
+      const cId = existingExam.courseId?._id || existingExam.courseId;
+      await checkCourseAccess(cId, userId);
+
       const deleted = await examRepo.deleteById(id);
       if (!deleted) throw notFound("Exam not found");
       return deleted;
     },
 
-    compileDraft: async (body, reqId) => compileDraftImpl(body, reqId),
+    compileDraft: async (body, reqId, userId) => compileDraftImpl(body, reqId, userId),
     compileLatexOnly: async (body, reqId) => compileLatexOnlyImpl(body, reqId),
     getBaseLatexTemplate: async () => {
       const template = await loadBaseTemplateContent();

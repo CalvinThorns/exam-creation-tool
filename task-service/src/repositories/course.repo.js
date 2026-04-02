@@ -8,7 +8,7 @@ function createCourseRepo() {
       return Course.create(data);
     },
 
-    async findAll({ page = 1, limit = 20, q = "" }) {
+    async findAllForUser({ page = 1, limit = 20, q = "" }, userId) {
       const { page: safePage, limit: safeLimit } = normalizePagination(
         page,
         limit,
@@ -17,6 +17,10 @@ function createCourseRepo() {
       const filter = {
         ...buildCourseSearchFilter(q),
         isDeleted: { $ne: true },
+        $or: [
+          { creator: userId },
+          { collaborators: userId }
+        ]
       };
 
       const [items, total] = await Promise.all([
@@ -28,6 +32,17 @@ function createCourseRepo() {
       ]);
 
       return { items, total, page: safePage, limit: safeLimit };
+    },
+
+    async findByIdForUser(id, userId) {
+      return Course.findOne({
+        _id: id,
+        isDeleted: { $ne: true },
+        $or: [
+          { creator: userId },
+          { collaborators: userId }
+        ]
+      });
     },
 
     async findById(id) {
@@ -56,6 +71,14 @@ function createCourseRepo() {
         { new: true },
       );
     },
+
+    async addCollaborator(id, collaboratorId) {
+      return Course.findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        { $addToSet: { collaborators: collaboratorId } },
+        { new: true }
+      );
+    }
   };
 }
 

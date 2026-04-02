@@ -1,7 +1,10 @@
 const express = require("express");
+const { protect } = require("../middlewares/auth.middleware"); 
 
 function createCourseRoutes({ courseController }) {
   const router = express.Router();
+
+  router.use(protect);
 
   router.post("/", courseController.create);
   router.get("/", courseController.list);
@@ -9,6 +12,8 @@ function createCourseRoutes({ courseController }) {
   router.put("/:id", courseController.updateById);
   router.patch("/:id", courseController.updateById);
   router.delete("/:id", courseController.deleteById);
+
+  router.post("/:id/collaborators", courseController.addCollaborator);
 
   return router;
 }

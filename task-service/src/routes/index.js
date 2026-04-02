@@ -24,7 +24,7 @@ router.use("/courses", createCourseRoutes({ courseController }));
 
 // topics wiring
 const topicRepo = createTopicRepo();
-const topicService = createTopicService({ topicRepo });
+const topicService = createTopicService({ topicRepo, courseRepo }); 
 const topicController = createTopicController({ topicService });
 const topicImagesController = createTopicImagesController({ topicRepo });
 router.use("/topics", createTopicRoutes({ topicController }));

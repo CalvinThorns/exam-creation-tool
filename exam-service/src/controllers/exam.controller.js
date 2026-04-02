@@ -5,10 +5,12 @@ const {
 } = require("./helpers/examControllerHelpers");
 
 function createExamController({ examService }) {
+  const getUserId = (req) => req.user?.userId || req.user?.id || req.user?._id;
+
   return {
     create: async (req, res, next) => {
       try {
-        const exam = await examService.createExam(req.body);
+        const exam = await examService.createExam(req.body, getUserId(req));
         return sendSuccess(res, { data: exam, status: 201 });
       } catch (err) {
         next(err);
@@ -17,7 +19,7 @@ function createExamController({ examService }) {
 
     list: async (req, res, next) => {
       try {
-        const result = await examService.listExams(req.query);
+        const result = await examService.listExams(req.query, getUserId(req));
         const { items, ...meta } = result;
         return sendSuccess(res, {
           data: items,
@@ -30,7 +32,7 @@ function createExamController({ examService }) {
 
     getById: async (req, res, next) => {
       try {
-        const exam = await examService.getExam(req.params.id);
+        const exam = await examService.getExam(req.params.id, getUserId(req));
         return sendSuccess(res, { data: exam });
       } catch (err) {
         next(err);
@@ -39,7 +41,7 @@ function createExamController({ examService }) {
 
     updateById: async (req, res, next) => {
       try {
-        const exam = await examService.updateExam(req.params.id, req.body);
+        const exam = await examService.updateExam(req.params.id, req.body, getUserId(req));
         return sendSuccess(res, { data: exam });
       } catch (err) {
         next(err);
@@ -48,8 +50,7 @@ function createExamController({ examService }) {
 
     deleteById: async (req, res, next) => {
       try {
-        await examService.deleteExam(req.params.id);
-        // successful deletion with no content
+        await examService.deleteExam(req.params.id, getUserId(req));
         return res.status(204).send();
       } catch (err) {
         next(err);
@@ -59,7 +60,7 @@ function createExamController({ examService }) {
     generateDraft: async (req, res, next) => {
       try {
         ensureDraftFns(examService);
-        const result = await examService.generateDraft(req.body);
+        const result = await examService.generateDraft(req.body, getUserId(req));
         return sendSuccess(res, { data: result });
       } catch (err) {
         next(err);
@@ -69,7 +70,7 @@ function createExamController({ examService }) {
     regenerateDraftTopic: async (req, res, next) => {
       try {
         ensureDraftFns(examService);
-        const result = await examService.regenerateDraftTopic(req.body);
+        const result = await examService.regenerateDraftTopic(req.body, getUserId(req));
         return sendSuccess(res, { data: result });
       } catch (err) {
         next(err);
@@ -81,6 +82,7 @@ function createExamController({ examService }) {
         const { pdfBuffer, filename, errors } = await examService.compileDraft(
           req.body,
           req.id,
+          getUserId(req) 
         );
 
         return sendSuccess(res, {

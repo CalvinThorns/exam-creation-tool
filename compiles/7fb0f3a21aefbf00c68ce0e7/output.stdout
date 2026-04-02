@@ -1,0 +1,31 @@
+Rc files read:
+  /etc/LatexMk
+Latexmk: This is Latexmk, John Collins, 7 Jan. 2023. Version 4.79.
+Latexmk: Changing directory to '/overleaf/services/clsi/compiles/7fb0f3a21aefbf00c68ce0e7/'
+No existing .aux file, so I'll make a simple one, and require run of *latex.
+Latexmk: applying rule 'pdflatex'...
+Rule 'pdflatex':  Reasons for rerun
+Category 'other':
+  Rerun of 'pdflatex' forced or previously required
+
+------------
+Run number 1 of rule 'pdflatex'
+------------
+------------
+Running 'pdflatex  -synctex=1 -interaction=batchmode -recorder --jobname="output"  "main.tex"'
+------------
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (TeX Live 2022/Debian) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'output.log'
+Latexmk: Examining 'output.fls'
+Latexmk: Examining 'output.log'
+Latexmk: Errors, in force_mode: so I tried finishing targets
+Collected error summary (may duplicate other messages):
+  pdflatex: Command for 'pdflatex' gave return code 1
+      Refer to 'output.log' and/or above output for details
+Latexmk: Undoing directory change
+'pdflatex': time = 0.08
+Processing time = 0.10
+Number of rules run = 1
+

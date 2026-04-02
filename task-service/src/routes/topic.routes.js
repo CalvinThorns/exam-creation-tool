@@ -1,7 +1,10 @@
 const express = require("express");
+const { protect } = require("../middlewares/auth.middleware"); 
 
 function createTopicRoutes({ topicController }) {
   const router = express.Router();
+
+  router.use(protect); 
 
   router.post("/", topicController.create);
   router.get("/", topicController.list);
