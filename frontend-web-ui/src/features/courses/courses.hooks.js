@@ -1,6 +1,8 @@
-  import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-  // import { coursesApi } from "../../api/client";
-  import { coursesApi } from "../../api/courses.api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+// import { coursesApi } from "../../api/client";
+import { coursesApi } from "../../api/courses.api";
+import i18n from "../../i18n";
+import { notifySuccess } from "../../app/notifications";
 
   const toCreateDto = (values, creatorId) => {
     return {
@@ -28,6 +30,17 @@
       },
     });
   }
+
+export function useCourse(id, options) {
+  return useQuery({
+    queryKey: ["course", id],
+    queryFn: async () => {
+      const response = await coursesApi.getById(id);
+      return response;
+    },
+    enabled: Boolean(id) && (options?.enabled ?? true),
+  });
+}
 
 export function useCreateCourse() {
   const queryClient = useQueryClient();
@@ -84,6 +97,5 @@ export function useAddCollaborator() {
     mutationFn: async ({ id, email }) => {
       return await coursesApi.addCollaborator(id, email);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["courses"] }),
   });
 }

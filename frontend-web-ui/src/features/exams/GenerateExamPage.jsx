@@ -1,6 +1,6 @@
 // GenerateExamPage.jsx
-import { useMemo, useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import {
   Autocomplete,
   Box,
@@ -21,9 +21,14 @@ import {
   ListItemText,
   Tooltip,
 } from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import BuildIcon from "@mui/icons-material/Build";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
@@ -34,28 +39,69 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditIcon from "@mui/icons-material/Edit";
 
-import { PageHeader } from "../../components/ui/PageHeader";
-import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
+import { PageHeader, PdfPreviewPanel } from "../../components/ui";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { TopicCard } from "./components/TopicCard";
-import { CoverPagePreviewDialog } from "./components/CoverPagePreviewDialog";
-import { useCourses } from "../courses/courses.hooks";
-import { useTopics } from "../topics/topics.hooks";
+import { TopicCard, CoverPagePreviewDialog } from "./components";
+import { useCourses } from "../courses";
+import { useTopics } from "../topics";
 import {
   useCreateExam,
   useExam,
+  useExamValidation,
   useGenerateDraft,
   useRegenerateDraftTopic,
   useUpdateExam,
-} from "./exams.hooks";
+} from "./hooks";
 import { examsApi } from "../../api/exams.api";
 import { useTranslation } from "react-i18next";
+import {
+  getCompileResultPayload,
+  notifyCompileOutcome,
+  toCompilerMessages,
+} from "../../utils/compileDiagnostics";
 
-const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages"];
+const SOLUTION_SPACE_OPTIONS = ["1 Page", "2 Pages", "3 Pages", "4 Pages"];
+const SEMESTER_OPTIONS = ["SoSe", "WiSe"];
 
 const DEFAULT_SOLUTION_SPACE = "1 Page";
-const DEFAULT_SPLIT_PERCENT = 66.6667;
+const DEFAULT_SPLIT_PERCENT = 65;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
+
+function parseSemesterStartYear(rawYear) {
+  const value = String(rawYear || "").trim();
+  const match = value.match(/^(\d{4})/);
+  return match ? match[1] : "";
+}
+
+function parseSemesterValue(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return { year: "", semesterType: "" };
+
+  const match = value.match(/^(.*)\s+(SoSe|WiSe)$/);
+  if (!match) {
+    return { year: value, semesterType: "" };
+  }
+
+  return {
+    year: String(match[1] || "").trim(),
+    semesterType: match[2],
+  };
+}
+
+function formatSemesterValue(year, semesterType) {
+  const normalizedYear = parseSemesterStartYear(year);
+  const normalizedType = String(semesterType || "").trim();
+  if (!normalizedYear || !normalizedType) return "";
+  if (normalizedType === "WiSe") {
+    const nextShortYear = String((Number(normalizedYear) + 1) % 100).padStart(
+      2,
+      "0",
+    );
+    return `${normalizedYear}/${nextShortYear} ${normalizedType}`;
+  }
+  return `${normalizedYear} ${normalizedType}`;
+}
 
 function sumPoints(topics) {
   return (topics || []).reduce((acc, topic) => {
@@ -162,17 +208,58 @@ function CompileButton({ disabled, onCompile }) {
 export function GenerateExamPage() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const nav = useNavigate();
   const { id: examId } = useParams(); // present only in edit mode (/exams/:id/edit)
   const isEditMode = Boolean(examId);
+  const dropdownPaperBg =
+    theme.palette.mode === "light"
+      ? theme.palette.grey[50]
+      : theme.palette.grey[900];
+  const dropdownPaperColor = theme.palette.getContrastText(dropdownPaperBg);
+  const dropdownHoverBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.hoverOpacity + 0.1,
+  );
+  const dropdownSelectedBg = alpha(
+    theme.palette.primary.main,
+    theme.palette.action.selectedOpacity + 0.16,
+  );
 
-  const { data: coursesData } = useCourses({ page: 1, limit: 200 });
+  const [courseQuery, setCourseQuery] = useState("");
+  const [debouncedCourseQuery, setDebouncedCourseQuery] = useState("");
+  const [topicQuery, setTopicQuery] = useState("");
+  const [debouncedTopicQuery, setDebouncedTopicQuery] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedCourseQuery(courseQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [courseQuery]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedTopicQuery(topicQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [topicQuery]);
+
+  const { data: coursesData, isFetching: isCoursesLoading } = useCourses({
+    page: 1,
+    limit: 20,
+    q: debouncedCourseQuery || undefined,
+  });
   const courses = useMemo(
     () => coursesData?.data || coursesData || [],
     [coursesData],
   );
 
   const [courseId, setCourseId] = useState("");
-  const [targetPoints, setTargetPoints] = useState(null);
+  const [semesterYear, setSemesterYear] = useState("");
+  const [semesterType, setSemesterType] = useState("");
+  const [targetPoints, setTargetPoints] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
   const { pdfUrl, setPdfFromBase64, clearPdf, downloadPdf } =
     usePdfPreview("exam.pdf");
@@ -193,7 +280,23 @@ export function GenerateExamPage() {
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
   const [collapsedPane, setCollapsedPane] = useState(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [isEditable, setIsEditable] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    action: null, // "cancel" or "navigate"
+  });
   const splitContainerRef = useRef(null);
+  const blockerRef = useRef(null);
+  const blockedLocationRef = useRef(null);
+  const isIntentionalNavigationRef = useRef(false);
+  const initialStateRef = useRef({
+    courseId: "",
+    semesterYear: "",
+    semesterType: "",
+    targetPoints: "",
+    selectedTopics: [],
+    draft: null,
+  });
 
   // Fetch existing exam when in edit mode
   const { data: examData, isLoading: examLoading } = useExam(examId, {
@@ -207,9 +310,12 @@ export function GenerateExamPage() {
 
     const resolvedCourseId =
       typeof exam.courseId === "object" ? exam.courseId?.id : exam.courseId;
+    const parsedSemester = parseSemesterValue(exam.semester);
 
     setCourseId(resolvedCourseId || "");
-    setTargetPoints(exam.targetPoints ?? exam.points ?? 0);
+    setSemesterYear(parseSemesterStartYear(parsedSemester.year));
+    setSemesterType(parsedSemester.semesterType || "");
+    setTargetPoints(exam.targetPoints ?? exam.points ?? "");
 
     const topicNames = (exam.topics || []).map((t) => t.topic);
     setSelectedTopics(topicNames);
@@ -220,19 +326,54 @@ export function GenerateExamPage() {
         typeof exam.courseId === "object"
           ? exam.courseId
           : { id: resolvedCourseId },
-      targetPoints: exam.targetPoints ?? exam.points ?? 0,
+      targetPoints: exam.targetPoints ?? exam.points ?? "",
       totalPoints:
         exam.totalPoints ??
         (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
       diff: 0,
       topics: exam.topics || [],
     });
+    initialStateRef.current = {
+      courseId: resolvedCourseId || "",
+      semesterYear: parseSemesterStartYear(parsedSemester.year),
+      semesterType: parsedSemester.semesterType || "",
+      targetPoints: exam.targetPoints ?? exam.points ?? "",
+      selectedTopics: topicNames,
+      draft: {
+        course:
+          typeof exam.courseId === "object"
+            ? exam.courseId
+            : { id: resolvedCourseId },
+        targetPoints: exam.targetPoints ?? exam.points ?? "",
+        totalPoints:
+          exam.totalPoints ??
+          (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
+        diff: 0,
+        topics: exam.topics || [],
+      },
+    };
+    setIsEditable(true);
   }, [examData]);
 
-  const { data: topicsData } = useTopics({
+  useEffect(() => {
+    if (!isEditMode) {
+      initialStateRef.current = {
+        courseId: "",
+        semesterYear: "",
+        semesterType: "",
+        targetPoints: "",
+        selectedTopics: [],
+        draft: null,
+      };
+      setIsEditable(true);
+    }
+  }, [isEditMode]);
+
+  const { data: topicsData, isFetching: isTopicsLoading } = useTopics({
     page: 1,
-    limit: 500,
+    limit: 20,
     courseId: courseId || undefined,
+    q: debouncedTopicQuery || undefined,
   });
 
   const topics = useMemo(() => topicsData?.data || [], [topicsData?.data]);
@@ -246,6 +387,17 @@ export function GenerateExamPage() {
   const regenM = useRegenerateDraftTopic();
   const saveM = useCreateExam();
   const updateM = useUpdateExam();
+  const examValidation = useExamValidation(draft);
+  const hasPointsValidationError = Boolean(draft) && examValidation.hasErrors;
+  const mismatchedTopicNames = examValidation.invalidTopics || [];
+
+  const topicValidationByIndex = useMemo(() => {
+    const validationMap = new Map();
+    (examValidation.topicErrors || []).forEach((entry) => {
+      validationMap.set(entry.topicIndex, entry);
+    });
+    return validationMap;
+  }, [examValidation.topicErrors]);
 
   const courseLabel = useMemo(() => {
     const courseFromDraft = draft?.course;
@@ -269,27 +421,56 @@ export function GenerateExamPage() {
     return courseId || "";
   }, [draft, courses, courseId, examData]);
 
-  const handleCourseChange = (e) => {
-    setCourseId(e.target.value);
+  const selectedCourseOption = useMemo(() => {
+    const matchedCourse = courses.find((course) => course.id === courseId);
+    if (matchedCourse) {
+      return matchedCourse;
+    }
+
+    if (courseId && courseLabel) {
+      return {
+        id: courseId,
+        title: courseLabel,
+        shortName: "",
+      };
+    }
+
+    return null;
+  }, [courses, courseId, courseLabel]);
+
+  const handleCourseChange = (nextCourse) => {
+    setCourseId(nextCourse?.id || "");
     setSelectedTopics([]);
+    setTopicQuery("");
     setDraft(null);
   };
 
   const handleTargetPointsChange = (e) => {
-    const nextTarget = Number(e.target.value || 0);
+    const nextRawValue = e.target.value;
+    const nextTarget =
+      nextRawValue === "" ? "" : Math.max(1, Number(nextRawValue));
     setTargetPoints(nextTarget);
 
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.targetPoints = nextTarget;
+      next.targetPoints =
+        nextTarget === "" ? "" : Math.max(1, Number(nextTarget));
       return recalcDraftTotals(next);
     });
   };
 
+  const handleSemesterYearChange = (e) => {
+    setSemesterYear(e.target.value);
+  };
+
+  const handleSemesterTypeChange = (e) => {
+    setSemesterType(e.target.value);
+  };
+
   // version: "STUDENT" | "TEACHER"
   const compileDraft = async (version) => {
-    if (!draft) return;
+    if (!draft || hasPointsValidationError) return;
     clearPdf();
     setCompileDiagnostics(null);
 
@@ -303,8 +484,8 @@ export function GenerateExamPage() {
         version,
       });
 
-      const compileData = res?.data || {};
-      const { pdfBase64, filename, contentType, errors } = compileData;
+      const { pdfBase64, filename, contentType, diagnostics } =
+        getCompileResultPayload(res);
 
       setPdfFromBase64({
         base64: pdfBase64,
@@ -312,19 +493,8 @@ export function GenerateExamPage() {
         mimeType: contentType || "application/pdf",
       });
 
-      setCompileDiagnostics({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
+      setCompileDiagnostics(toCompilerMessages(diagnostics));
+      notifyCompileOutcome(diagnostics);
     } finally {
       setIsCompiling(false);
     }
@@ -359,8 +529,8 @@ export function GenerateExamPage() {
         version: "STUDENT",
       });
 
-      const compileData = res?.data || {};
-      const { pdfBase64, filename, contentType, errors } = compileData;
+      const { pdfBase64, filename, contentType, diagnostics } =
+        getCompileResultPayload(res);
 
       setCoverPdfFromBase64({
         base64: pdfBase64,
@@ -368,19 +538,8 @@ export function GenerateExamPage() {
         mimeType: contentType || "application/pdf",
       });
 
-      setCoverCompileDiagnostics({
-        clsiStatus: errors?.clsiStatus || null,
-        buildId: errors?.buildId || null,
-        errorCount: Number(errors?.errorCount ?? errors?.errors?.length ?? 0),
-        warningCount: Number(
-          errors?.warningCount ?? errors?.warnings?.length ?? 0,
-        ),
-        errors: errors?.errors || [],
-        warnings: errors?.warnings || [],
-        timings: errors?.timings || null,
-        stats: errors?.stats || null,
-        log: errors?.log || "",
-      });
+      setCoverCompileDiagnostics(toCompilerMessages(diagnostics));
+      notifyCompileOutcome(diagnostics);
     } finally {
       setIsCoverCompiling(false);
     }
@@ -408,21 +567,14 @@ export function GenerateExamPage() {
     return nextDraft;
   };
 
-  const syncTopicPointsFromTasks = (nextDraft, topicIndex) => {
-    const tasks = nextDraft.topics?.[topicIndex]?.tasks || [];
-    if (tasks.length === 0) {
-      return nextDraft;
-    }
-
-    nextDraft.topics[topicIndex].points = tasks.reduce(
-      (acc, task) => acc + Number(task?.points || 0),
-      0,
-    );
-    return nextDraft;
-  };
-
   const generateDraft = async () => {
-    if (!courseId || selectedTopics.length === 0 || Number(targetPoints) <= 0)
+    const normalizedSemester = formatSemesterValue(semesterYear, semesterType);
+    if (
+      !courseId ||
+      !normalizedSemester ||
+      selectedTopics.length === 0 ||
+      Number(targetPoints) <= 0
+    )
       return;
     // Clear previous content immediately so the UI shows empty states while loading
     setDraft(null);
@@ -451,7 +603,6 @@ export function GenerateExamPage() {
       if (!prev) return prev;
       const next = structuredClone(prev);
       next.topics[topicIndex].tasks[taskIndex][field] = value;
-      syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
     });
   };
@@ -465,9 +616,8 @@ export function GenerateExamPage() {
         question: "",
         solution: "",
         solutionSpace: DEFAULT_SOLUTION_SPACE,
-        points: 0,
+        points: "",
       });
-      syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
     });
   };
@@ -478,7 +628,6 @@ export function GenerateExamPage() {
       const next = structuredClone(prev);
       next.topics[topicIndex].tasks = next.topics[topicIndex].tasks || [];
       next.topics[topicIndex].tasks.splice(taskIndex, 1);
-      syncTopicPointsFromTasks(next, topicIndex);
       return recalcDraftTotals(next);
     });
   };
@@ -503,19 +652,155 @@ export function GenerateExamPage() {
   };
 
   const saveExam = async () => {
-    if (!draft) return;
+    if (!draft || hasPointsValidationError) return;
+    const normalizedSemester = formatSemesterValue(semesterYear, semesterType);
+    if (!normalizedSemester) return;
+
     const body = {
       courseId: draft.course?.id || courseId,
+      semester: normalizedSemester,
       targetPoints: Number(draft.targetPoints),
       topics: withSolutionSpace(draft.topics),
     };
 
     if (isEditMode) {
       await updateM.mutateAsync({ id: examId, body });
+      // After successful update, sync initial state to prevent blocker dialog on nav
+      initialStateRef.current = {
+        courseId: draft.course?.id || courseId,
+        semesterYear,
+        semesterType,
+        targetPoints,
+        selectedTopics,
+        draft,
+      };
+      nav("/exams/list");
       return;
     }
 
     await saveM.mutateAsync(body);
+    // After successful create, sync initial state to prevent blocker dialog on nav
+    initialStateRef.current = {
+      courseId: draft.course?.id || courseId,
+      semesterYear,
+      semesterType,
+      targetPoints,
+      selectedTopics,
+      draft,
+    };
+    nav("/exams/list");
+  };
+
+  const hasUnsavedChanges = useCallback(() => {
+    const snapshot = initialStateRef.current;
+    return (
+      courseId !== snapshot.courseId ||
+      semesterYear !== snapshot.semesterYear ||
+      semesterType !== snapshot.semesterType ||
+      targetPoints !== snapshot.targetPoints ||
+      JSON.stringify(selectedTopics) !==
+        JSON.stringify(snapshot.selectedTopics) ||
+      JSON.stringify(draft) !== JSON.stringify(snapshot.draft)
+    );
+  }, [
+    courseId,
+    semesterYear,
+    semesterType,
+    targetPoints,
+    selectedTopics,
+    draft,
+  ]);
+
+  const handleCancelClick = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmDialog({ open: true, action: "cancel" });
+    } else {
+      nav("/exams/list");
+    }
+  };
+
+  // Prevent navigation if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (hasUnsavedChanges()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Block route changes when there are unsaved changes
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  // Store blocker in ref and show dialog when navigation is blocked
+  useEffect(() => {
+    blockerRef.current = blocker;
+    if (blocker.state === "blocked") {
+      // Skip if this is an intentional navigation from dialog
+      if (isIntentionalNavigationRef.current) {
+        isIntentionalNavigationRef.current = false;
+        blockerRef.current.proceed();
+        return;
+      }
+
+      // Only open dialog if this is a new blocked state (different location)
+      const currentLocation = blocker.location.pathname;
+      if (
+        blockedLocationRef.current !== currentLocation &&
+        !confirmDialog.open
+      ) {
+        blockedLocationRef.current = currentLocation;
+        setConfirmDialog({
+          open: true,
+          action: "navigate",
+        });
+      }
+    } else if (blocker.state === "unblocked") {
+      blockedLocationRef.current = null;
+    }
+  }, [blocker, blocker.state, blocker.location?.pathname, confirmDialog.open]);
+
+  const handleResetClick = () => {
+    resetExamForm();
+  };
+
+  const handleConfirmDialogConfirm = () => {
+    const action = confirmDialog.action;
+    setConfirmDialog({ open: false, action: null });
+
+    if (action === "cancel") {
+      isIntentionalNavigationRef.current = true;
+      nav("/exams/list");
+    } else if (action === "navigate" && blockerRef.current) {
+      blockerRef.current.proceed();
+    }
+  };
+
+  const handleConfirmDialogCancel = () => {
+    if (blockerRef.current?.state === "blocked") {
+      blockerRef.current.reset();
+    }
+    setConfirmDialog({ open: false, action: null });
+  };
+
+  const resetExamForm = () => {
+    const snapshot = initialStateRef.current;
+    setCourseId(snapshot.courseId || "");
+    setSemesterYear(snapshot.semesterYear || "");
+    setSemesterType(snapshot.semesterType || "");
+    setTargetPoints(snapshot.targetPoints ?? "");
+    setSelectedTopics(snapshot.selectedTopics || []);
+    setDraft(snapshot.draft ? structuredClone(snapshot.draft) : null);
+    setCompileDiagnostics(null);
+    clearPdf();
+    setCompiledVersion(null);
+    setIsEditable(true);
   };
 
   const resetSplitLayout = () => {
@@ -590,6 +875,9 @@ export function GenerateExamPage() {
     collapsedPane === "right" ? "100%" : `${splitPercent}%`;
   const rightPanelWidth =
     collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
+  const isSemesterReady = Boolean(
+    formatSemesterValue(semesterYear, semesterType),
+  );
 
   return (
     <Box
@@ -603,7 +891,40 @@ export function GenerateExamPage() {
     >
       {/* ── Page header ── */}
       <PageHeader
-        title={isEditMode ? t("exams.editTitle") : t("exams.generateTitle")}
+        title={isEditMode ? t("exams.editTitle") : t("exams.createTitle")}
+        right={
+          <Stack direction="row" spacing={1}>
+            {!isEditMode ? (
+              <Button
+                variant="outlined"
+                startIcon={<RestartAltIcon />}
+                size="small"
+                onClick={handleResetClick}
+              >
+                {t("common.reset")}
+              </Button>
+            ) : null}
+            <Button variant="outlined" size="small" onClick={handleCancelClick}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              size="small"
+              onClick={saveExam}
+              disabled={
+                !draft ||
+                saveM.isPending ||
+                updateM.isPending ||
+                !isEditable ||
+                !formatSemesterValue(semesterYear, semesterType) ||
+                hasPointsValidationError
+              }
+            >
+              {t("common.save")}
+            </Button>
+          </Stack>
+        }
       />
 
       {/* Loading skeleton while fetching exam in edit mode */}
@@ -688,27 +1009,19 @@ export function GenerateExamPage() {
                     <Stack direction="row" spacing={1}>
                       <Button
                         variant="contained"
+                        size="small"
                         startIcon={<RefreshIcon />}
                         onClick={generateDraft}
                         disabled={
                           !courseId ||
+                          !isSemesterReady ||
                           selectedTopics.length === 0 ||
                           Number(targetPoints) <= 0 ||
-                          generateM.isPending
+                          generateM.isPending ||
+                          !isEditable
                         }
                       >
                         {t("exams.generate")}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        color="secondary"
-                        startIcon={<SaveIcon />}
-                        onClick={saveExam}
-                        disabled={
-                          !draft || saveM.isPending || updateM.isPending
-                        }
-                      >
-                        {t("common.save")}
                       </Button>
                     </Stack>
                   </>
@@ -736,39 +1049,139 @@ export function GenerateExamPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "20% 10% 65%",
+                  gridTemplateColumns: "15% 20% 10% 50%",
                   gap: 2,
                 }}
               >
-                <TextField
-                  select
-                  label={t("common.course")}
-                  value={courseId}
-                  onChange={handleCourseChange}
+                <Autocomplete
+                  options={courses}
+                  value={selectedCourseOption}
+                  onChange={(_, value) => handleCourseChange(value)}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "clear") {
+                      setCourseQuery("");
+                      return;
+                    }
+                    if (reason === "input") {
+                      setCourseQuery(value);
+                    }
+                  }}
+                  loading={isCoursesLoading}
+                  disabled={!isEditable}
                   fullWidth
                   size="small"
-                  disabled={isEditMode}
-                >
-                  <MenuItem value="">{t("common.selectCourse")}</MenuItem>
-                  {courses.map((c) => (
-                    <MenuItem key={c.id} value={c.id}>
-                      {c.title} ({c.shortName})
-                    </MenuItem>
-                  ))}
-                  {isEditMode &&
-                    courseId &&
-                    !courses.some((c) => c.id === courseId) && (
-                      <MenuItem value={courseId}>{courseLabel}</MenuItem>
-                    )}
-                </TextField>
+                  slotProps={{
+                    paper: {
+                      elevation: 8,
+                      sx: {
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        border: 1,
+                        borderColor: "divider",
+                      },
+                    },
+                    listbox: {
+                      sx: {
+                        maxHeight: 200,
+                        overflowY: "auto",
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        "& .MuiAutocomplete-option": {
+                          minHeight: 40,
+                          color: dropdownPaperColor,
+                        },
+                        "& .MuiAutocomplete-option.Mui-focused": {
+                          bgcolor: dropdownHoverBg,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"]': {
+                          bgcolor: dropdownSelectedBg,
+                          color: dropdownPaperColor,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"].Mui-focused':
+                          {
+                            bgcolor: dropdownSelectedBg,
+                          },
+                      },
+                    },
+                  }}
+                  isOptionEqualToValue={(option, value) =>
+                    option.id === value.id
+                  }
+                  getOptionLabel={(option) => {
+                    if (!option) return "";
+                    const title = option.title || "";
+                    const shortName = option.shortName
+                      ? ` (${option.shortName})`
+                      : "";
+                    return `${title}${shortName}`.trim();
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t("common.course")}
+                      placeholder={t("common.selectCourse")}
+                    />
+                  )}
+                />
+
+                <Stack direction="row" spacing={1}>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      label={t("exams.year")}
+                      views={["year"]}
+                      openTo="year"
+                      value={
+                        semesterYear && /^\d{4}$/.test(semesterYear)
+                          ? dayjs(`${semesterYear}-01-01`)
+                          : null
+                      }
+                      onChange={(value) => {
+                        const year = value ? value.year() : "";
+                        handleSemesterYearChange({
+                          target: { value: year ? String(year) : "" },
+                        });
+                      }}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          disabled: !isEditable,
+                        },
+                      }}
+                      format="YYYY"
+                      yearsOrder="asc"
+                      minDate={dayjs(`${new Date().getFullYear() - 25}-01-01`)}
+                      maxDate={dayjs(`${new Date().getFullYear() + 25}-12-31`)}
+                    />
+                  </LocalizationProvider>
+
+                  <TextField
+                    select
+                    label={t("exams.semester")}
+                    value={semesterType}
+                    onChange={handleSemesterTypeChange}
+                    fullWidth
+                    size="small"
+                    disabled={!isEditable}
+                  >
+                    <MenuItem value="">{t("exams.selectSemester")}</MenuItem>
+                    {SEMESTER_OPTIONS.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
 
                 <TextField
                   label={t("exams.totalPoints")}
                   type="number"
+                  slotProps={{ htmlInput: { min: 1 } }}
                   value={targetPoints}
                   onChange={handleTargetPointsChange}
                   fullWidth
                   size="small"
+                  disabled={!isEditable}
                 />
 
                 <Autocomplete
@@ -776,10 +1189,22 @@ export function GenerateExamPage() {
                   options={topicNames}
                   value={selectedTopics}
                   onChange={(_, value) => setSelectedTopics(value)}
-                  disabled={!courseId}
+                  inputValue={topicQuery}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "clear") {
+                      setTopicQuery("");
+                      return;
+                    }
+                    if (reason === "input") {
+                      setTopicQuery(value);
+                    }
+                  }}
+                  loading={isTopicsLoading}
+                  disabled={!courseId || !isEditable}
                   fullWidth
                   size="small"
                   filterSelectedOptions
+                  filterOptions={(options) => options}
                   sx={{
                     "& .MuiAutocomplete-inputRoot": {
                       flexWrap: "nowrap",
@@ -795,10 +1220,36 @@ export function GenerateExamPage() {
                     },
                   }}
                   slotProps={{
+                    paper: {
+                      elevation: 8,
+                      sx: {
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        border: 1,
+                        borderColor: "divider",
+                      },
+                    },
                     listbox: {
                       sx: {
-                        maxHeight: 240,
+                        maxHeight: 200,
                         overflowY: "auto",
+                        bgcolor: dropdownPaperBg,
+                        color: dropdownPaperColor,
+                        "& .MuiAutocomplete-option": {
+                          minHeight: 40,
+                          color: dropdownPaperColor,
+                        },
+                        "& .MuiAutocomplete-option.Mui-focused": {
+                          bgcolor: dropdownHoverBg,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"]': {
+                          bgcolor: dropdownSelectedBg,
+                          color: dropdownPaperColor,
+                        },
+                        '& .MuiAutocomplete-option[aria-selected="true"].Mui-focused':
+                          {
+                            bgcolor: dropdownSelectedBg,
+                          },
                       },
                     },
                   }}
@@ -868,25 +1319,19 @@ export function GenerateExamPage() {
                   <Stack direction="row" spacing={1}>
                     <Button
                       variant="contained"
+                      size="small"
                       startIcon={<RefreshIcon />}
                       onClick={generateDraft}
                       disabled={
                         !courseId ||
+                        !isSemesterReady ||
                         selectedTopics.length === 0 ||
                         Number(targetPoints) <= 0 ||
-                        generateM.isPending
+                        generateM.isPending ||
+                        !isEditable
                       }
                     >
                       {t("exams.generate")}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      startIcon={<SaveIcon />}
-                      onClick={saveExam}
-                      disabled={!draft || saveM.isPending || updateM.isPending}
-                    >
-                      {t("common.save")}
                     </Button>
                   </Stack>
                 </Stack>
@@ -971,14 +1416,28 @@ export function GenerateExamPage() {
                     <Typography variant="h6">
                       {t("exams.exam")}{" "}
                       {draft && (
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          color="text.secondary"
-                        >
-                          ({draft.totalPoints} / {draft.targetPoints}{" "}
-                          {t("exams.pts")})
-                        </Typography>
+                        <>
+                          <Typography
+                            component="span"
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            ({draft.totalPoints} / {draft.targetPoints}{" "}
+                            {t("exams.pts")})
+                          </Typography>
+                          {hasPointsValidationError && (
+                            <Typography
+                              component="span"
+                              variant="body2"
+                              color="error.main"
+                              sx={{ ml: 2, fontWeight: 600 }}
+                            >
+                              {t("exams.pointsValidationErrorTopics", {
+                                topics: mismatchedTopicNames.join(", "),
+                              })}
+                            </Typography>
+                          )}
+                        </>
                       )}
                     </Typography>
 
@@ -989,7 +1448,7 @@ export function GenerateExamPage() {
                         size="small"
                         startIcon={<EditIcon />}
                         onClick={openCoverPageDialog}
-                        disabled={!draft}
+                        disabled={!draft || !isEditable}
                       >
                         {t("exams.editCoverPage")}
                       </Button>
@@ -1008,7 +1467,9 @@ export function GenerateExamPage() {
                         </Button>
                       ) : (
                         <CompileButton
-                          disabled={!draft}
+                          disabled={
+                            !draft || !isEditable || hasPointsValidationError
+                          }
                           onCompile={compileDraft}
                         />
                       )}
@@ -1056,7 +1517,9 @@ export function GenerateExamPage() {
                             key={`${topic.topic}-${i}`}
                             topic={topic}
                             topicIndex={i}
+                            pointsValidation={topicValidationByIndex.get(i)}
                             solutionSpaceOptions={SOLUTION_SPACE_OPTIONS}
+                            editable={isEditable}
                             onTopicField={updateTopicField}
                             onTaskField={updateTaskField}
                             onAddTask={addTask}
@@ -1252,6 +1715,15 @@ export function GenerateExamPage() {
           disableActions={!draft}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={t("exams.confirmCancelTitle")}
+        message={t("exams.unsavedChangesMessage")}
+        confirmText={t("exams.confirmYes")}
+        onCancel={handleConfirmDialogCancel}
+        onConfirm={handleConfirmDialogConfirm}
+      />
     </Box>
   );
 }

@@ -20,7 +20,9 @@ import { useTranslation } from "react-i18next";
 export function TopicCard({
   topic,
   topicIndex,
+  pointsValidation,
   solutionSpaceOptions,
+  editable = true,
   onTopicField,
   onTaskField,
   onAddTask,
@@ -48,23 +50,42 @@ export function TopicCard({
           alignItems="center"
           sx={{ mb: 2 }}
         >
-          <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-            {topic.topic}
-          </Typography>
-          <Chip
-            label={`${topic.points} ${t("exams.pts")}`}
-            size="small"
-            color="primary"
-            variant="outlined"
-            sx={{ fontWeight: 700, mr: 1 }}
-          />
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Typography
+              variant="subtitle1"
+              fontWeight={700}
+              color="text.primary"
+            >
+              {topic.topic}
+            </Typography>
+            <Chip
+              label={`${topic.points} ${t("exams.pts")}`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 700 }}
+            />
+            {pointsValidation && !pointsValidation.isValid && (
+              <Typography variant="caption" color="error.main">
+                {t("common.pointsMismatchPrefix")} {t("common.sumOfTaskPoints")}{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {pointsValidation.taskPoints}
+                </Box>{" "}
+                {t("exams.pts")}, {t("common.topicPointsLabel")}{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {pointsValidation.topicPoints}
+                </Box>{" "}
+                {t("exams.pts")}
+              </Typography>
+            )}
+          </Stack>
           <Button
             variant="outlined"
             color="secondary"
             size="small"
             startIcon={<RefreshIcon />}
             onClick={() => onRegenerate(topic.topic)}
-            disabled={regenPending}
+            disabled={regenPending || !editable}
           >
             {t("exams.regenerate")}
           </Button>
@@ -85,16 +106,22 @@ export function TopicCard({
             onChange={(e) => onTopicField(topicIndex, "topic", e.target.value)}
             fullWidth
             size="small"
+            disabled={!editable}
           />
           <TextField
             label={t("common.points")}
             type="number"
-            value={topic.points ?? 0}
-            onChange={(e) =>
-              onTopicField(topicIndex, "points", Number(e.target.value || 0))
-            }
+            slotProps={{ htmlInput: { min: 1 } }}
+            value={topic.points ?? ""}
+            onChange={(e) => {
+              const rawValue = e.target.value;
+              const nextValue =
+                rawValue === "" ? "" : Math.max(1, Number(rawValue));
+              onTopicField(topicIndex, "points", nextValue);
+            }}
             sx={{ width: 110 }}
             size="small"
+            disabled={!editable}
           />
         </Box>
 
@@ -105,9 +132,13 @@ export function TopicCard({
         >
           {t("common.description")}
         </Typography>
+
         <LatexEditor
           value={topic.description || ""}
-          onChange={(value) => onTopicField(topicIndex, "description", value)}
+          onChange={(value) => {
+            if (!editable) return;
+            onTopicField(topicIndex, "description", value);
+          }}
           height={140}
         />
 
@@ -156,17 +187,24 @@ export function TopicCard({
                         <TextField
                           label={t("common.points")}
                           type="number"
-                          value={task.points ?? 0}
-                          onChange={(e) =>
+                          slotProps={{ htmlInput: { min: 1 } }}
+                          value={task.points ?? ""}
+                          onChange={(e) => {
+                            const rawValue = e.target.value;
+                            const nextValue =
+                              rawValue === ""
+                                ? ""
+                                : Math.max(1, Number(rawValue));
                             onTaskField(
                               topicIndex,
                               taskIndex,
                               "points",
-                              Number(e.target.value || 0),
-                            )
-                          }
+                              nextValue,
+                            );
+                          }}
                           sx={{ width: 100 }}
                           size="small"
+                          disabled={!editable}
                         />
                         <Button
                           variant="text"
@@ -174,6 +212,7 @@ export function TopicCard({
                           size="small"
                           startIcon={<DeleteOutlineIcon />}
                           onClick={() => onRemoveTask(topicIndex, taskIndex)}
+                          disabled={!editable}
                         >
                           {t("topics.remove")}
                         </Button>
@@ -189,9 +228,10 @@ export function TopicCard({
                     </Typography>
                     <LatexEditor
                       value={task.question || ""}
-                      onChange={(value) =>
-                        onTaskField(topicIndex, taskIndex, "question", value)
-                      }
+                      onChange={(value) => {
+                        if (!editable) return;
+                        onTaskField(topicIndex, taskIndex, "question", value);
+                      }}
                       height={160}
                     />
 
@@ -204,9 +244,10 @@ export function TopicCard({
                     </Typography>
                     <LatexEditor
                       value={task.solution || ""}
-                      onChange={(value) =>
-                        onTaskField(topicIndex, taskIndex, "solution", value)
-                      }
+                      onChange={(value) => {
+                        if (!editable) return;
+                        onTaskField(topicIndex, taskIndex, "solution", value);
+                      }}
                       height={120}
                     />
 
@@ -224,6 +265,7 @@ export function TopicCard({
                       }
                       size="small"
                       sx={{ mt: 1.5, width: "50%" }}
+                      disabled={!editable}
                     >
                       {solutionSpaceOptions.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -241,6 +283,7 @@ export function TopicCard({
                 variant="outlined"
                 startIcon={<AddIcon />}
                 onClick={() => onAddTask(topicIndex)}
+                disabled={!editable}
               >
                 {t("exams.addTask")}
               </Button>

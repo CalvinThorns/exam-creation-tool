@@ -55,6 +55,7 @@ function GridLoadingOverlay() {
  * - onSortChange(sortModel): sortModel = [{ colId, sort: 'asc'|'desc' }].
  * - onFilterChange(filterModel): AG Grid filter model; parent maps to API.
  * - sortModel / filterModel: optional controlled state for AG Grid.
+ * - multiSort: enabled by default (no modifier key required).
  *
  * actions: optional row actions column (see below).
  */
@@ -63,7 +64,7 @@ export function DataTable({
   rowData,
   actions = [],
   actionsHeaderName,
-  actionsWidth = 220,
+  actionsWidth = 10,
   // client-side
   pageSize = 10,
   height = 500,
@@ -76,6 +77,7 @@ export function DataTable({
   onFilterChange,
   sortModel,
   filterModel,
+  alwaysMultiSort = true,
   loading = false,
   noRowsTitle,
   noRowsHint,
@@ -189,6 +191,9 @@ export function DataTable({
     () => ({
       sortable: true,
       filter: true,
+      filterParams: {
+        buttons: ["clear"],
+      },
       resizable: true,
       flex: 1,
       minWidth: 120,
@@ -239,6 +244,8 @@ export function DataTable({
         sortable: false,
         filter: false,
         width: actionsWidth,
+        flex: 0,
+        pinned: "right",
         cellRenderer: (params) => {
           const row = params.data;
 
@@ -370,6 +377,7 @@ export function DataTable({
           suppressCellFocus={false}
           enableCellTextSelection
           defaultColDef={defaultColDef}
+          alwaysMultiSort={alwaysMultiSort}
           animateRows
           onGridReady={onGridReady}
           onSortChanged={serverSide ? onSortChanged : undefined}

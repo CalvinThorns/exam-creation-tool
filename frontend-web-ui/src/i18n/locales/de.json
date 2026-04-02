@@ -10,6 +10,7 @@
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "save": "Speichern",
+    "reset": "Zurücksetzen",
     "close": "Schließen",
     "cancel": "Abbrechen",
     "loading": "Lädt...",
@@ -35,7 +36,12 @@
     "title": "Titel",
     "selectCourse": "Kurs auswählen",
     "selectTopics": "Themen auswählen",
-    "selectCourseFirst": "Zuerst Kurs auswählen"
+    "selectCourseFirst": "Zuerst Kurs auswählen",
+    "validationError": "Validierungsfehler",
+    "sumOfTaskPoints": "Summe der Aufgabenpunkte",
+    "topicPointsLabel": "Themenpunkte",
+    "mustEqual": "muessen",
+    "pointsMismatchPrefix": "Punktemismatch:"
   },
   "sidebar": {
     "exams": "Prüfungen",
@@ -80,6 +86,7 @@
     "deleteTitle": "Kurs löschen",
     "deleteMessage": "Möchten Sie diesen Kurs wirklich löschen?",
     "addTitle": "Kurs hinzufügen",
+    "createTitle": "Kurs erstellen",
     "editTitle": "Kurs bearbeiten",
     "coverPage": "Deckblatt",
     "coverPageLatex": "Deckblatt LaTeX",
@@ -88,7 +95,10 @@
     "resizeAria": "Größe von Deckblatteditor und Vorschau ändern",
     "compilingPreview": "Deckblatt-Vorschau wird kompiliert…",
     "emptyPreview": "Kompilieren, um die Deckblatt-PDF-Vorschau zu sehen",
-    "compileFailed": "Deckblatt-Vorschau konnte nicht kompiliert werden."
+    "compileFailed": "Deckblatt-Vorschau konnte nicht kompiliert werden.",
+    "confirmCancelTitle": "Änderungen verwerfen?",
+    "confirmYes": "Ja",
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },
   "topics": {
     "pageTitle": "Aufgaben",
@@ -99,6 +109,10 @@
     "deleteTitle": "Aufgabensatz löschen",
     "deleteMessage": "Möchten Sie dieses Thema und seine Aufgaben wirklich löschen?",
     "dialogTitle": "Aufgabe hinzufügen",
+    "createTitle": "Aufgaben erstellen",
+    "editTitle": "Aufgaben bearbeiten",
+    "previewSourceTitle": "Kombinierte LaTeX-Quelle",
+    "previewDocTitle": "Aufgaben-Vorschau",
     "descriptionLatex": "Beschreibung LaTeX",
     "uploadImage": "Bild hochladen",
     "taskBlockTitle": "Aufgabe",
@@ -108,8 +122,12 @@
     "remove": "Entfernen",
     "taskLatex": "Aufgabe LaTeX",
     "solutionLatex": "Lösung LaTeX",
+    "pointsValidationErrorDetailed": "Aufgabenpunkte {{taskPoints}} muessen Themenpunkte {{topicPoints}} sein",
     "uploadTaskImage": "Aufgabenbild hochladen",
-    "relatedToTopic": "Zum Thema gehörend"
+    "relatedToTopic": "Zum Thema gehörend",
+    "confirmCancelTitle": "Änderungen verwerfen?",
+    "confirmYes": "Ja",
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },
   "exams": {
     "pageTitle": "Prüfungen",
@@ -120,6 +138,7 @@
     "deleteMessage": "Möchten Sie diese Prüfung wirklich löschen?",
     "date": "Datum",
     "generateTitle": "Prüfung erzeugen",
+    "createTitle": "Prüfung erstellen",
     "editTitle": "Prüfung bearbeiten",
     "loadingExam": "Prüfung wird geladen…",
     "generate": "Erzeugen",
@@ -137,15 +156,26 @@
     "teacherVersion": "Lehrerversion",
     "studentVersionHint": "Ohne Lösungen",
     "teacherVersionHint": "Mit Lösungen",
+    "year": "Jahr",
+    "semester": "Semester",
+    "selectYear": "Jahr auswählen",
+    "selectSemester": "Semester auswählen",
     "totalPoints": "Gesamtpunkte",
     "topics": "Themen",
     "exam": "Prüfung",
-    "selectAndGenerate": "Kurs auswählen, Themen wählen und auf Erzeugen klicken",
+    "selectAndGenerate": "Kurs, Jahr und Semester auswählen, Themen wählen und dann auf Erzeugen klicken",
     "solutionSpace": "Lösungsraum",
     "addTask": "Aufgabe hinzufügen",
     "regenerate": "Neu erzeugen",
     "tasksCount": "Aufgaben ({{count}})",
-    "pts": "Pkt"
+    "pts": "Pkt",
+    "confirmCancelTitle": "Änderungen verwerfen?",
+    "pointsValidationError": "Aufgabenpunkte muessen den Themenpunkten entsprechen",
+    "pointsValidationErrorDetailed": "{{topic}}: Aufgabenpunkte {{taskPoints}} muessen Themenpunkte {{topicPoints}} sein",
+    "pointsValidationErrorTopics": "Punktemismatch in Themen: {{topics}}",
+    "pointsValidationErrorTopicDetails": "Punktemismatch: Aufgabensumme {{taskPoints}} Pkt, Thema {{topicPoints}} Pkt",
+    "confirmYes": "Ja",
+    "unsavedChangesMessage": "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?"
   },
   "coverPageDialog": {
     "title": "Deckblatt bearbeiten",
@@ -196,6 +226,23 @@
   "confirmDialog": {
     "confirm": "Bestätigen"
   },
+  "notifications": {
+    "courseCreated": "Kurs erfolgreich erstellt",
+    "courseUpdated": "Kurs erfolgreich aktualisiert",
+    "courseDeleted": "Kurs erfolgreich gelöscht",
+    "topicCreated": "Aufgabe erfolgreich erstellt",
+    "topicUpdated": "Aufgabe erfolgreich aktualisiert",
+    "topicDeleted": "Aufgabe erfolgreich gelöscht",
+    "examCreated": "Prüfung erfolgreich gespeichert",
+    "examUpdated": "Prüfung erfolgreich aktualisiert",
+    "examDeleted": "Prüfung erfolgreich gelöscht",
+    "examGenerated": "Prüfung erfolgreich generiert",
+    "draftGenerated": "Entwurf erfolgreich generiert",
+    "topicRegenerated": "Aufgabe erfolgreich neu generiert",
+    "compileSuccess": "Kompilierung erfolgreich",
+    "compileWithWarnings": "Kompiliert mit {{count}} Warnung(en)",
+    "compileWithErrors": "Kompiliert mit {{count}} Fehler(n)"
+  },
   "errors": {
     "requestFailed": "Anfrage fehlgeschlagen",
     "requiredTitle": "Titel ist erforderlich",
@@ -204,6 +251,7 @@
     "requiredCourse": "Kurs ist erforderlich",
     "requiredTopic": "Thema ist erforderlich",
     "requiredQuestion": "Aufgabe ist erforderlich",
-    "pointsMin": "Punkte müssen >= 0 sein"
+    "pointsMin": "Punkte müssen >= 1 sein",
+    "taskPointsMismatch": "Die Summe der Aufgabenpunkte muss den Themenpunkten entsprechen"
   }
 }

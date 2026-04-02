@@ -1,17 +1,17 @@
 openapi: 3.0.3
 info:
   title: Exam API
-  version: 1.0.0
-  description: RESTful API for exam generation and management.
+  version: 1.1.0
+  description: Exam generation and management service.
+
+tags:
+  - name: Exams
+    description: Endpoints for exam generation, compilation, and CRUD.
 
 paths:
   /api/exams:
     get:
-      summary: Get all exams
-      description: >-
-        Retrieve a paginated list of exams. Supports sorting and filtering via
-        query parameters. Example:
-        `/api/exams?sort=createdAt:desc,amount:asc&filter=name:eq:Data Structures&filter=marks:gte:100&page=1&pageSize=20`
+      summary: List exams
       tags: [Exams]
       parameters:
         - in: query
@@ -19,32 +19,25 @@ paths:
           schema:
             type: integer
             minimum: 1
-          description: Page number (1-based)
         - in: query
           name: pageSize
           schema:
             type: integer
             minimum: 1
             maximum: 100
-          description: Number of items per page (alias for `limit`)
         - in: query
           name: sort
           schema:
             type: string
-          description: >-
-            Comma-separated list of `field:direction` pairs. Direction may be
-            `asc` (default) or `desc`. Example: `createdAt:desc,points:asc`.
+          description: Comma-separated field:direction values, e.g. createdAt:desc,points:asc
         - in: query
           name: filter
           schema:
             type: string
-          description: >-
-            Filter expression of the form `field:op:value`. Supported
-            operators: `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, `nin`,
-            `regex`. This parameter may be repeated.
+          description: Repeated field:op:value filter (eq, ne, lt, lte, gt, gte, in, nin, regex)
       responses:
         "200":
-          description: A list of all exams
+          description: Exams list
           content:
             application/json:
               schema:
@@ -56,29 +49,17 @@ paths:
                         type: array
                         items:
                           $ref: "#/components/schemas/ExamDto"
-              examples:
-                sortedAndFiltered:
-                  summary: Page 2 of exams sorted by date desc and filtered by points
-                  value:
-                    success: true
-                    data:
-                      - id: "abcd1234"
-                        courseId: "62f0c1a5bde8f72f9e4d3a10"
-                        points: 120
-                        topics: []
-                      - id: "efgh5678"
-                        courseId: "62f0c1a5bde8f72f9e4d3a10"
-                        points: 150
-                        topics: []
-                    meta:
-                      page: 2
-                      limit: 20
-                      total: 53
-                      totalPages: 3
-                      hasNextPage: true
-                      hasPreviousPage: true
+                      meta:
+                        allOf:
+                          - $ref: "#/components/schemas/ResponseMeta"
+                          - $ref: "#/components/schemas/PaginationMeta"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     post:
-      summary: Create a new exam
+      summary: Create exam
       tags: [Exams]
       requestBody:
         required: true
@@ -86,22 +67,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateExamDto"
-            examples:
-              minimal:
-                summary: Minimum required fields
-                value:
-                  courseId: "62f0c1a5bde8f72f9e4d3a10"
-                  targetPoints: 100
-                  topics:
-                    - topic: "Algebra I"
-                      points: 20
-                      tasks: []
-                    - topic: "Geometry Basics"
-                      points: 30
-                      tasks: []
       responses:
         "201":
-          description: Exam successfully created
+          description: Exam created
           content:
             application/json:
               schema:
@@ -111,33 +79,16 @@ paths:
                     properties:
                       data:
                         $ref: "#/components/schemas/ExamDto"
-              examples:
-                success:
-                  summary: Example success response
-                  value:
-                    success: true
-                    data:
-                      id: "abcd1234"
-                      courseId: "62f0c1a5bde8f72f9e4d3a10"
-                      points: 50
-                      topics:
-                        - topic: "Algebra I"
-                          points: 20
-                          tasks: []
-                        - topic: "Geometry Basics"
-                          points: 30
-                          tasks: []
-                validationError:
-                  summary: Example validation error
-                  value:
-                    success: false
-                    error:
-                      message: "topics must be an array"
-                      code: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/exams/{id}:
     get:
-      summary: Get an exam by ID
+      summary: Get exam by id
       tags: [Exams]
       parameters:
         - in: path
@@ -157,14 +108,15 @@ paths:
                     properties:
                       data:
                         $ref: "#/components/schemas/ExamDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
-          description: Exam not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     put:
-      summary: Update an exam by ID
+      summary: Update exam by id
       tags: [Exams]
       parameters:
         - in: path
@@ -180,7 +132,7 @@ paths:
               $ref: "#/components/schemas/UpdateExamDto"
       responses:
         "200":
-          description: Exam successfully updated
+          description: Exam updated
           content:
             application/json:
               schema:
@@ -190,8 +142,15 @@ paths:
                     properties:
                       data:
                         $ref: "#/components/schemas/ExamDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     delete:
-      summary: Delete an exam by ID
+      summary: Delete exam by id
       tags: [Exams]
       parameters:
         - in: path
@@ -201,65 +160,479 @@ paths:
             type: string
       responses:
         "204":
-          description: Exam successfully deleted
+          description: Deleted successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
-  /api/exams/generate:
+  /api/exams/draft:
     post:
-      summary: Generate PDF for an exam
+      summary: Generate draft exam topics
       tags: [Exams]
-      description: Triggers the LaTeX builder and compiles the exam via the CLSI service.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/GenerateExamRequestDto"
+              $ref: "#/components/schemas/GenerateDraftRequestDto"
       responses:
         "200":
-          description: Exam generated successfully
+          description: Draft generated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/DraftResultDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/exams/draft/regenerate-topic:
+    post:
+      summary: Regenerate a single draft topic variant
+      tags: [Exams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegenerateDraftTopicRequestDto"
+      responses:
+        "200":
+          description: Topic regenerated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/DraftResultDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/exams/draft/compile:
+    post:
+      summary: Compile generated draft to PDF
+      tags: [Exams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompileDraftRequestDto"
+      responses:
+        "200":
+          description: Draft compiled, PDF returned as base64
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CompileResultDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /api/exams/compile-latex:
+    post:
+      summary: Compile raw latex to PDF
+      tags: [Exams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [latexContent]
+              properties:
+                latexContent:
+                  type: string
+      responses:
+        "200":
+          description: Latex compiled, PDF returned as base64
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CompileResultDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /api/exams/latex-template/base:
+    get:
+      summary: Get base latex template
+      tags: [Exams]
+      responses:
+        "200":
+          description: Template retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          template:
+                            type: string
+                          placeholder:
+                            type: string
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update base latex template
+      tags: [Exams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template]
+              properties:
+                template:
+                  type: string
+      responses:
+        "200":
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          template:
+                            type: string
+                          placeholder:
+                            type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
 components:
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    BadGateway:
+      description: Upstream service failure (e.g. CLSI)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
   schemas:
+    ResponseMeta:
+      type: object
+      required: [timestamp, status]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        requestId:
+          type: string
+          nullable: true
+        path:
+          type: string
+          nullable: true
+        method:
+          type: string
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
     SuccessEnvelope:
       type: object
+      required: [success, meta]
       properties:
         success:
           type: boolean
-          example: true
+          enum: [true]
         data:
-          description: The payload of a successful response. May be an object, array, or null.
+          nullable: true
+          description: Endpoint-specific payload
         meta:
-          type: object
-          description: Optional metadata (pagination, links, etc.)
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ErrorIssue:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+        field:
+          type: string
+          nullable: true
+        kind:
+          type: string
+          nullable: true
+        details:
+          nullable: true
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: BAD_REQUEST
+        message:
+          type: string
+        details:
+          nullable: true
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorIssue"
+        errors:
+          description: Legacy alias of issues
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorIssue"
 
     ErrorEnvelope:
       type: object
+      required: [success, error, meta]
       properties:
         success:
           type: boolean
-          example: false
+          enum: [false]
         error:
+          $ref: "#/components/schemas/ErrorBody"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CompileDiagnosticError:
+      type: object
+      properties:
+        message:
+          type: string
+        line:
+          type: integer
+          nullable: true
+        snippet:
+          type: string
+          nullable: true
+
+    CompileDiagnosticWarning:
+      type: object
+      properties:
+        where:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        message:
+          type: string
+
+    CompileDiagnostics:
+      type: object
+      required: [outcome, errorCount, warningCount, errors, warnings]
+      properties:
+        outcome:
+          type: string
+          enum: [success, success_with_warnings, success_with_errors]
+        clsiStatus:
+          type: string
+          nullable: true
+        buildId:
+          type: string
+          nullable: true
+        stats:
           type: object
-          properties:
-            # single error fields
-            code:
-              type: string
-            message:
-              type: string
-            details:
-              type: object
-            # or a list of errors (e.g. validation failures)
-            errors:
-              type: array
-              items:
-                type: object
-                properties:
-                  code:
-                    type: string
-                  message:
-                    type: string
-                  details:
-                    type: object
+          additionalProperties: true
+        timings:
+          type: object
+          additionalProperties: true
+        errorCount:
+          type: integer
+        warningCount:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompileDiagnosticError"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompileDiagnosticWarning"
+        log:
+          type: string
+          nullable: true
+        stdout:
+          type: string
+          nullable: true
+        stderr:
+          type: string
+          nullable: true
+
+    CompileResultDto:
+      type: object
+      required: [filename, contentType, pdfBase64]
+      properties:
+        filename:
+          type: string
+        contentType:
+          type: string
+          example: application/pdf
+        pdfBase64:
+          type: string
+        diagnostics:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CompileDiagnostics"
+        errors:
+          description: Legacy alias of diagnostics
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CompileDiagnostics"
+
+    TaskDto:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        question:
+          type: string
+        points:
+          type: number
+          minimum: 0
+        solution:
+          type: string
+        solutionSpace:
+          type: string
+        isRelatedToTopic:
+          type: boolean
+
+    DraftTopicDto:
+      type: object
+      properties:
+        topicId:
+          type: string
+          nullable: true
+        courseId:
+          type: string
+          nullable: true
+        topic:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskDto"
+
+    CourseSnapshotDto:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        shortName:
+          type: string
+        coverPage:
+          type: string
+
+    DraftResultDto:
+      type: object
+      properties:
+        course:
+          $ref: "#/components/schemas/CourseSnapshotDto"
+        topicNames:
+          type: array
+          items:
+            type: string
+        targetPoints:
+          type: number
+        totalPoints:
+          type: number
+        diff:
+          type: number
+        topics:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftTopicDto"
 
     ExamDto:
       type: object
@@ -267,51 +640,19 @@ components:
         id:
           type: string
         courseId:
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/CourseSnapshotDto"
+        semester:
           type: string
-          description: Reference to the corresponding Course ID
+        targetPoints:
+          type: number
         points:
           type: number
         topics:
           type: array
-          description: Snapshot of topic variants stored with the exam
           items:
-            type: object
-            properties:
-              courseId:
-                type: string
-              topic:
-                type: string
-              points:
-                type: number
-              tasks:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    question:
-                      type: string
-                    points:
-                      type: number
-                      minimum: 0
-                    solution:
-                      type: string
-                    solutionSpace:
-                      type: string
-                      enum:
-                        [
-                          "1/4 Page",
-                          "1/2 Page",
-                          "3/4 Page",
-                          "1 Page",
-                          "2 Pages",
-                        ]
-                      default: "1 Page"
-            required:
-              - courseId
-              - topic
-              - points
+            $ref: "#/components/schemas/DraftTopicDto"
         createdAt:
           type: string
           format: date-time
@@ -321,88 +662,83 @@ components:
 
     CreateExamDto:
       type: object
-      # the body used when saving an exam to the database
-      required:
-        - courseId
-        - targetPoints
-        - topics
+      required: [courseId, semester, targetPoints, topics]
       properties:
         courseId:
           type: string
-          description: MongoDB _id of an existing course
+        semester:
+          type: string
         targetPoints:
           type: number
           minimum: 1
-          description: Desired total points for the exam (must be >0)
         topics:
           type: array
-          description: Snapshot of the chosen topic variants; courseId will be populated from the parent object
           items:
-            type: object
-            required:
-              - topic
-              - points
-            properties:
-              topic:
-                type: string
-                description: The name of the topic variant
-              points:
-                type: number
-                minimum: 0
-                description: points assigned for this topic variant
-              tasks:
-                type: array
-                description: optional list of tasks associated with the topic
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    question:
-                      type: string
-                    points:
-                      type: number
-                      minimum: 0
-                    solution:
-                      type: string
-                    solutionSpace:
-                      type: string
-                      enum:
-                        [
-                          "1/4 Page",
-                          "1/2 Page",
-                          "3/4 Page",
-                          "1 Page",
-                          "2 Pages",
-                        ]
-                      default: "1 Page"
-          default: []
-      example:
-        courseId: "62f0c1a5bde8f72f9e4d3a10"
-        targetPoints: 100
-        topics:
-          - topic: "Algebra I"
-            points: 20
-            tasks: []
-          - topic: "Geometry Basics"
-            points: 30
-            tasks: []
+            $ref: "#/components/schemas/DraftTopicDto"
 
     UpdateExamDto:
       type: object
       properties:
+        courseId:
+          type: string
+        semester:
+          type: string
+        targetPoints:
+          type: number
+          minimum: 1
         points:
           type: number
           minimum: 0
         topics:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/DraftTopicDto"
 
-    GenerateExamRequestDto:
+    GenerateDraftRequestDto:
       type: object
-      required:
-        - examId
+      required: [courseId, topics, targetPoints]
       properties:
-        examId:
+        courseId:
           type: string
+        topics:
+          type: array
+          items:
+            type: string
+        targetPoints:
+          type: number
+          minimum: 1
+
+    RegenerateDraftTopicRequestDto:
+      type: object
+      required: [courseId, topicName, targetPoints, currentDraftTopics]
+      properties:
+        courseId:
+          type: string
+        topicName:
+          type: string
+        targetPoints:
+          type: number
+          minimum: 1
+        currentDraftTopics:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftTopicDto"
+
+    CompileDraftRequestDto:
+      type: object
+      required: [courseId, topics]
+      properties:
+        courseId:
+          type: string
+        course:
+          $ref: "#/components/schemas/CourseSnapshotDto"
+        coverPage:
+          type: string
+        version:
+          type: string
+          enum: [STUDENT, TEACHER]
+          default: STUDENT
+        topics:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftTopicDto"

@@ -10,6 +10,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "save": "Save",
+    "reset": "Reset",
     "close": "Close",
     "cancel": "Cancel",
     "loading": "Loading...",
@@ -35,7 +36,12 @@
     "title": "Title",
     "selectCourse": "Select course",
     "selectTopics": "Select topics",
-    "selectCourseFirst": "Select course first"
+    "selectCourseFirst": "Select course first",
+    "validationError": "Validation Error",
+    "sumOfTaskPoints": "Sum of task points",
+    "topicPointsLabel": "topic points",
+    "mustEqual": "must equal",
+    "pointsMismatchPrefix": "Points mismatch:"
   },
   "sidebar": {
     "exams": "Exams",
@@ -80,6 +86,7 @@
     "deleteTitle": "Delete course",
     "deleteMessage": "Are you sure you want to delete this course?",
     "addTitle": "Add Course",
+    "createTitle": "Create Course",
     "editTitle": "Edit Course",
     "coverPage": "Cover Page",
     "coverPageLatex": "Cover page LaTeX",
@@ -88,7 +95,10 @@
     "resizeAria": "Resize cover page editor and preview panels",
     "compilingPreview": "Compiling cover page preview…",
     "emptyPreview": "Compile to see cover page PDF preview",
-    "compileFailed": "Failed to compile cover page preview."
+    "compileFailed": "Failed to compile cover page preview.",
+    "confirmCancelTitle": "Discard Changes?",
+    "confirmYes": "Yes",
+    "unsavedChangesMessage": "You have unsaved changes. Do you want to discard them?"
   },
   "topics": {
     "pageTitle": "Tasks",
@@ -99,6 +109,10 @@
     "deleteTitle": "Delete task set",
     "deleteMessage": "Are you sure you want to delete this topic and its tasks?",
     "dialogTitle": "Add Task",
+    "createTitle": "Create Tasks",
+    "editTitle": "Edit Tasks",
+    "previewSourceTitle": "Combined LaTeX source",
+    "previewDocTitle": "Tasks Preview",
     "descriptionLatex": "Description LaTeX",
     "uploadImage": "Upload image",
     "taskBlockTitle": "Task",
@@ -108,8 +122,12 @@
     "remove": "Remove",
     "taskLatex": "Task LaTeX",
     "solutionLatex": "Solution LaTeX",
+    "pointsValidationErrorDetailed": "Task points {{taskPoints}} must equal topic points {{topicPoints}}",
     "uploadTaskImage": "Upload task image",
-    "relatedToTopic": "Related to topic"
+    "relatedToTopic": "Related to topic",
+    "confirmCancelTitle": "Discard Changes?",
+    "confirmYes": "Yes",
+    "unsavedChangesMessage": "You have unsaved changes. Do you want to discard them?"
   },
   "exams": {
     "pageTitle": "Exams",
@@ -120,6 +138,7 @@
     "deleteMessage": "Are you sure you want to delete this exam?",
     "date": "Date",
     "generateTitle": "Generate Exam",
+    "createTitle": "Create Exam",
     "editTitle": "Edit Exam",
     "loadingExam": "Loading exam…",
     "generate": "Generate",
@@ -137,15 +156,26 @@
     "teacherVersion": "Teacher Version",
     "studentVersionHint": "No solutions",
     "teacherVersionHint": "Includes solutions",
+    "year": "Year",
+    "semester": "Semester",
+    "selectYear": "Select year",
+    "selectSemester": "Select semester",
     "totalPoints": "Total points",
     "topics": "Topics",
     "exam": "Exam",
-    "selectAndGenerate": "Select a course, choose topics and click Generate",
+    "selectAndGenerate": "Select the course, year and semester, choose topics, then click Generate",
     "solutionSpace": "Solution Space",
     "addTask": "Add task",
     "regenerate": "Regenerate",
     "tasksCount": "Tasks ({{count}})",
-    "pts": "pts"
+    "pointsValidationError": "Task points must equal topic points",
+    "pointsValidationErrorDetailed": "{{topic}}: task points {{taskPoints}} must equal topic points {{topicPoints}}",
+    "pointsValidationErrorTopics": "Points mismatch in topics: {{topics}}",
+    "pointsValidationErrorTopicDetails": "Points mismatch: task total {{taskPoints}} pts, topic {{topicPoints}} pts",
+    "pts": "pts",
+    "confirmCancelTitle": "Discard Changes?",
+    "confirmYes": "Yes",
+    "unsavedChangesMessage": "You have unsaved changes. Do you want to discard them?"
   },
   "coverPageDialog": {
     "title": "Edit Cover Page",
@@ -196,6 +226,23 @@
   "confirmDialog": {
     "confirm": "Confirm"
   },
+  "notifications": {
+    "courseCreated": "Course created successfully",
+    "courseUpdated": "Course updated successfully",
+    "courseDeleted": "Course deleted successfully",
+    "topicCreated": "Task created successfully",
+    "topicUpdated": "Task updated successfully",
+    "topicDeleted": "Task deleted successfully",
+    "examCreated": "Exam saved successfully",
+    "examUpdated": "Exam updated successfully",
+    "examDeleted": "Exam deleted successfully",
+    "examGenerated": "Exam generated successfully",
+    "draftGenerated": "Draft generated successfully",
+    "topicRegenerated": "Task regenerated successfully",
+    "compileSuccess": "Compiled successfully",
+    "compileWithWarnings": "Compiled with {{count}} warning(s)",
+    "compileWithErrors": "Compiled with {{count}} error(s)"
+  },
   "errors": {
     "requestFailed": "Request failed",
     "requiredTitle": "Title is required",
@@ -204,6 +251,7 @@
     "requiredCourse": "Course is required",
     "requiredTopic": "Topic is required",
     "requiredQuestion": "Question is required",
-    "pointsMin": "Points must be >= 0"
+    "pointsMin": "Points must be >= 1",
+    "taskPointsMismatch": "Total points mismatch"
   }
 }

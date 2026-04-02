@@ -56,6 +56,7 @@ export function ExamsPage() {
     () =>
       items.map((e) => ({
         ...e,
+        semester: e.semester || "",
         courseTitle:
           (e.courseId && (e.courseId.title ?? e.courseId.shortName)) ||
           (typeof e.courseId === "string" ? e.courseId : ""),
@@ -71,8 +72,24 @@ export function ExamsPage() {
         field: "courseTitle",
         colId: "courseId",
       },
-      { headerName: t("common.points"), field: "points", colId: "points" },
-      { headerName: t("exams.date"), field: "date", colId: "createdAt" },
+      {
+        headerName: t("exams.semester"),
+        field: "semester",
+        colId: "semester",
+      },
+      {
+        headerName: t("common.points"),
+        field: "points",
+        colId: "points",
+        cellDataType: "number",
+        cellStyle: { textAlign: "right" },
+      },
+      {
+        headerName: t("exams.date"),
+        field: "date",
+        colId: "createdAt",
+        cellStyle: { textAlign: "right" },
+      },
     ],
     [t],
   );
@@ -83,7 +100,7 @@ export function ExamsPage() {
         id: "edit",
         label: t("common.edit"),
         icon: EditIcon,
-        onClick: (row) => nav(`/exams/${row.id}/edit`),
+        onClick: (row) => nav(`/exams/edit/${row.id}`),
       },
       {
         id: "delete",
@@ -125,8 +142,9 @@ export function ExamsPage() {
         right={
           <Button
             variant="contained"
+            size="small"
             startIcon={<AddIcon />}
-            onClick={() => nav("/exams/generate")}
+            onClick={() => nav("/exams/create")}
           >
             {t("common.addNew")}
           </Button>
