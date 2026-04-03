@@ -54,6 +54,7 @@ import {
   useUpdateExam,
 } from "./hooks";
 import { examsApi } from "../../api/exams.api";
+import { coursesApi } from "../../api/courses.api";
 import { useTranslation } from "react-i18next";
 import {
   getCompileResultPayload,
@@ -479,6 +480,7 @@ export function GenerateExamPage() {
     try {
       const res = await examsApi.compileDraft({
         course: draft.course,
+        courseId: draft.course?.id || courseId,
         coverPage: draft.course?.coverPage || "",
         topics: draft.topics,
         version,
@@ -524,6 +526,7 @@ export function GenerateExamPage() {
           ...draft.course,
           coverPage: coverPageDraft,
         },
+        courseId: draft.course?.id || courseId,
         coverPage: coverPageDraft,
         topics: [],
         version: "STUDENT",
@@ -546,6 +549,18 @@ export function GenerateExamPage() {
   };
 
   const saveCoverPage = async () => {
+    const resolvedCourseId = String(draft?.course?.id || courseId || "").trim();
+    if (!resolvedCourseId || !draft?.course) return;
+
+    const latestCourse = await coursesApi.getById(resolvedCourseId);
+    const currentCourse = latestCourse?.data ?? latestCourse;
+
+    await coursesApi.update(resolvedCourseId, {
+      title: currentCourse?.title || draft.course?.title || "",
+      coverPage: coverPageDraft,
+      topics: Array.isArray(currentCourse?.topics) ? currentCourse.topics : [],
+    });
+
     setDraft((prev) => {
       if (!prev) return prev;
       return {

@@ -60,6 +60,41 @@ function createTopicRepo() {
         { new: true },
       );
     },
+
+    async deleteByCourseId(courseId) {
+      return Topic.updateMany(
+        { courseId, isDeleted: { $ne: true } },
+        { $set: { isDeleted: true } },
+      );
+    },
+
+    async renameTopicForCourse(courseId, fromTopic, toTopic) {
+      const docs = await Topic.find({
+        courseId,
+        topic: fromTopic,
+        isDeleted: { $ne: true },
+      });
+
+      await Promise.all(
+        docs.map((doc) => {
+          const rawLatex = String(doc.full_tex_code || "");
+          const nextLatex = rawLatex.replace(
+            /\\section\{[^}]*\}/,
+            `\\section{${toTopic}}`,
+          );
+
+          return Topic.updateOne(
+            { _id: doc._id },
+            {
+              $set: {
+                topic: toTopic,
+                full_tex_code: nextLatex || rawLatex,
+              },
+            },
+          );
+        }),
+      );
+    },
   };
 }
 

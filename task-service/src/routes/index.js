@@ -11,23 +11,17 @@ const { createTopicRepo } = require("../repositories/topic.repo");
 const { createTopicService } = require("../services/topic.service");
 const { createTopicController } = require("../controllers/topic.controller");
 const { createTopicRoutes } = require("./topic.routes");
-const { createTopicImagesController } = require("../controllers/topicImages.controller");
-const { createTopicImagesRoutes } = require("./topicImages.routes");
 
 const router = express.Router();
 
-// courses wiring
 const courseRepo = createCourseRepo();
-const courseService = createCourseService({ courseRepo });
-const courseController = createCourseController({ courseService });
-router.use("/courses", createCourseRoutes({ courseController }));
-
-// topics wiring
 const topicRepo = createTopicRepo();
-const topicService = createTopicService({ topicRepo, courseRepo }); 
+const courseService = createCourseService({ courseRepo, topicRepo });
+const courseController = createCourseController({ courseService });
+const topicService = createTopicService({ topicRepo, courseRepo });
 const topicController = createTopicController({ topicService });
-const topicImagesController = createTopicImagesController({ topicRepo });
+
+router.use("/courses", createCourseRoutes({ courseController }));
 router.use("/topics", createTopicRoutes({ topicController }));
-router.use("/topics", createTopicImagesRoutes({ topicImagesController }));
 
 module.exports = router;

@@ -4,7 +4,8 @@ const courseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     shortName: { type: String, required: true, trim: true, unique: true },
-    coverPage: { type: String, required: true, trim: true },
+    coverPage: { type: String, default: "" },
+    topics: { type: [String], default: [] },
     
     creator: { 
       type: mongoose.Schema.Types.ObjectId, 

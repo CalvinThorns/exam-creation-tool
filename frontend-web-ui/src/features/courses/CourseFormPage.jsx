@@ -1,25 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useBlocker } from "react-router-dom";
+import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import {
   alpha,
-  CircularProgress,
-  Button,
-  TextField,
   Box,
-  Typography,
+  Button,
+  CircularProgress,
   IconButton,
-  Stack,
-  Tooltip,
-  useTheme,
   Paper,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+  useTheme,
 } from "@mui/material";
 import BuildIcon from "@mui/icons-material/Build";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import { useForm, useWatch } from "react-hook-form";
+import SaveIcon from "@mui/icons-material/Save";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { courseSchema } from "../../utils/validators";
 import { examsApi } from "../../api/exams.api";
@@ -27,10 +28,10 @@ import { LatexEditor } from "../../components/ui/LatexEditor";
 import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { RequiredLabel } from "../../components/ui/RequiredLabel";
-import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { Loader } from "../../components/ui/Loader";
+import { usePdfPreview } from "../../hooks/usePdfPreview";
 import { useCourse, useCreateCourse, useUpdateCourse } from "./courses.hooks";
 import { useTranslation } from "react-i18next";
 import {
@@ -61,7 +62,11 @@ export function CourseFormPage() {
 
   const form = useForm({
     resolver: zodResolver(courseSchema(t)),
-    defaultValues: { title: "", shortName: "", coverPage: "" },
+    defaultValues: {
+      title: "",
+      coverPage: "",
+      topics: [],
+    },
   });
 
   const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
@@ -69,12 +74,16 @@ export function CourseFormPage() {
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compilerMessages, setCompilerMessages] = useState(null);
-  const [isEditable, setIsEditable] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     action: null,
   });
-  const initialValuesRef = useRef({ title: "", shortName: "", coverPage: "" });
+
+  const initialValuesRef = useRef({
+    title: "",
+    coverPage: "",
+    topics: [],
+  });
   const splitContainerRef = useRef(null);
   const blockerRef = useRef(null);
   const blockedLocationRef = useRef(null);
@@ -82,40 +91,58 @@ export function CourseFormPage() {
   const { pdfUrl, setPdfFromBase64, clearPdf } =
     usePdfPreview("cover-page.pdf");
 
+  const {
+    control,
+    formState,
+    getValues,
+    handleSubmit,
+    register,
+    reset,
+    setValue,
+  } = form;
+
+  const coverPageValue = useWatch({ control, name: "coverPage" }) || "";
+  const { fields: topicFields, append: appendTopic, remove: removeTopic } =
+    useFieldArray({
+      control,
+      name: "topics",
+    });
+
   useEffect(() => {
     if (!isEditMode) {
-      const defaults = { title: "", shortName: "", coverPage: "" };
-      form.reset(defaults);
+      const defaults = {
+        title: "",
+        coverPage: "",
+        topics: [],
+      };
+      reset(defaults);
       initialValuesRef.current = defaults;
-      setIsEditable(true);
+      clearPdf();
+      setCompilerMessages(null);
       setCollapsedPane(null);
       setSplitPercent(DEFAULT_SPLIT_PERCENT);
-      setCompilerMessages(null);
-      clearPdf();
       return;
     }
 
     const resolved = courseData?.data ?? courseData;
     if (!resolved) return;
 
-    const hydratedValues = {
-      title: resolved?.title || "",
-      shortName: resolved?.shortName || "",
-      coverPage: resolved?.coverPage || "",
+    const hydrated = {
+      title: String(resolved.title || ""),
+      coverPage: String(resolved.coverPage || ""),
+      topics: Array.isArray(resolved.topics) ? resolved.topics : [],
     };
 
-    form.reset(hydratedValues);
-    initialValuesRef.current = hydratedValues;
-    setIsEditable(true);
-
+    reset(hydrated);
+    initialValuesRef.current = hydrated;
+    clearPdf();
+    setCompilerMessages(null);
     setCollapsedPane(null);
     setSplitPercent(DEFAULT_SPLIT_PERCENT);
-    setCompilerMessages(null);
-    clearPdf();
-  }, [courseData, isEditMode, form, clearPdf]);
+  }, [clearPdf, courseData, isEditMode, reset]);
 
   useEffect(() => {
-    if (!isDraggingSplit) return;
+    if (!isDraggingSplit) return undefined;
 
     const handleMouseMove = (event) => {
       const container = splitContainerRef.current;
@@ -163,9 +190,50 @@ export function CourseFormPage() {
     };
   }, [isDraggingSplit]);
 
-  const { register, handleSubmit, formState, setValue, control, getValues } =
-    form;
-  const coverPageValue = useWatch({ control, name: "coverPage" }) || "";
+  const normalizeTopics = (topics) =>
+    (Array.isArray(topics) ? topics : []).map((topic) => String(topic || ""));
+
+  const hasUnsavedChanges = () => {
+    const currentValues = {
+      title: String(getValues("title") || ""),
+      coverPage: String(getValues("coverPage") || ""),
+      topics: normalizeTopics(getValues("topics")),
+    };
+
+    return (
+      JSON.stringify(currentValues) !== JSON.stringify(initialValuesRef.current)
+    );
+  };
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  useEffect(() => {
+    blockerRef.current = blocker;
+    if (blocker.state === "blocked") {
+      if (isIntentionalNavigationRef.current) {
+        isIntentionalNavigationRef.current = false;
+        blockerRef.current.proceed();
+        return;
+      }
+
+      const currentLocation = blocker.location.pathname;
+      if (
+        blockedLocationRef.current !== currentLocation &&
+        !confirmDialog.open
+      ) {
+        blockedLocationRef.current = currentLocation;
+        setConfirmDialog({
+          open: true,
+          action: "navigate",
+        });
+      }
+    } else if (blocker.state === "unblocked") {
+      blockedLocationRef.current = null;
+    }
+  }, [blocker, confirmDialog.open]);
 
   const resetSplitLayout = () => {
     setCollapsedPane(null);
@@ -183,17 +251,63 @@ export function CourseFormPage() {
   const rightPanelWidth =
     collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
 
+  const handleCancelClick = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmDialog({ open: true, action: "cancel" });
+      return;
+    }
+    nav("/courses/list");
+  };
+
+  const handleConfirmDialogConfirm = () => {
+    const action = confirmDialog.action;
+    setConfirmDialog({ open: false, action: null });
+
+    if (action === "cancel") {
+      isIntentionalNavigationRef.current = true;
+      nav("/courses/list");
+    } else if (action === "navigate" && blockerRef.current) {
+      blockerRef.current.proceed();
+    }
+  };
+
+  const handleConfirmDialogCancel = () => {
+    if (blockerRef.current?.state === "blocked") {
+      blockerRef.current.reset();
+    }
+    setConfirmDialog({ open: false, action: null });
+  };
+
+  const resetForm = () => {
+    reset(initialValuesRef.current);
+    clearPdf();
+    setCompilerMessages(null);
+  };
+
+  const addTopicField = () => {
+    appendTopic("", {
+      shouldFocus: true,
+    });
+  };
+
+  const removeTopicField = (index) => {
+    removeTopic(index);
+  };
+
   const compileCoverPage = async () => {
-    const coverPage = getValues("coverPage") || "";
+    const latexContent = String(getValues("coverPage") || "").trim();
+    if (!latexContent) {
+      clearPdf();
+      setCompilerMessages(null);
+      return;
+    }
 
     clearPdf();
     setCompilerMessages(null);
     setIsCompiling(true);
 
     try {
-      const response = await examsApi.compileLatexOnly({
-        latexContent: coverPage,
-      });
+      const response = await examsApi.compileLatexOnly({ latexContent });
       const { pdfBase64, filename, contentType, diagnostics } =
         getCompileResultPayload(response);
 
@@ -202,7 +316,6 @@ export function CourseFormPage() {
         filename,
         mimeType: contentType || "application/pdf",
       });
-
       setCompilerMessages(toCompilerMessages(diagnostics));
       notifyCompileOutcome(diagnostics);
     } catch (compileError) {
@@ -228,99 +341,44 @@ export function CourseFormPage() {
     }
   };
 
+  const loadTexFile = async (file) => {
+    if (!file) return;
+    const fileName = String(file.name || "").toLowerCase();
+    if (!fileName.endsWith(".tex")) {
+      return;
+    }
+
+    const content = await file.text();
+    setValue("coverPage", content, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const handleTexUpload = async (event) => {
+    const [file] = Array.from(event.target.files || []);
+    try {
+      await loadTexFile(file);
+    } finally {
+      event.target.value = "";
+    }
+  };
+
   const submit = handleSubmit(async (values) => {
     if (isEditMode) {
       await updateM.mutateAsync({ id, body: values });
     } else {
       await createM.mutateAsync(values);
     }
-    // After successful save, sync initial state to prevent blocker dialog on nav
+
     initialValuesRef.current = {
-      title: values.title,
-      shortName: values.shortName,
-      coverPage: values.coverPage,
+      title: String(values.title || ""),
+      coverPage: String(values.coverPage || ""),
+      topics: normalizeTopics(values.topics),
     };
+
     nav("/courses/list");
   });
-
-  const hasUnsavedChanges = () => {
-    const currentValues = {
-      title: form.getValues("title"),
-      shortName: form.getValues("shortName"),
-      coverPage: form.getValues("coverPage"),
-    };
-    return (
-      JSON.stringify(currentValues) !== JSON.stringify(initialValuesRef.current)
-    );
-  };
-
-  // Block route changes when there are unsaved changes
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
-  );
-
-  // Store blocker in ref and show dialog when navigation is blocked
-  useEffect(() => {
-    blockerRef.current = blocker;
-    if (blocker.state === "blocked") {
-      // Skip if this is an intentional navigation from dialog
-      if (isIntentionalNavigationRef.current) {
-        isIntentionalNavigationRef.current = false;
-        blockerRef.current.proceed();
-        return;
-      }
-
-      // Only open dialog if this is a new blocked state (different location)
-      const currentLocation = blocker.location.pathname;
-      if (
-        blockedLocationRef.current !== currentLocation &&
-        !confirmDialog.open
-      ) {
-        blockedLocationRef.current = currentLocation;
-        setConfirmDialog({
-          open: true,
-          action: "navigate",
-        });
-      }
-    } else if (blocker.state === "unblocked") {
-      blockedLocationRef.current = null;
-    }
-  }, [blocker.state, blocker.location?.pathname, confirmDialog.open]);
-
-  const handleCancelClick = () => {
-    if (hasUnsavedChanges()) {
-      setConfirmDialog({ open: true, action: "cancel" });
-    } else {
-      nav("/courses/list");
-    }
-  };
-
-  const handleConfirmDialogConfirm = () => {
-    const action = confirmDialog.action;
-    setConfirmDialog({ open: false, action: null });
-
-    if (action === "cancel") {
-      isIntentionalNavigationRef.current = true;
-      nav("/courses/list");
-    } else if (action === "navigate" && blockerRef.current) {
-      blockerRef.current.proceed();
-    }
-  };
-
-  const handleConfirmDialogCancel = () => {
-    if (blockerRef.current?.state === "blocked") {
-      blockerRef.current.reset();
-    }
-    setConfirmDialog({ open: false, action: null });
-  };
-
-  const resetForm = () => {
-    form.reset(initialValuesRef.current);
-    setCompilerMessages(null);
-    clearPdf();
-    setIsEditable(true);
-  };
 
   return (
     <Box
@@ -348,7 +406,7 @@ export function CourseFormPage() {
               startIcon={<SaveIcon />}
               size="small"
               onClick={submit}
-              disabled={createM.isPending || updateM.isPending || !isEditable}
+              disabled={createM.isPending || updateM.isPending}
             >
               {t("common.save")}
             </Button>
@@ -369,40 +427,16 @@ export function CourseFormPage() {
               height: "100%",
               display: "flex",
               flexDirection: "column",
+              overflow: "hidden",
             }}
           >
-            <Box
-              className="grid grid-cols-1 md:grid-cols-2 gap-6"
-              sx={{ mb: 2 }}
-            >
-              <TextField
-                label={<RequiredLabel label={t("common.title")} />}
-                fullWidth
-                size="small"
-                {...register("title")}
-                error={!!formState.errors.title}
-                helperText={formState.errors.title?.message}
-                disabled={!isEditable}
-              />
-
-              <TextField
-                label={t("common.shortName")}
-                fullWidth
-                size="small"
-                {...register("shortName")}
-                error={!!formState.errors.shortName}
-                helperText={formState.errors.shortName?.message}
-                disabled={!isEditable}
-              />
-            </Box>
-
             <Box
               ref={splitContainerRef}
               sx={{
                 display: "flex",
                 gap: 0,
                 flex: 1,
-                minHeight: 460,
+                minHeight: 0,
                 overflow: "hidden",
               }}
             >
@@ -451,65 +485,152 @@ export function CourseFormPage() {
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 1,
+                    gap: 2,
                   }}
                 >
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block" }}
-                    >
-                      <RequiredLabel label={t("courses.coverPageLatex")} />
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      size="small"
-                      startIcon={
-                        isCompiling ? (
-                          <CircularProgress size={14} color="inherit" />
-                        ) : (
-                          <BuildIcon />
-                        )
-                      }
-                      onClick={compileCoverPage}
-                      disabled={isCompiling || !isEditable}
-                    >
-                      {isCompiling
-                        ? t("common.compiling")
-                        : t("common.compilePreview")}
-                    </Button>
-                  </Stack>
+                  <TextField
+                    label={<RequiredLabel label={t("common.title")} />}
+                    fullWidth
+                    size="small"
+                    {...register("title")}
+                    error={!!formState.errors.title}
+                    helperText={formState.errors.title?.message}
+                  />
 
-                  <Box sx={{ flex: 1, minHeight: 0 }}>
-                    <LatexEditor
-                      value={coverPageValue}
-                      onChange={(value) => {
-                        if (!isEditable) return;
-                        setValue("coverPage", value, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
+                  <Box>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      sx={{ mb: 1 }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        {t("courses.courseTopics")}
+                      </Typography>
+                      <Button size="small" onClick={addTopicField}>
+                        {t("courses.addTopic")}
+                      </Button>
+                    </Stack>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 1,
+                        alignItems: "flex-start",
                       }}
-                      height="100%"
-                      placeholder={t("courses.coverPageLatex")}
-                    />
+                    >
+                      {topicFields.map((field, index) => (
+                        <Stack
+                          key={field.id}
+                          direction="row"
+                          spacing={0.5}
+                          alignItems="center"
+                          sx={{
+                            border: `1px solid ${theme.palette.divider}`,
+                            borderRadius: 2,
+                            px: 1,
+                            py: 0.75,
+                            bgcolor: "background.default",
+                          }}
+                        >
+                          <TextField
+                            size="small"
+                            {...register(`topics.${index}`)}
+                            error={Boolean(formState.errors.topics?.[index])}
+                            helperText={formState.errors.topics?.[index]?.message}
+                            placeholder={t("courses.addTopic")}
+                            sx={{
+                              width: 180,
+                              "& .MuiFormHelperText-root": {
+                                ml: 0,
+                                mr: 0,
+                              },
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={() => removeTopicField(index)}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      ))}
+                    </Box>
                   </Box>
 
-                  {formState.errors.coverPage?.message ? (
-                    <Typography variant="caption" color="error.main">
-                      {formState.errors.coverPage.message}
-                    </Typography>
-                  ) : null}
+                  <Box
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      flexWrap="wrap"
+                      gap={1}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block" }}
+                      >
+                        {t("courses.coverPageLatex")}
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Button variant="outlined" component="label" size="small">
+                          {t("topics.uploadTexFile")}
+                          <input
+                            hidden
+                            type="file"
+                            accept=".tex,text/x-tex,application/x-tex"
+                            onChange={handleTexUpload}
+                          />
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="secondary"
+                          size="small"
+                          startIcon={
+                            isCompiling ? (
+                              <CircularProgress size={14} color="inherit" />
+                            ) : (
+                              <BuildIcon />
+                            )
+                          }
+                          onClick={compileCoverPage}
+                          disabled={isCompiling}
+                        >
+                          {isCompiling
+                            ? t("common.compiling")
+                            : t("common.compilePreview")}
+                        </Button>
+                      </Stack>
+                    </Stack>
+
+                    <Box sx={{ flex: 1, minHeight: 0 }}>
+                      <LatexEditor
+                        value={coverPageValue}
+                        onChange={(value) => {
+                          setValue("coverPage", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
+                        height="100%"
+                        placeholder={t("courses.coverPageLatex")}
+                      />
+                    </Box>
+                  </Box>
                 </Box>
               )}
 
-              {collapsedPane === null && (
+              {collapsedPane === null ? (
                 <Box
                   onMouseDown={startSplitDrag}
                   role="separator"
@@ -578,7 +699,7 @@ export function CourseFormPage() {
                     </Tooltip>
                   </Stack>
                 </Box>
-              )}
+              ) : null}
 
               {collapsedPane === "right" ? (
                 <Box

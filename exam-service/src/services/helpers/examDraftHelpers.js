@@ -4,29 +4,74 @@ const {
   DEFAULT_SOLUTION_SPACE,
 } = require("../../models/topic.model");
 
+function bufferLikeToBase64(value) {
+  if (!value) return "";
+  if (Buffer.isBuffer(value)) return value.toString("base64");
+  if (typeof value === "string") return value;
+  if (value && Buffer.isBuffer(value.buffer)) {
+    return value.buffer.toString("base64");
+  }
+  if (value && Array.isArray(value.data)) {
+    return Buffer.from(value.data).toString("base64");
+  }
+  return "";
+}
+
+function serializeImageLike(image) {
+  const base64 = bufferLikeToBase64(image?.data);
+  if (!base64) {
+    return {
+      base64: "",
+      contentType: "",
+      filename: "",
+    };
+  }
+
+  return {
+    base64,
+    contentType: image?.contentType || "",
+    filename: image?.filename || "",
+  };
+}
+
+function serializeAssetLike(asset) {
+  const base64 = bufferLikeToBase64(asset?.data);
+  if (!base64) {
+    return {
+      filename: asset?.filename || "",
+      contentType: asset?.contentType || "",
+      base64: "",
+    };
+  }
+
+  return {
+    filename: asset?.filename || "",
+    contentType: asset?.contentType || "",
+    base64,
+  };
+}
+
 function snapshotFromTopicDoc(doc, numOrZero) {
   return {
     topicId: doc?._id ? String(doc._id) : undefined,
     courseId: doc.courseId,
+    full_tex_code: doc.full_tex_code || "",
     topic: doc.topic || "",
     description: doc.description || "",
     points: numOrZero(doc.points),
-    description_img: doc.description_img || {
-      base64: "",
-      contentType: "",
-      filename: "",
-    },
+    description_img: serializeImageLike(doc.description_img),
     tasks: Array.isArray(doc.tasks)
       ? doc.tasks.map((t) => ({
           id: t.id || null,
+          description: t.description || "",
+          full_tex_code: t.full_tex_code || "",
           question: t.question || "",
           points: numOrZero(t.points),
-          question_img: t.question_img || {
-            base64: "",
-            contentType: "",
-            filename: "",
-          },
+          question_img: serializeImageLike(t.question_img),
           solution: t.solution || "",
+          assets: Array.isArray(t.assets)
+            ? t.assets.map(serializeAssetLike).filter((asset) => asset.base64)
+            : [],
           solutionSpace: SOLUTION_SPACE_OPTIONS.includes(t.solutionSpace)
             ? t.solutionSpace
             : DEFAULT_SOLUTION_SPACE,
@@ -39,14 +84,23 @@ function snapshotFromTopicDoc(doc, numOrZero) {
 
 function topicSignature(topic, numOrZero) {
   return JSON.stringify({
+    full_tex_code: topic?.full_tex_code || "",
     topic: topic?.topic || "",
     description: topic?.description || "",
     points: numOrZero(topic?.points),
     tasks: Array.isArray(topic?.tasks)
       ? topic.tasks.map((t) => ({
+          description: t?.description || "",
+          full_tex_code: t?.full_tex_code || "",
           question: t?.question || "",
           points: numOrZero(t?.points),
           solution: t?.solution || "",
+          assets: Array.isArray(t?.assets)
+            ? t.assets.map((asset) => ({
+                filename: asset?.filename || "",
+                contentType: asset?.contentType || "",
+              }))
+            : [],
           solutionSpace: SOLUTION_SPACE_OPTIONS.includes(t?.solutionSpace)
             ? t.solutionSpace
             : DEFAULT_SOLUTION_SPACE,

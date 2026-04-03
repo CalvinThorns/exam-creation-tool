@@ -1,9 +1,6 @@
 const { app } = require("./app");
 const { connectDB } = require("./config/db");
 const { env } = require("./config/env");
-const { httpLogger } = require("./middlewares/logger");
-
-app.use(httpLogger);
 (async () => {
   try {
     await connectDB(env.mongoUri);

@@ -1,6 +1,6 @@
-function num(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+function num(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 const SOLUTION_SPACE_TO_PAGES = {
@@ -13,9 +13,10 @@ const SOLUTION_SPACE_TO_PAGES = {
   "4 Pages": 4,
 };
 const DEFAULT_SOLUTION_SPACE = "1 Page";
+const BASE_TEMPLATE_PLACEHOLDER = "{{EXAM_CONTENT}}";
 
-function sanitizeTexInput(s) {
-  return String(s || "");
+function sanitizeTexInput(value) {
+  return String(value || "");
 }
 
 function normalizeSolutionSpace(space) {
@@ -38,7 +39,7 @@ function buildStudentAnswerSpaceLatex(space) {
 
   if (Number.isInteger(pages) && pages >= 2) {
     const blocks = [String.raw`\vspace*{\fill}`];
-    for (let i = 1; i < pages; i++) {
+    for (let index = 1; index < pages; index += 1) {
       blocks.push(String.raw`\newpage
 \null`);
     }
@@ -48,119 +49,196 @@ function buildStudentAnswerSpaceLatex(space) {
   return `\\vspace*{${pages}\\textheight}`;
 }
 
-function stripLeadingSubsection(s) {
-  const str = String(s || "");
-  return str.replace(/^\\subsection\*?\{[^}]*\}\s*/m, "");
+function stripLeadingSubsection(value) {
+  const source = String(value || "");
+  return source.replace(/^\\subsection\*?\{[^}]*\}\s*/m, "");
 }
 
-function unwrapSolutionEnv(s) {
-  const str = String(s || "");
-  const m = str.match(/\\begin\{solution\}([\s\S]*?)\\end\{solution\}/m);
-  return m ? m[1].trim() : str;
+function unwrapSolutionEnv(value) {
+  const source = String(value || "");
+  const match = source.match(/\\begin\{solution\}([\s\S]*?)\\end\{solution\}/m);
+  return match ? match[1].trim() : source;
 }
-
-const BASE_TEMPLATE_PLACEHOLDER = "{{EXAM_CONTENT}}";
 
 function withShowSolutionsFlag(template, showSolutions) {
-  const src = String(template || "");
+  const source = String(template || "");
   const desired = showSolutions
     ? "\\showsolutionstrue"
     : "\\showsolutionsfalse";
 
-  if (/\\showsolutions(?:true|false)/.test(src)) {
-    return src.replace(/\\showsolutions(?:true|false)/, desired);
+  if (/\\showsolutions(?:true|false)/.test(source)) {
+    return source.replace(/\\showsolutions(?:true|false)/, desired);
   }
 
-  if (/\\newif\\ifshowsolutions/.test(src)) {
-    return src.replace(
+  if (/\\newif\\ifshowsolutions/.test(source)) {
+    return source.replace(
       /\\newif\\ifshowsolutions/,
       `\\newif\\ifshowsolutions\n${desired}`,
     );
   }
 
-  return src;
+  return source;
 }
 
-/**
- * Generates the dynamic marks table block for the cover page.
- * Uses topics[].points and fills Summe.
- */
+function withRunningHeadValue(source, runningHead) {
+  const nextRunningHead = String(runningHead || "");
+  if (/\\def\s*\\runninghead\s*\{[^}]*\}/.test(source)) {
+    return source.replace(
+      /\\def\s*\\runninghead\s*\{[^}]*\}/,
+      `\\def \\runninghead {${nextRunningHead}}`,
+    );
+  }
+  return source;
+}
+
+function extractDocumentBody(source) {
+  const latex = String(source || "").trim();
+  const match = latex.match(
+    /\\begin\{document\}([\s\S]*?)\\end\{document\}/i,
+  );
+  return match ? match[1].trim() : latex;
+}
+
+function stripSolutionEnvironments(source) {
+  return String(source || "")
+    .replace(/\\begin\{solution\}[\s\S]*?\\end\{solution\}\s*/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buildMarksTableLatex(topics) {
-  const nTopics = Array.isArray(topics) ? topics.length : 0;
-  const n = Math.max(1, nTopics);
+  const topicCount = Array.isArray(topics) ? topics.length : 0;
+  const columnCount = Math.max(1, topicCount);
+  const headerNumbers = Array.from({ length: columnCount }, (_, index) =>
+    String(index + 1),
+  );
+  const points = (topics || []).map((topic) => num(topic?.points));
+  while (points.length < columnCount) points.push(0);
+  const sum = points.reduce((acc, value) => acc + num(value), 0);
 
-  const headerNums = Array.from({ length: n }, (_, i) => String(i + 1));
-  const points = (topics || []).map((t) => num(t?.points));
-  while (points.length < n) points.push(0);
-
-  const sum = points.reduce((a, b) => a + num(b), 0);
-
-  const headerRow = `Aufgabe & ${headerNums.join(" & ")} & Summe \\\\`;
+  const headerRow = `Aufgabe & ${headerNumbers.join(" & ")} & Summe \\\\`;
   const pointsRow = `Punkte & ${points.join(" & ")} & ${sum} \\\\`;
-  const reachedRow = `Erreicht & ${Array(n).fill("").join(" & ")} & \\\\`;
+  const reachedRow = `Erreicht & ${Array(columnCount).fill("").join(" & ")} & \\\\`;
 
-  // widths:
-  // - first column fixed
-  // - sum column fixed (a bit wider)
-  // - task columns use tabularx X-columns so total width stays within \linewidth
-  const firstW = "2.0cm";
-  const sumW = "2.5cm";
-
-  const tableFont = n >= 12 ? "\\scriptsize" : n >= 9 ? "\\footnotesize" : "";
-  const tabColSep = n >= 12 ? "2pt" : n >= 9 ? "3pt" : "4pt";
-  const arrayStretch = n >= 12 ? "1.1" : "1.2";
-
-  const taskCols = `*{${n}}{>{\\centering\\arraybackslash}X|}`;
-
-  const colSpec = `|L{${firstW}}||${taskCols}C{${sumW}}|`;
+  const firstWidth = "2.0cm";
+  const sumWidth = "2.5cm";
+  const tableFont =
+    columnCount >= 12 ? "\\scriptsize" : columnCount >= 9 ? "\\footnotesize" : "";
+  const tabColSep = columnCount >= 12 ? "2pt" : columnCount >= 9 ? "3pt" : "4pt";
+  const arrayStretch = columnCount >= 12 ? "1.1" : "1.2";
+  const taskColumns = `*{${columnCount}}{>{\\centering\\arraybackslash}X|}`;
+  const columnSpec = `|L{${firstWidth}}||${taskColumns}C{${sumWidth}}|`;
 
   return String.raw`
-    \vspace{0.5cm}
+\vspace{0.5cm}
 
-    {${tableFont}
-    \renewcommand{\arraystretch}{${arrayStretch}}
-    \setlength{\tabcolsep}{${tabColSep}}
-    \begin{tabularx}{\linewidth}{${colSpec}}
-    \hline
-    ${headerRow}
-    \hline
-    ${pointsRow}
-    \hline
-    ${reachedRow}
-    \hline
-    \end{tabularx}
-    }
-  `;
+{${tableFont}
+\renewcommand{\arraystretch}{${arrayStretch}}
+\setlength{\tabcolsep}{${tabColSep}}
+\begin{tabularx}{\linewidth}{${columnSpec}}
+\hline
+${headerRow}
+\hline
+${pointsRow}
+\hline
+${reachedRow}
+\hline
+\end{tabularx}
+}
+`;
 }
 
-/**
- * Replaces the marks table block inside course.coverPage.
- * This is robust for user-provided cover pages because it searches for a tabularx
- * that contains the key rows: Aufgabe, Punkte, Erreicht.
- */
 function injectMarksTableAuto(coverPageLatex, topics) {
-  const src = String(coverPageLatex || "");
+  const source = String(coverPageLatex || "");
   const replacement = buildMarksTableLatex(topics);
-
-  // Find the tabularx that contains Aufgabe + Punkte + Erreicht.
-  // Then optionally include the preceding \vspace{0.5cm}\hrule block if present.
-  const re =
+  const tableRegex =
     /(?:\\vspace\{0\.5cm\}\s*\\hrule\s*)?\\begin\{tabularx\}\{\\linewidth\}\{[\s\S]*?\}[\s\S]*?Aufgabe[\s\S]*?Punkte[\s\S]*?Erreicht[\s\S]*?\\end\{tabularx\}/m;
 
-  if (!re.test(src)) {
-    // Fallback: replace the first tabularx on cover page (better than failing compile),
-    // but only if there is at least one tabularx.
+  if (!tableRegex.test(source)) {
     const firstTabularx =
       /\\begin\{tabularx\}\{\\linewidth\}\{[\s\S]*?\\end\{tabularx\}/m;
-    if (firstTabularx.test(src)) {
-      return src.replace(firstTabularx, replacement);
+    if (firstTabularx.test(source)) {
+      return source.replace(firstTabularx, replacement);
     }
-
-    // If there is no table at all, append it near the end (still usable).
-    return src + "\n\n" + replacement + "\n";
+    return `${source}\n\n${replacement}\n`;
   }
 
-  return src.replace(re, replacement);
+  return source.replace(tableRegex, replacement);
+}
+
+function buildFallbackTopicBody(topic, isStudentVersion) {
+  const parts = [];
+  const topicTitle = String(topic?.topic || "").trim();
+  const topicPoints = num(topic?.points);
+
+  parts.push(`\\section{${topicTitle} (${topicPoints}P)}`);
+
+  if (topic?.description && String(topic.description).trim()) {
+    parts.push(sanitizeTexInput(topic.description));
+  }
+
+  if (topic.__descImgPath) {
+    parts.push(String.raw`\begin{center}
+\includegraphics[width=0.9\linewidth]{${topic.__descImgPath}}
+\end{center}`);
+  }
+
+  const tasks = Array.isArray(topic?.tasks) ? topic.tasks : [];
+  tasks.forEach((task) => {
+    const points = num(task?.points);
+    parts.push(`\\subsection{${points}P}`);
+
+    const questionBody = stripLeadingSubsection(task?.question || "");
+    if (String(questionBody).trim()) {
+      parts.push(sanitizeTexInput(questionBody));
+    }
+
+    if (task.__qImgPath) {
+      parts.push(String.raw`\begin{center}
+\includegraphics[width=0.9\linewidth]{${task.__qImgPath}}
+\end{center}`);
+    }
+
+    const solutionBody = unwrapSolutionEnv(task?.solution || "");
+    if (String(solutionBody).trim()) {
+      parts.push(String.raw`\begin{solution}
+${sanitizeTexInput(solutionBody)}
+\end{solution}`);
+    }
+
+    if (isStudentVersion) {
+      parts.push(buildStudentAnswerSpaceLatex(task?.solutionSpace));
+    }
+  });
+
+  return parts.filter(Boolean).join("\n\n").trim();
+}
+
+function buildTopicBody(topic, isStudentVersion) {
+  const rawTopicLatex = String(topic?.full_tex_code || "").trim();
+  if (!rawTopicLatex) {
+    return buildFallbackTopicBody(topic, isStudentVersion);
+  }
+
+  const topicTitle = String(topic?.topic || "").trim();
+  const topicPoints = num(topic?.points);
+  const heading = `\\section{${topicTitle} (${topicPoints}P)}`;
+
+  let body = extractDocumentBody(rawTopicLatex);
+  if (/\\section\*?\{[^}]*\}(?:\s*\([^)]*\))?/.test(body)) {
+    body = body.replace(
+      /\\section\*?\{[^}]*\}(?:\s*\([^)]*\))?/,
+      heading,
+    );
+  } else {
+    body = `${heading}\n\n${body}`.trim();
+  }
+
+  if (isStudentVersion) {
+    body = stripSolutionEnvironments(body);
+  }
+
+  return body.trim();
 }
 
 function buildLatexFromDraft({
@@ -168,10 +246,11 @@ function buildLatexFromDraft({
   topics,
   version,
   baseTemplate,
+  courseTitle,
 }) {
-  const v = String(version || "TEACHER").toUpperCase();
-  const showSolutions = v !== "STUDENT";
-  const isStudentVersion = v === "STUDENT";
+  const normalizedVersion = String(version || "TEACHER").toUpperCase();
+  const showSolutions = normalizedVersion !== "STUDENT";
+  const isStudentVersion = normalizedVersion === "STUDENT";
   const template = String(baseTemplate || "");
 
   if (!template.includes(BASE_TEMPLATE_PLACEHOLDER)) {
@@ -182,82 +261,33 @@ function buildLatexFromDraft({
 
   const parts = [];
 
-  // cover page (and table injection) stays as you already have it
   if (coverPageLatex && String(coverPageLatex).trim()) {
-    const filledCover = injectMarksTableAuto(coverPageLatex, topics);
-    parts.push(sanitizeTexInput(filledCover));
-  } else {
-    parts.push(String.raw`\section*{Exam}`);
-    parts.push(String.raw`\newpage`);
+    let coverBody = injectMarksTableAuto(coverPageLatex, topics);
+    coverBody = extractDocumentBody(coverBody);
+    coverBody = withRunningHeadValue(coverBody, courseTitle || "");
+    parts.push(sanitizeTexInput(coverBody));
   }
 
   parts.push(String.raw`\thispagestyle{fancy}`);
   parts.push(String.raw`\setcounter{page}{1}`);
 
-  // rest of your topic/task rendering stays the same
-  // when STUDENT, the solution env is excluded automatically
-  // when TEACHER, it is shown automatically
-
-  for (let i = 0; i < (topics || []).length; i++) {
-    const t = topics[i] || {};
-    if (i > 0) {
+  (topics || []).forEach((topic, index) => {
+    if (index > 0) {
       parts.push(String.raw`\newpage`);
     }
-    const topicStr = String(t.topic || "").trim();
-    const topicHeader = topicStr.startsWith("\\section")
-      ? sanitizeTexInput(topicStr)
-      : String.raw`\section{${sanitizeTexInput(topicStr)}}`;
+    parts.push(buildTopicBody(topic, isStudentVersion));
+  });
 
-    parts.push(topicHeader);
-
-    if (t.description && String(t.description).trim()) {
-      parts.push(sanitizeTexInput(t.description));
-    }
-
-    if (t.__descImgPath) {
-      parts.push(String.raw`\begin{center}
-\includegraphics[width=0.9\linewidth]{${t.__descImgPath}}
-\end{center}`);
-    }
-
-    const tasks = Array.isArray(t.tasks) ? t.tasks : [];
-    for (let j = 0; j < tasks.length; j++) {
-      const task = tasks[j] || {};
-      const pts = num(task.points);
-
-      if (isStudentVersion) {
-        parts.push(String.raw`\newpage`);
-      }
-
-      parts.push(String.raw`\subsection{${pts}P}`);
-
-      const questionBody = stripLeadingSubsection(task.question || "");
-      if (String(questionBody).trim()) {
-        parts.push(sanitizeTexInput(questionBody));
-      }
-
-      if (task.__qImgPath) {
-        parts.push(String.raw`\begin{center}
-\includegraphics[width=0.9\linewidth]{${task.__qImgPath}}
-\end{center}`);
-      }
-
-      const solBody = unwrapSolutionEnv(task.solution || "");
-      if (String(solBody).trim()) {
-        parts.push(String.raw`\begin{solution}
-${sanitizeTexInput(solBody)}
-\end{solution}`);
-      }
-
-      if (isStudentVersion) {
-        parts.push(buildStudentAnswerSpaceLatex(task.solutionSpace));
-      }
-    }
-  }
-
-  const body = parts.join("\n\n");
+  const body = parts.filter(Boolean).join("\n\n");
   const templateWithFlag = withShowSolutionsFlag(template, showSolutions);
-  return templateWithFlag.replace(BASE_TEMPLATE_PLACEHOLDER, body);
+  const templateWithRunningHead = withRunningHeadValue(
+    templateWithFlag,
+    courseTitle || "",
+  );
+
+  return templateWithRunningHead.replace(BASE_TEMPLATE_PLACEHOLDER, body);
 }
 
-module.exports = { buildLatexFromDraft };
+module.exports = {
+  buildLatexFromDraft,
+};

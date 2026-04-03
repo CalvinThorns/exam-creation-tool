@@ -15,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   SchoolOutlined,
-  TaskOutlined,
   LogoutOutlined, 
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
@@ -35,7 +34,6 @@ export function Sidebar({ isCollapsed, onToggle }) {
   const items = [
     { label: t("sidebar.exams"), to: "/exams", icon: AssignmentOutlined },
     { label: t("sidebar.courses"), to: "/courses", icon: SchoolOutlined },
-    { label: t("sidebar.tasks"), to: "/tasks", icon: TaskOutlined },
   ];
 
   const handleLogout = () => {

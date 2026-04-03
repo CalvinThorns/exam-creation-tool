@@ -1,20 +1,19 @@
+import { useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 function registerLatex(monaco) {
-  // Register LaTeX language
-  if (!monaco.languages.getLanguages().some((l) => l.id === "latex")) {
+  if (!monaco.languages.getLanguages().some((language) => language.id === "latex")) {
     monaco.languages.register({ id: "latex" });
   }
 
-  // Basic tokenization for LaTeX (good enough for commands, braces, comments, math)
   monaco.languages.setMonarchTokensProvider("latex", {
     tokenizer: {
       root: [
         [/%.*$/, "comment"],
         [/\\[a-zA-Z@]+/, "keyword"],
-        [/\$[^$]*\$/, "string"], // inline math
+        [/\$[^$]*\$/, "string"],
         [/\$\$/, "delimiter"],
         [/[{}[\]()]/, "delimiter"],
         [/&/, "delimiter"],
@@ -23,7 +22,6 @@ function registerLatex(monaco) {
     },
   });
 
-  // Optional: language config for brackets and auto closing
   monaco.languages.setLanguageConfiguration("latex", {
     comments: { lineComment: "%" },
     brackets: [
@@ -43,12 +41,31 @@ function registerLatex(monaco) {
 export function LatexEditor({
   value,
   onChange,
+  onPaste,
   height = 180,
   placeholder = "Write LaTeX here...",
   className,
 }) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
+  const editorRef = useRef(null);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !onPaste) return undefined;
+
+    const domNode = editor.getDomNode();
+    if (!domNode) return undefined;
+
+    const handlePaste = (event) => {
+      onPaste(event);
+    };
+
+    domNode.addEventListener("paste", handlePaste);
+    return () => {
+      domNode.removeEventListener("paste", handlePaste);
+    };
+  }, [onPaste]);
 
   return (
     <Box
@@ -67,7 +84,10 @@ export function LatexEditor({
         height="100%"
         defaultLanguage="latex"
         value={value || ""}
-        onChange={(v) => onChange?.(v ?? "")}
+        onMount={(editor) => {
+          editorRef.current = editor;
+        }}
+        onChange={(nextValue) => onChange?.(nextValue ?? "")}
         beforeMount={(monaco) => {
           registerLatex(monaco);
 
@@ -110,6 +130,7 @@ export function LatexEditor({
           automaticLayout: true,
           cursorBlinking: "smooth",
           padding: { top: 10, bottom: 10 },
+          contextmenu: !onPaste,
         }}
         theme={isDarkMode ? "exam-dark" : "exam-light"}
       />

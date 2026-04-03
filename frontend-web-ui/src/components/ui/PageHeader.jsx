@@ -9,7 +9,13 @@ export function PageHeader({ title, right }) {
         justifyContent="space-between"
         spacing={2}
       >
-        <Typography variant="h6">{title}</Typography>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          {typeof title === "string" ? (
+            <Typography variant="h6">{title}</Typography>
+          ) : (
+            title
+          )}
+        </Box>
 
         <Box
           sx={{
