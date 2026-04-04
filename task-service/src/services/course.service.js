@@ -7,6 +7,8 @@ const {
 } = require("./helpers/courseValidation");
 
 function createCourseService({ courseRepo, topicRepo }) {
+  const normalizeTopicName = (value) => String(value || "").trim().toLowerCase();
+
   const checkAccess = (course, userId) => {
     const isCreator = String(course.creator) === String(userId);
     const collaborators = Array.isArray(course.collaborators)
@@ -84,24 +86,57 @@ function createCourseService({ courseRepo, topicRepo }) {
 
       if (update.topics) {
         const currentTopics = Array.isArray(course.topics) ? course.topics : [];
-        const renamePairs = [];
+        const nextTopics = Array.isArray(update.topics) ? update.topics : [];
+        const currentTopicSet = new Set(currentTopics.map(normalizeTopicName));
+        const nextTopicSet = new Set(nextTopics.map(normalizeTopicName));
+        const removedTopics = currentTopics.filter(
+          (topicName) => !nextTopicSet.has(normalizeTopicName(topicName)),
+        );
+        const addedTopics = nextTopics.filter(
+          (topicName) => !currentTopicSet.has(normalizeTopicName(topicName)),
+        );
 
-        for (
-          let index = 0;
-          index < Math.min(currentTopics.length, update.topics.length);
-          index += 1
-        ) {
-          const previousName = String(currentTopics[index] || "").trim();
-          const nextName = String(update.topics[index] || "").trim();
-          if (previousName && nextName && previousName !== nextName) {
-            renamePairs.push([previousName, nextName]);
+        const renamePairs = [];
+        if (removedTopics.length === addedTopics.length && removedTopics.length > 0) {
+          for (
+            let index = 0;
+            index < Math.min(currentTopics.length, nextTopics.length);
+            index += 1
+          ) {
+            const previousName = String(currentTopics[index] || "").trim();
+            const nextName = String(nextTopics[index] || "").trim();
+            if (
+              previousName &&
+              nextName &&
+              previousName !== nextName &&
+              removedTopics.some(
+                (name) => normalizeTopicName(name) === normalizeTopicName(previousName),
+              ) &&
+              addedTopics.some(
+                (name) => normalizeTopicName(name) === normalizeTopicName(nextName),
+              )
+            ) {
+              renamePairs.push([previousName, nextName]);
+            }
           }
         }
 
+        const renamedFromTopics = new Set(
+          renamePairs.map(([previousName]) => normalizeTopicName(previousName)),
+        );
+        const topicsToDelete = removedTopics.filter(
+          (topicName) => !renamedFromTopics.has(normalizeTopicName(topicName)),
+        );
+
         await Promise.all(
-          renamePairs.map(([previousName, nextName]) =>
-            topicRepo.renameTopicForCourse(id, previousName, nextName),
-          ),
+          [
+            ...renamePairs.map(([previousName, nextName]) =>
+              topicRepo.renameTopicForCourse(id, previousName, nextName),
+            ),
+            ...topicsToDelete.map((topicName) =>
+              topicRepo.deleteByCourseIdAndTopic(id, topicName),
+            ),
+          ],
         );
       }
 

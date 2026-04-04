@@ -68,6 +68,13 @@ function createTopicRepo() {
       );
     },
 
+    async deleteByCourseIdAndTopic(courseId, topic) {
+      return Topic.updateMany(
+        { courseId, topic, isDeleted: { $ne: true } },
+        { $set: { isDeleted: true } },
+      );
+    },
+
     async renameTopicForCourse(courseId, fromTopic, toTopic) {
       const docs = await Topic.find({
         courseId,
