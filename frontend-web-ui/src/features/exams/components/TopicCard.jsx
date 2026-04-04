@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { LatexEditor } from "../../../components/ui/LatexEditor";
 import { useTranslation } from "react-i18next";
 
@@ -24,6 +25,7 @@ export function TopicCard({
   onVariantSolutionSpace,
   onSubtaskField,
   onAddTask,
+  canAddTask = true,
   onRemoveSubtask,
   onRegenerate,
   regenPending,
@@ -42,11 +44,11 @@ export function TopicCard({
       }}
     >
       <CardContent>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 2 }}
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{ mb: 2 }}
         >
           <Stack direction="row" spacing={1.25} alignItems="center">
             <Typography variant="subtitle1" fontWeight={700} color="text.primary">
@@ -79,7 +81,7 @@ export function TopicCard({
               variant="outlined"
               startIcon={<AddIcon />}
               onClick={() => onAddTask(topicGroup.topicName)}
-              disabled={!editable}
+              disabled={!editable || !canAddTask}
             >
               {t("exams.addTask")}
             </Button>
@@ -131,24 +133,36 @@ export function TopicCard({
                       )}
                     </Stack>
 
-                    <TextField
-                      select
-                      label={t("exams.solutionSpace")}
-                      value={sharedSolutionSpace}
-                      onChange={(event) =>
-                        onVariantSolutionSpace(flatIndex, event.target.value)
-                      }
-                      SelectProps={{ native: true }}
-                      size="small"
-                      sx={{ width: 180 }}
-                      disabled={!editable}
-                    >
-                      {solutionSpaceOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </TextField>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Button
+                        variant="text"
+                        color="error"
+                        size="small"
+                        startIcon={<DeleteOutlineIcon />}
+                        onClick={() => onRemoveSubtask(flatIndex)}
+                        disabled={!editable}
+                      >
+                        {t("topics.remove")}
+                      </Button>
+                      <TextField
+                        select
+                        label={t("exams.solutionSpace")}
+                        value={sharedSolutionSpace}
+                        onChange={(event) =>
+                          onVariantSolutionSpace(flatIndex, event.target.value)
+                        }
+                        SelectProps={{ native: true }}
+                        size="small"
+                        sx={{ width: 180 }}
+                        disabled={!editable}
+                      >
+                        {solutionSpaceOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </TextField>
+                    </Stack>
                   </Stack>
 
                   <Box

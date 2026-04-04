@@ -173,6 +173,45 @@ function groupDraftTopicsForUi(topics = []) {
   }));
 }
 
+function shuffleItems(items = []) {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
+function buildTopicVariantKey(topic) {
+  const explicitId = String(topic?.topicId || topic?.id || "").trim();
+  if (explicitId) return explicitId;
+
+  return JSON.stringify({
+    topic: String(topic?.topic || "").trim(),
+    description: String(topic?.description || "").trim(),
+    points: Number(topic?.points || 0),
+    full_tex_code: String(topic?.full_tex_code || "").trim(),
+    tasks: Array.isArray(topic?.tasks)
+      ? topic.tasks.map((task) => ({
+          description: String(task?.description || "").trim(),
+          question: String(task?.question || "").trim(),
+          solution: String(task?.solution || "").trim(),
+          points: Number(task?.points || 0),
+        }))
+      : [],
+  });
+}
+
+function uniqueTopicVariants(items = []) {
+  const seen = new Set();
+  return (items || []).filter((topic) => {
+    const key = buildTopicVariantKey(topic);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Compile Split Button  (Build ▾  →  dropdown with Student / Teacher)
 // ---------------------------------------------------------------------------
@@ -451,6 +490,40 @@ export function GenerateExamPage() {
     [draft?.topics],
   );
 
+  const getAvailableTopicVariants = useCallback(
+    (topicName) => {
+      const normalizedTopicName = String(topicName || "").trim().toLowerCase();
+      return uniqueTopicVariants(
+        (topics || []).filter(
+          (topic) =>
+            String(topic?.topic || "").trim().toLowerCase() === normalizedTopicName,
+        ),
+      );
+    },
+    [topics],
+  );
+
+  const countRemainingTopicVariants = useCallback(
+    (topicName, currentDraftTopics = draft?.topics || []) => {
+      const normalizedTopicName = String(topicName || "").trim().toLowerCase();
+      const usedTopicKeys = new Set(
+        (currentDraftTopics || [])
+          .filter(
+            (topic) =>
+              String(topic?.topic || "").trim().toLowerCase() === normalizedTopicName,
+          )
+          .map(buildTopicVariantKey)
+          .filter(Boolean),
+      );
+
+      return getAvailableTopicVariants(topicName).filter((topic) => {
+        const variantKey = buildTopicVariantKey(topic);
+        return variantKey && !usedTopicKeys.has(variantKey);
+      }).length;
+    },
+    [draft?.topics, getAvailableTopicVariants],
+  );
+
   const courseLabel = useMemo(() => {
     const courseFromDraft = draft?.course;
     if (courseFromDraft?.title || courseFromDraft?.shortName) {
@@ -693,27 +766,23 @@ export function GenerateExamPage() {
   const addTask = (topicName) => {
     setDraft((prev) => {
       if (!prev) return prev;
-      const usedTopicIds = new Set(
+      const normalizedTopicName = String(topicName || "").trim().toLowerCase();
+      const usedTopicKeys = new Set(
         (prev.topics || [])
           .filter(
             (topic) =>
-              String(topic?.topic || "").trim().toLowerCase() ===
-              String(topicName || "").trim().toLowerCase(),
+              String(topic?.topic || "").trim().toLowerCase() === normalizedTopicName,
           )
-          .map((topic) => String(topic?.topicId || topic?.id || "").trim())
+          .map(buildTopicVariantKey)
           .filter(Boolean),
       );
 
-      const availableVariants = (topics || [])
-        .filter(
-          (topic) =>
-            String(topic?.topic || "").trim().toLowerCase() ===
-            String(topicName || "").trim().toLowerCase(),
-        )
-        .filter((topic) => {
-          const variantId = String(topic?.id || topic?.topicId || "").trim();
-          return variantId && !usedTopicIds.has(variantId);
-        });
+      const availableVariants = getAvailableTopicVariants(topicName).filter(
+        (topic) => {
+          const variantKey = buildTopicVariantKey(topic);
+          return variantKey && !usedTopicKeys.has(variantKey);
+        },
+      );
 
       if (availableVariants.length === 0) {
         return prev;
@@ -739,12 +808,12 @@ export function GenerateExamPage() {
     });
   };
 
-  const removeTask = (topicIndex, taskIndex) => {
+  const removeTask = (topicIndex) => {
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.topics[topicIndex].tasks = next.topics[topicIndex].tasks || [];
-      next.topics[topicIndex].tasks.splice(taskIndex, 1);
+      if (!Array.isArray(next.topics) || topicIndex < 0) return prev;
+      next.topics.splice(topicIndex, 1);
       return recalcDraftTotals(next);
     });
   };
@@ -752,21 +821,40 @@ export function GenerateExamPage() {
   const regenerateTopic = async (topicName) => {
     if (!draft) return;
     setCompileDiagnostics(null);
-    const res = await regenM.mutateAsync({
-      courseId,
-      topicName,
-      targetPoints: Number(draft.targetPoints),
-      currentDraftTopics: draft.topics,
-    });
+
+    const normalizedTopicName = String(topicName || "").trim().toLowerCase();
+    const matchingIndices = (draft.topics || [])
+      .map((topic, index) => ({
+        index,
+        topic,
+      }))
+      .filter(
+        ({ topic }) =>
+          String(topic?.topic || "").trim().toLowerCase() === normalizedTopicName,
+      );
+
+    if (matchingIndices.length === 0) return;
+
+    const uniqueVariants = shuffleItems(
+      uniqueTopicVariants(getAvailableTopicVariants(topicName)),
+    );
+
+    if (uniqueVariants.length === 0) return;
+
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.topics = withSolutionSpace(res.data.topics || []).map(
-        normalizeDraftTopicVariant,
+      const replacementVariants = uniqueVariants
+        .slice(0, matchingIndices.length)
+        .map(normalizeDraftTopicVariant);
+
+      const firstIndex = matchingIndices[0].index;
+      next.topics = (next.topics || []).filter(
+        (topic) =>
+          String(topic?.topic || "").trim().toLowerCase() !== normalizedTopicName,
       );
-      next.totalPoints = res.data.totalPoints;
-      next.diff = res.data.diff;
-      return next;
+      next.topics.splice(firstIndex, 0, ...replacementVariants);
+      return recalcDraftTotals(next);
     });
   };
 
@@ -1642,6 +1730,12 @@ export function GenerateExamPage() {
                             onVariantSolutionSpace={updateTopicSolutionSpace}
                             onSubtaskField={updateTaskField}
                             onAddTask={addTask}
+                            canAddTask={
+                              countRemainingTopicVariants(
+                                topicGroup.topicName,
+                                draft?.topics || [],
+                              ) > 0
+                            }
                             onRemoveSubtask={removeTask}
                             onRegenerate={regenerateTopic}
                             regenPending={regenM.isPending}
