@@ -54,6 +54,24 @@
     "collapse": "Collapse sidebar",
     "logout": "Logout"
   },
+  "auth": {
+    "loginTitle": "Login",
+    "registerTitle": "Create Account",
+    "email": "Email Address",
+    "username": "Username",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "loginButton": "Log in",
+    "registerButton": "Register",
+    "forgotPassword": "Forgot Password?",
+    "rememberMe": "Remember me",
+    "noAccountPrompt": "Don't have an account?",
+    "hasAccountPrompt": "Already have an account?",
+    "signUpLink": "Sign up here",
+    "signInLink": "Log in here"
+  },
   "customizeDialog": {
     "title": "Customize",
     "mode": "Mode",
@@ -258,7 +276,10 @@
     "topicRegenerated": "Task regenerated successfully",
     "compileSuccess": "Compiled successfully",
     "compileWithWarnings": "Compiled with {{count}} warning(s)",
-    "compileWithErrors": "Compiled with {{count}} error(s)"
+    "compileWithErrors": "Compiled with {{count}} error(s)",
+    "loginSuccess": "Successfully logged in",
+    "registerSuccess": "Account successfully created",
+    "logoutSuccess": "Successfully logged out"
   },
   "errors": {
     "requestFailed": "Request failed",
@@ -279,6 +300,14 @@
     "invalidImageFile": "Only image files are allowed",
     "imageUploadFailed": "Failed to process image upload",
     "duplicateTaskAsset": "A file named {{filename}} is already attached.",
-    "invalidTaskLatex": "Could not parse the provided LaTeX"
+    "invalidTaskLatex": "Could not parse the provided LaTeX",
+    "invalidEmail": "Please enter a valid email address",
+    "passwordsMismatch": "Passwords do not match",
+    "passwordTooShort": "The password must be at least 6 characters long",
+    "requiredEmail": "Email is required",
+    "requiredPassword": "Password is required",
+    "loginFailed": "Login failed. Please check your credentials.",
+    "registerFailed": "Registration failed. Please try again later.",
+    "userAlreadyExists": "A user with this email already exists"
   }
 }

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next"; // Hinzugefügt
 import {
   Box,
   Button,
@@ -11,6 +12,7 @@ import {
 } from "@mui/material";
 
 export function Register() {
+  const { t } = useTranslation(); 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
@@ -29,10 +31,10 @@ export function Register() {
     setError(null);
 
     if (formData.password !== formData.confirmPassword) {
-      return setError("Die Passwörter stimmen nicht überein.");
+      return setError(t('errors.passwordsMismatch'));
     }
     if (formData.password.length < 6) {
-      return setError("Das Passwort muss mindestens 6 Zeichen lang sein.");
+      return setError(t('errors.passwordTooShort'));
     }
 
     setLoading(true);
@@ -53,7 +55,7 @@ export function Register() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || data.error?.message || "Registrierung fehlgeschlagen.");
+        throw new Error(data.message || data.error?.message || t('errors.registerFailed'));
       }
       navigate("/login");
 
@@ -76,7 +78,7 @@ export function Register() {
       >
         <Paper elevation={3} sx={{ p: 4, width: "100%", borderRadius: 2 }}>
           <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Account erstellen
+            {t('auth.registerTitle')}
           </Typography>
 
           {error && (
@@ -91,7 +93,7 @@ export function Register() {
               required
               fullWidth
               id="email"
-              label="E-Mail Adresse"
+              label={t('auth.email')}
               name="email"
               type="email"
               autoComplete="email"
@@ -104,7 +106,7 @@ export function Register() {
               required
               fullWidth
               name="password"
-              label="Passwort"
+              label={t('auth.password')}
               type="password"
               id="password"
               value={formData.password}
@@ -115,7 +117,7 @@ export function Register() {
               required
               fullWidth
               name="confirmPassword"
-              label="Passwort bestätigen"
+              label={t('auth.confirmPassword')}
               type="password"
               id="confirmPassword"
               value={formData.confirmPassword}
@@ -129,12 +131,12 @@ export function Register() {
               sx={{ mt: 3, mb: 2, py: 1.5 }}
               disabled={loading}
             >
-              {loading ? "Wird registriert..." : "Registrieren"}
+              {loading ? t('common.loading') : t('auth.registerButton')}
             </Button>
             
             <Box textAlign="center">
               <Link to="/login" style={{ textDecoration: "none", color: "#1976d2" }}>
-                Du hast bereits einen Account? Hier einloggen.
+                {t('auth.hasAccountPrompt')} {t('auth.signInLink')}
               </Link>
             </Box>
           </Box>

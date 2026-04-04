@@ -64,7 +64,7 @@ export function DataTable({
   rowData,
   actions = [],
   actionsHeaderName,
-  actionsWidth = 10,
+  actionsWidth = 20,
   // client-side
   pageSize = 10,
   height = 500,
