@@ -54,24 +54,6 @@
     "collapse": "Seitenleiste einklappen",
     "logout": "Abmelden"
   },
- "auth": {
-    "loginTitle": "Anmelden",
-    "registerTitle": "Konto erstellen",
-    "email": "E-Mail-Adresse",
-    "username": "Benutzername",
-    "password": "Passwort",
-    "confirmPassword": "Passwort bestätigen",
-    "firstName": "Vorname",
-    "lastName": "Nachname",
-    "loginButton": "Einloggen",
-    "registerButton": "Registrieren",
-    "forgotPassword": "Passwort vergessen?",
-    "rememberMe": "Angemeldet bleiben",
-    "noAccountPrompt": "Noch kein Konto?",
-    "hasAccountPrompt": "Bereits ein Konto?",
-    "signUpLink": "Jetzt registrieren",
-    "signInLink": "Hier anmelden"
-  },
   "customizeDialog": {
     "title": "Anpassen",
     "mode": "Modus",
@@ -199,6 +181,8 @@
     "addTask": "Aufgabe hinzufügen",
     "regenerate": "Neu erzeugen",
     "tasksCount": "Aufgaben ({{count}})",
+    "subtasksCount": "Teilaufgaben ({{count}})",
+    "subtaskLabel": "Teilaufgabe {{index}}",
     "pts": "Pkt",
     "confirmCancelTitle": "Änderungen verwerfen?",
     "pointsValidationError": "Aufgabenpunkte muessen den Themenpunkten entsprechen",
@@ -272,10 +256,7 @@
     "topicRegenerated": "Aufgabe erfolgreich neu generiert",
     "compileSuccess": "Kompilierung erfolgreich",
     "compileWithWarnings": "Kompiliert mit {{count}} Warnung(en)",
-    "compileWithErrors": "Kompiliert mit {{count}} Fehler(n)",
-    "loginSuccess": "Erfolgreich angemeldet",
-    "registerSuccess": "Konto erfolgreich erstellt",
-    "logoutSuccess": "Erfolgreich abgemeldet"
+    "compileWithErrors": "Kompiliert mit {{count}} Fehler(n)"
   },
   "errors": {
     "requestFailed": "Anfrage fehlgeschlagen",
@@ -296,14 +277,6 @@
     "invalidImageFile": "Only image files are allowed",
     "imageUploadFailed": "Failed to process image upload",
     "duplicateTaskAsset": "A file named {{filename}} is already attached.",
-    "invalidTaskLatex": "Could not parse the provided LaTeX",
-    "invalidEmail": "Bitte gib eine gültige E-Mail-Adresse ein",
-    "passwordsMismatch": "Die Passwörter stimmen nicht überein",
-    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein",
-    "requiredEmail": "E-Mail ist erforderlich",
-    "requiredPassword": "Passwort ist erforderlich",
-    "loginFailed": "Anmeldung fehlgeschlagen. Bitte überprüfe deine Zugangsdaten.",
-    "registerFailed": "Registrierung fehlgeschlagen. Bitte versuche es später erneut.",
-    "userAlreadyExists": "Ein Benutzer mit dieser E-Mail existiert bereits"
+    "invalidTaskLatex": "Could not parse the provided LaTeX"
   }
 }

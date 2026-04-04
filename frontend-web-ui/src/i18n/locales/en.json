@@ -54,24 +54,6 @@
     "collapse": "Collapse sidebar",
     "logout": "Logout"
   },
-  "auth": {
-    "loginTitle": "Login",
-    "registerTitle": "Create Account",
-    "email": "Email Address",
-    "username": "Username",
-    "password": "Password",
-    "confirmPassword": "Confirm Password",
-    "firstName": "First Name",
-    "lastName": "Last Name",
-    "loginButton": "Log in",
-    "registerButton": "Register",
-    "forgotPassword": "Forgot Password?",
-    "rememberMe": "Remember me",
-    "noAccountPrompt": "Don't have an account?",
-    "hasAccountPrompt": "Already have an account?",
-    "signUpLink": "Sign up here",
-    "signInLink": "Log in here"
-  },
   "customizeDialog": {
     "title": "Customize",
     "mode": "Mode",
@@ -197,8 +179,12 @@
     "selectAndGenerate": "Select the course, year and semester, choose topics, then click Generate",
     "solutionSpace": "Solution Space",
     "addTask": "Add task",
+    "taskLabel": "Task {{index}}",
+    "taskDescriptionLabel": "Task {{index}} Description",
     "regenerate": "Regenerate",
     "tasksCount": "Tasks ({{count}})",
+    "subtasksCount": "Subtasks ({{count}})",
+    "subtaskLabel": "Subtask {{index}}",
     "pointsValidationError": "Task points must equal topic points",
     "pointsValidationErrorDetailed": "{{topic}}: task points {{taskPoints}} must equal topic points {{topicPoints}}",
     "pointsValidationErrorTopics": "Points mismatch in topics: {{topics}}",
@@ -272,10 +258,7 @@
     "topicRegenerated": "Task regenerated successfully",
     "compileSuccess": "Compiled successfully",
     "compileWithWarnings": "Compiled with {{count}} warning(s)",
-    "compileWithErrors": "Compiled with {{count}} error(s)",
-    "loginSuccess": "Successfully logged in",
-    "registerSuccess": "Account successfully created",
-    "logoutSuccess": "Successfully logged out"
+    "compileWithErrors": "Compiled with {{count}} error(s)"
   },
   "errors": {
     "requestFailed": "Request failed",
@@ -296,14 +279,6 @@
     "invalidImageFile": "Only image files are allowed",
     "imageUploadFailed": "Failed to process image upload",
     "duplicateTaskAsset": "A file named {{filename}} is already attached.",
-    "invalidTaskLatex": "Could not parse the provided LaTeX",
-    "invalidEmail": "Please enter a valid email address",
-    "passwordsMismatch": "Passwords do not match",
-    "passwordTooShort": "The password must be at least 6 characters long",
-    "requiredEmail": "Email is required",
-    "requiredPassword": "Password is required",
-    "loginFailed": "Login failed. Please check your credentials.",
-    "registerFailed": "Registration failed. Please try again later.",
-    "userAlreadyExists": "A user with this email already exists"
+    "invalidTaskLatex": "Could not parse the provided LaTeX"
   }
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import axios from 'axios';
+// 🚨 1. Hier "Link" hinzufügen:
 import { useNavigate, Link } from 'react-router-dom'; 
-import { useTranslation } from 'react-i18next'; // Hinzugefügt
 
 export default function Login() {
-  const { t } = useTranslation(); // Hook initialisieren
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,8 +25,7 @@ export default function Login() {
 
       navigate('/courses');
     } catch (err) {
-      // Nutze die i18n Fehlermeldung als Fallback
-      setError(err.response?.data?.message || t('errors.loginFailed'));
+      setError(err.response?.data?.message || 'Login fehlgeschlagen. Prüfen Sie Ihre Daten.');
     } finally {
       setLoading(false);
     }
@@ -36,7 +34,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-lg border border-gray-100">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">{t('auth.loginTitle')}</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">Exam Creation Tool</h2>
         
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg text-center">
@@ -46,7 +44,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.email')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail Adresse</label>
             <input
               type="email"
               value={email}
@@ -57,7 +55,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.password')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
             <input
               type="password"
               value={password}
@@ -75,7 +73,7 @@ export default function Login() {
               loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {loading ? t('common.loading') : t('auth.loginButton')}
+            {loading ? 'Wird angemeldet...' : 'Anmelden'}
           </button>
         </form>
 
@@ -84,7 +82,7 @@ export default function Login() {
             to="/register" 
             className="text-sm text-gray-600 hover:text-blue-600 hover:underline transition-colors font-medium"
           >
-            {t('auth.noAccountPrompt')} {t('auth.signUpLink')}
+            Noch keinen Account? Hier registrieren.
           </Link>
         </div>
 

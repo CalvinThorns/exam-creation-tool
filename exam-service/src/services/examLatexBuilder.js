@@ -33,20 +33,19 @@ function buildStudentAnswerSpaceLatex(space) {
   const normalized = normalizeSolutionSpace(space);
   const pages = SOLUTION_SPACE_TO_PAGES[normalized];
 
-  if (pages === 1) {
-    return String.raw`\vspace*{\fill}`;
-  }
-
-  if (Number.isInteger(pages) && pages >= 2) {
-    const blocks = [String.raw`\vspace*{\fill}`];
-    for (let index = 1; index < pages; index += 1) {
-      blocks.push(String.raw`\newpage
-\null`);
+  if (Number.isInteger(pages) && pages >= 1) {
+    const blocks = [];
+    for (let index = 0; index < pages; index += 1) {
+      blocks.push(String.raw`\null
+\vspace*{\fill}
+\newpage`);
     }
-    return blocks.join("\n");
+    return blocks.join("\n\n");
   }
 
-  return `\\vspace*{${pages}\\textheight}`;
+  return String.raw`\null
+\vspace*{${pages}\textheight}
+\newpage`;
 }
 
 function stripLeadingSubsection(value) {
@@ -205,11 +204,11 @@ function buildFallbackTopicBody(topic, isStudentVersion) {
 ${sanitizeTexInput(solutionBody)}
 \end{solution}`);
     }
-
-    if (isStudentVersion) {
-      parts.push(buildStudentAnswerSpaceLatex(task?.solutionSpace));
-    }
   });
+
+  if (isStudentVersion && tasks.length > 0) {
+    parts.push(buildStudentAnswerSpaceLatex(tasks[0]?.solutionSpace));
+  }
 
   return parts.filter(Boolean).join("\n\n").trim();
 }
@@ -236,6 +235,10 @@ function buildTopicBody(topic, isStudentVersion) {
 
   if (isStudentVersion) {
     body = stripSolutionEnvironments(body);
+    const tasks = Array.isArray(topic?.tasks) ? topic.tasks : [];
+    if (tasks.length > 0) {
+      body = `${body}\n\n${buildStudentAnswerSpaceLatex(tasks[0]?.solutionSpace)}`.trim();
+    }
   }
 
   return body.trim();
