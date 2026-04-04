@@ -130,6 +130,49 @@ function withSolutionSpace(topics = []) {
   }));
 }
 
+function normalizeDraftTopicVariant(topic) {
+  return {
+    ...topic,
+    topicId: topic?.topicId || topic?.id || "",
+    tasks: (topic?.tasks || []).map((task) => ({
+      ...task,
+      solutionSpace: SOLUTION_SPACE_OPTIONS.includes(task?.solutionSpace)
+        ? task.solutionSpace
+        : DEFAULT_SOLUTION_SPACE,
+    })),
+  };
+}
+
+function groupDraftTopicsForUi(topics = []) {
+  const groups = [];
+  const byName = new Map();
+
+  (topics || []).forEach((topic, flatIndex) => {
+    const topicName = String(topic?.topic || "").trim() || `topic-${flatIndex}`;
+    if (!byName.has(topicName)) {
+      const group = {
+        topicName,
+        flatIndices: [],
+        variants: [],
+      };
+      byName.set(topicName, group);
+      groups.push(group);
+    }
+
+    const group = byName.get(topicName);
+    group.flatIndices.push(flatIndex);
+    group.variants.push(topic);
+  });
+
+  return groups.map((group) => ({
+    ...group,
+    totalPoints: group.variants.reduce(
+      (sum, variant) => sum + Number(variant?.points || 0),
+      0,
+    ),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Compile Split Button  (Build ▾  →  dropdown with Student / Teacher)
 // ---------------------------------------------------------------------------
@@ -322,6 +365,9 @@ export function GenerateExamPage() {
     setSelectedTopics(topicNames);
 
     // Shape the exam into the same draft format GenerateExamPage uses
+    const normalizedTopics = withSolutionSpace(exam.topics || []).map(
+      normalizeDraftTopicVariant,
+    );
     setDraft({
       course:
         typeof exam.courseId === "object"
@@ -330,9 +376,9 @@ export function GenerateExamPage() {
       targetPoints: exam.targetPoints ?? exam.points ?? "",
       totalPoints:
         exam.totalPoints ??
-        (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
+        normalizedTopics.reduce((s, t) => s + Number(t.points || 0), 0),
       diff: 0,
-      topics: exam.topics || [],
+      topics: normalizedTopics,
     });
     initialStateRef.current = {
       courseId: resolvedCourseId || "",
@@ -348,9 +394,9 @@ export function GenerateExamPage() {
         targetPoints: exam.targetPoints ?? exam.points ?? "",
         totalPoints:
           exam.totalPoints ??
-          (exam.topics || []).reduce((s, t) => s + Number(t.points || 0), 0),
+          normalizedTopics.reduce((s, t) => s + Number(t.points || 0), 0),
         diff: 0,
-        topics: exam.topics || [],
+        topics: normalizedTopics,
       },
     };
     setIsEditable(true);
@@ -399,6 +445,11 @@ export function GenerateExamPage() {
     });
     return validationMap;
   }, [examValidation.topicErrors]);
+
+  const groupedDraftTopics = useMemo(
+    () => groupDraftTopicsForUi(draft?.topics || []),
+    [draft?.topics],
+  );
 
   const courseLabel = useMemo(() => {
     const courseFromDraft = draft?.course;
@@ -601,7 +652,10 @@ export function GenerateExamPage() {
       topics: selectedTopics,
       targetPoints: Number(targetPoints),
     });
-    setDraft(res.data);
+    setDraft({
+      ...res.data,
+      topics: withSolutionSpace(res.data?.topics || []).map(normalizeDraftTopicVariant),
+    });
   };
 
   const updateTopicField = (topicIndex, field, value) => {
@@ -622,17 +676,65 @@ export function GenerateExamPage() {
     });
   };
 
-  const addTask = (topicIndex) => {
+  const updateTopicSolutionSpace = (topicIndex, value) => {
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.topics[topicIndex].tasks = next.topics[topicIndex].tasks || [];
-      next.topics[topicIndex].tasks.push({
-        question: "",
-        solution: "",
-        solutionSpace: DEFAULT_SOLUTION_SPACE,
-        points: "",
+      const tasks = Array.isArray(next.topics?.[topicIndex]?.tasks)
+        ? next.topics[topicIndex].tasks
+        : [];
+      tasks.forEach((task) => {
+        task.solutionSpace = value;
       });
+      return recalcDraftTotals(next);
+    });
+  };
+
+  const addTask = (topicName) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const usedTopicIds = new Set(
+        (prev.topics || [])
+          .filter(
+            (topic) =>
+              String(topic?.topic || "").trim().toLowerCase() ===
+              String(topicName || "").trim().toLowerCase(),
+          )
+          .map((topic) => String(topic?.topicId || topic?.id || "").trim())
+          .filter(Boolean),
+      );
+
+      const availableVariants = (topics || [])
+        .filter(
+          (topic) =>
+            String(topic?.topic || "").trim().toLowerCase() ===
+            String(topicName || "").trim().toLowerCase(),
+        )
+        .filter((topic) => {
+          const variantId = String(topic?.id || topic?.topicId || "").trim();
+          return variantId && !usedTopicIds.has(variantId);
+        });
+
+      if (availableVariants.length === 0) {
+        return prev;
+      }
+
+      const pickedVariant =
+        availableVariants[Math.floor(Math.random() * availableVariants.length)];
+      const next = structuredClone(prev);
+      const normalizedVariant = normalizeDraftTopicVariant(pickedVariant);
+      const insertAfterIndex = (next.topics || []).reduce((lastIndex, topic, index) => {
+        return String(topic?.topic || "").trim().toLowerCase() ===
+          String(topicName || "").trim().toLowerCase()
+          ? index
+          : lastIndex;
+      }, -1);
+
+      if (insertAfterIndex >= 0) {
+        next.topics.splice(insertAfterIndex + 1, 0, normalizedVariant);
+      } else {
+        next.topics.push(normalizedVariant);
+      }
       return recalcDraftTotals(next);
     });
   };
@@ -659,7 +761,9 @@ export function GenerateExamPage() {
     setDraft((prev) => {
       if (!prev) return prev;
       const next = structuredClone(prev);
-      next.topics = res.data.topics;
+      next.topics = withSolutionSpace(res.data.topics || []).map(
+        normalizeDraftTopicVariant,
+      );
       next.totalPoints = res.data.totalPoints;
       next.diff = res.data.diff;
       return next;
@@ -1527,18 +1631,18 @@ export function GenerateExamPage() {
                       </Box>
                     ) : (
                       <Stack spacing={2} sx={{ pr: 0.5 }}>
-                        {draft.topics.map((topic, i) => (
+                          {groupedDraftTopics.map((topicGroup, i) => (
                           <TopicCard
-                            key={`${topic.topic}-${i}`}
-                            topic={topic}
-                            topicIndex={i}
-                            pointsValidation={topicValidationByIndex.get(i)}
+                            key={`${topicGroup.topicName}-${i}`}
+                            topicGroup={topicGroup}
+                            pointsValidationByFlatIndex={topicValidationByIndex}
                             solutionSpaceOptions={SOLUTION_SPACE_OPTIONS}
                             editable={isEditable}
-                            onTopicField={updateTopicField}
-                            onTaskField={updateTaskField}
+                            onVariantField={updateTopicField}
+                            onVariantSolutionSpace={updateTopicSolutionSpace}
+                            onSubtaskField={updateTaskField}
                             onAddTask={addTask}
-                            onRemoveTask={removeTask}
+                            onRemoveSubtask={removeTask}
                             onRegenerate={regenerateTopic}
                             regenPending={regenM.isPending}
                           />
