@@ -4,15 +4,6 @@ const {
   DEFAULT_SOLUTION_SPACE,
 } = require("../../models/topic.model");
 
-function shuffleArray(items) {
-  const list = Array.isArray(items) ? [...items] : [];
-  for (let index = list.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [list[index], list[randomIndex]] = [list[randomIndex], list[index]];
-  }
-  return list;
-}
-
 function bufferLikeToBase64(value) {
   if (!value) return "";
   if (Buffer.isBuffer(value)) return value.toString("base64");
@@ -138,7 +129,7 @@ async function loadVariantsByTopicNames({ courseId, topicNames, badRequest }) {
     throw badRequest(`No topics found for: ${missing.join(", ")}`);
   }
 
-  const groups = cleaned.map((name) => shuffleArray(docs.filter((d) => d.topic === name)));
+  const groups = cleaned.map((name) => docs.filter((d) => d.topic === name));
   return { topicNames: cleaned, groups };
 }
 
@@ -219,5 +210,4 @@ module.exports = {
   loadVariantsByTopicNames,
   pickBestCombination,
   validateDraftTopicsShape,
-  shuffleArray,
 };

@@ -199,8 +199,6 @@
     "addTask": "Aufgabe hinzufügen",
     "regenerate": "Neu erzeugen",
     "tasksCount": "Aufgaben ({{count}})",
-    "subtasksCount": "Teilaufgaben ({{count}})",
-    "subtaskLabel": "Teilaufgabe {{index}}",
     "pts": "Pkt",
     "confirmCancelTitle": "Änderungen verwerfen?",
     "pointsValidationError": "Aufgabenpunkte muessen den Themenpunkten entsprechen",

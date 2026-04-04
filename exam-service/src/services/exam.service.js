@@ -20,7 +20,6 @@ const {
   topicSignature,
   loadVariantsByTopicNames,
   pickBestCombination,
-  shuffleArray,
   validateDraftTopicsShape,
 } = require("./helpers/examDraftHelpers");
 const {
@@ -672,7 +671,7 @@ function createExamService({ examRepo, courseRepo }) {
         return variantSignature !== currentTopicSignature;
       });
 
-      const pool = shuffleArray(candidates.length ? candidates : variants);
+      const pool = candidates.length ? candidates : variants;
 
       let best = null;
       let bestDiff = Infinity;
