@@ -8,6 +8,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable } from "../../components/ui/DataTable";
+import { CourseFormDialog } from "./CourseFormDialog";
 import {
   useCourses,
   useCreateCourse,
@@ -15,6 +16,7 @@ import {
   useUpdateCourse,
   useAddCollaborator,
 } from "./courses.hooks";
+import { useCourses, useDeleteCourse } from "./courses.hooks";
 import { useTranslation } from "react-i18next";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
