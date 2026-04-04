@@ -1,16 +1,16 @@
-#!/bin/bash
+#!/bin/sh
 set -ex
 
 apt-get update
 
 apt-get install -y \
+  patch \
   poppler-utils \
-  ghostscript \
+  ghostscript
 
 rm -rf /var/lib/apt/lists/*
 
-# Allow ImageMagick to process PDF files. This is for tests only, but since we
-# use the production images for tests, this will apply to production as well.
+if [ -f /etc/ImageMagick-6/policy.xml ]; then
 patch /etc/ImageMagick-6/policy.xml <<EOF
 --- old.xml	2022-03-23 09:16:03.985433900 -0400
 +++ new.xml	2022-03-23 09:16:18.625471992 -0400
@@ -22,3 +22,4 @@ patch /etc/ImageMagick-6/policy.xml <<EOF
    <policy domain="coder" rights="none" pattern="XPS" />
  </policymap>
 EOF
+fi

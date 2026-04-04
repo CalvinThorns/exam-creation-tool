@@ -39,15 +39,25 @@ async function buildClsiImageResourcesFromDraftTopics({
   apiBaseUrl,
 }) {
   const resources = [];
+  const seenPaths = new Set();
   const nextTopics = (Array.isArray(topics) ? topics : []).map((t) => ({
     ...t,
     tasks: Array.isArray(t.tasks) ? t.tasks.map((x) => ({ ...x })) : [],
   }));
 
+  const pushResource = (filename) => {
+    if (!filename || seenPaths.has(filename)) return;
+    seenPaths.add(filename);
+    resources.push({
+      path: filename,
+      url: `${apiBaseUrl}/api/exams/draft/assets/${token}/${encodeURIComponent(filename)}`,
+      modified: Date.now(),
+    });
+  };
+
   for (let i = 0; i < nextTopics.length; i++) {
     const t = nextTopics[i];
 
-    // description_img
     const descB64 = getImageB64(t.description_img);
     if (descB64) {
       const ext = extFromContentType(t.description_img?.contentType);
@@ -55,17 +65,10 @@ async function buildClsiImageResourcesFromDraftTopics({
       const diskPath = path.join(assetsDir, filename);
 
       await writeBase64File(diskPath, descB64);
-
-      resources.push({
-        path: filename,
-        url: `${apiBaseUrl}/api/exams/draft/assets/${token}/${filename}`,
-        modified: Date.now(),
-      });
-
+      pushResource(filename);
       t.__descImgPath = filename;
     }
 
-    // task images
     const tasks = Array.isArray(t.tasks) ? t.tasks : [];
     for (let j = 0; j < tasks.length; j++) {
       const task = tasks[j];
@@ -76,14 +79,19 @@ async function buildClsiImageResourcesFromDraftTopics({
         const diskPath = path.join(assetsDir, filename);
 
         await writeBase64File(diskPath, qB64);
-
-        resources.push({
-          path: filename,
-          url: `${apiBaseUrl}/api/exams/draft/assets/${token}/${filename}`,
-          modified: Date.now(),
-        });
-
+        pushResource(filename);
         task.__qImgPath = filename;
+      }
+
+      const assets = Array.isArray(task.assets) ? task.assets : [];
+      for (const asset of assets) {
+        const filename = String(asset?.filename || "").trim();
+        const assetB64 = getImageB64(asset);
+        if (!filename || !assetB64) continue;
+
+        const diskPath = path.join(assetsDir, filename);
+        await writeBase64File(diskPath, assetB64);
+        pushResource(filename);
       }
     }
   }

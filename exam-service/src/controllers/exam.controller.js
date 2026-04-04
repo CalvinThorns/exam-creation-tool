@@ -80,7 +80,7 @@ function createExamController({ examService }) {
 
     compileDraft: async (req, res, next) => {
       try {
-        const { pdfBuffer, filename, errors } = await examService.compileDraft(
+        const { pdfBuffer, filename, diagnostics, errors } = await examService.compileDraft(
           req.body,
           req.id,
           getUserId(req) 

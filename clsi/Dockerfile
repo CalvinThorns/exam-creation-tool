@@ -14,9 +14,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /overleaf/services/clsi
 COPY install_deps.sh /overleaf/services/clsi/
-RUN chmod 0755 ./install_deps.sh && ./install_deps.sh
-ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
 COPY entrypoint.sh /
+RUN sed -i 's/\r$//' /overleaf/services/clsi/install_deps.sh /entrypoint.sh \
+ && chmod 0755 /overleaf/services/clsi/install_deps.sh /entrypoint.sh \
+ && /bin/sh /overleaf/services/clsi/install_deps.sh
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
 
 # Google Cloud Storage needs a writable $HOME/.config for resumable uploads
 # (see https://googleapis.dev/nodejs/storage/latest/File.html#createWriteStream)

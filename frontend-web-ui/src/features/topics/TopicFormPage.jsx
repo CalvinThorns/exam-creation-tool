@@ -1,40 +1,42 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useBlocker } from "react-router-dom";
+import {
+  useBlocker,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   alpha,
   Autocomplete,
-  CircularProgress,
+  Box,
   Button,
-  TextField,
-  Menu,
-  MenuItem,
+  CircularProgress,
+  IconButton,
   ListItemIcon,
   ListItemText,
-  Box,
-  Typography,
-  IconButton,
+  Menu,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   Tooltip,
+  Typography,
   useTheme,
 } from "@mui/material";
-// import UploadIcon from "@mui/icons-material/Upload";
-import AddIcon from "@mui/icons-material/Add";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import BuildIcon from "@mui/icons-material/Build";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
-import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import SaveIcon from "@mui/icons-material/Save";
 import SchoolIcon from "@mui/icons-material/School";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { topicSchema } from "../../utils/validators";
-// import { fileToBase64 } from "../../utils/fileToBase64";
 import { examsApi } from "../../api/exams.api";
-import { TaskEditor } from "./TaskEditor";
+import { topicsApi } from "../../api/topics.api";
 import { LatexEditor } from "../../components/ui/LatexEditor";
 import { PdfPreviewPanel } from "../../components/ui/PdfPreviewPanel";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -46,24 +48,216 @@ import { Loader } from "../../components/ui/Loader";
 import { useCreateTopic, useTopic, useUpdateTopic } from "./topics.hooks";
 import { useCourses } from "../courses/courses.hooks";
 import { useTranslation } from "react-i18next";
+import { notifyError } from "../../app/notifications";
 import {
   getCompileResultPayload,
   notifyCompileOutcome,
   toCompilerMessages,
 } from "../../utils/compileDiagnostics";
-import { validateTopicFormPoints } from "../exams/utils/validation";
+import { fileToBase64 } from "../../utils/fileToBase64";
 
 const DEFAULT_SPLIT_PERCENT = 65;
 const COLLAPSE_THRESHOLD_PERCENT = 10;
 
-function getDefaultTask() {
+function buildTaskTemplateBody({
+  topicTitle = "Topic Title",
+  topicDescription = "",
+} = {}) {
+  const normalizedTopicTitle = String(topicTitle || "").trim() || "Topic Title";
+  const normalizedTopicDescription = String(topicDescription || "").trim();
+
+  return String.raw`\section{${normalizedTopicTitle}}
+${normalizedTopicDescription || "Some description may go here. Can include text, images, source code, and other things."}
+
+\subsection{5P}
+This is the first task
+
+\begin{solution}
+    This is the solution for task a)
+\end{solution}
+
+\subsection{4P}
+This is the second task
+
+\begin{solution}
+    This is the solution for task b)
+\end{solution}`;
+}
+
+function buildTaskLatex(task) {
+  const points = Number(task?.points || 0);
+  const parts = [`\\subsection{${points}P}`];
+  if (task?.question) parts.push(String(task.question).trim());
+  if (task?.solution) {
+    parts.push(`\\begin{solution}\n${String(task.solution).trim()}\n\\end{solution}`);
+  }
+  return parts.filter(Boolean).join("\n\n");
+}
+
+function buildRawLatexFromTopic(topic) {
+  const fullTopicLatex = String(topic?.full_tex_code || "").trim();
+  if (fullTopicLatex) return fullTopicLatex;
+
+  const topicTitle = String(topic?.topic || "").trim();
+  const description = String(topic?.description || "").trim();
+  const tasks = Array.isArray(topic?.tasks) ? topic.tasks : [];
+
+  const parts = [topicTitle ? `\\section{${topicTitle}}` : "", description];
+  tasks.forEach((task) => {
+    const taskLatex = String(task?.full_tex_code || buildTaskLatex(task)).trim();
+    if (taskLatex) parts.push(taskLatex);
+  });
+
+  return parts.filter(Boolean).join("\n\n").trim();
+}
+
+function resolveParsedTopic(parsedTopics, selectedTopic) {
+  if (!Array.isArray(parsedTopics) || parsedTopics.length === 0) return null;
+  const normalizedSelectedTopic = String(selectedTopic || "").trim().toLowerCase();
+
+  if (parsedTopics.length === 1) {
+    const parsedTopic = parsedTopics[0];
+    if (!normalizedSelectedTopic) return parsedTopic;
+
+    return {
+      ...parsedTopic,
+      topic: String(selectedTopic || parsedTopic.topic || "").trim(),
+    };
+  }
+
+  if (!normalizedSelectedTopic) return parsedTopics[0];
+
+  const matchedTopic =
+    parsedTopics.find(
+      (topic) =>
+        String(topic?.topic || "").trim().toLowerCase() ===
+        normalizedSelectedTopic,
+    ) || parsedTopics[0];
+
+  if (!matchedTopic) return null;
+
   return {
-    question: "",
-    points: "",
-    // question_img: null,
-    solution: "",
-    // isRelatedToTopic: true,
+    ...matchedTopic,
+    topic: String(selectedTopic || matchedTopic.topic || "").trim(),
   };
+}
+
+function hasSubsectionBlocks(latexContent) {
+  return /\\subsection\{[^}]*\}/.test(String(latexContent || ""));
+}
+
+function buildFilteredTasksListUrl(courseId, topic) {
+  const params = new URLSearchParams();
+  const normalizedCourseId = String(courseId || "").trim();
+  const normalizedTopic = String(topic || "").trim();
+  if (normalizedCourseId) params.set("courseId", normalizedCourseId);
+  if (normalizedTopic) params.set("topic", normalizedTopic);
+  return params.toString() ? `/tasks/list?${params.toString()}` : "/courses/list";
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function syncTopicTitleIntoLatex(latexContent, topicTitle) {
+  const source = String(latexContent || "");
+  const nextTopicTitle = String(topicTitle || "").trim();
+  if (!source || !nextTopicTitle) return source;
+
+  if (/\\section\{[^}]*\}/.test(source)) {
+    return source.replace(/\\section\{[^}]*\}/, `\\section{${nextTopicTitle}}`);
+  }
+
+  return source;
+}
+
+function buildPreviewLatex(latexContent, topicTitle, points) {
+  let source = syncTopicTitleIntoLatex(latexContent, topicTitle);
+  const normalizedPoints = Number(points);
+  const normalizedTopicTitle = String(topicTitle || "").trim();
+
+  if (!Number.isFinite(normalizedPoints) || normalizedPoints < 0) {
+    return source;
+  }
+
+  if (/\\section\{[^}]*\}(?:\s*\([^)]*\))?/.test(source)) {
+    return source.replace(
+      /\\section\{[^}]*\}(?:\s*\([^)]*\))?/,
+      `\\section{${normalizedTopicTitle} (${normalizedPoints}P)}`,
+    );
+  }
+
+  return source;
+}
+
+function injectTaskAssetsIntoLatex(latexContent, assets) {
+  const source = String(latexContent || "");
+  const nextAssets = Array.isArray(assets) ? assets : [];
+  const pendingBlocks = nextAssets
+    .filter((asset) => String(asset?.filename || "").trim())
+    .filter((asset) => {
+      const filename = String(asset.filename).trim();
+      return !new RegExp(escapeRegExp(filename)).test(source);
+    })
+    .map(
+      (asset) => String.raw`\begin{center}
+\includegraphics[width=0.9\linewidth]{${String(asset.filename).trim()}}
+\end{center}`,
+    );
+
+  if (pendingBlocks.length === 0) return source;
+
+  const block = `${pendingBlocks.join("\n\n")}\n\n`;
+  if (/\\subsection\{[^}]*\}/.test(source)) {
+    return source.replace(/(\\subsection\{[^}]*\})/, `${block}$1`);
+  }
+
+  return `${source.trim()}\n\n${block}`.trim();
+}
+
+function removeTaskAssetFromLatex(latexContent, filename) {
+  const source = String(latexContent || "");
+  const normalizedFilename = String(filename || "").trim();
+  if (!source || !normalizedFilename) return source;
+
+  const escapedFilename = escapeRegExp(normalizedFilename);
+  const centeredImageBlockRegex = new RegExp(
+    String.raw`(?:\r?\n)?\\begin\{center\}\s*\\includegraphics\[width=0\.9\\linewidth\]\{${escapedFilename}\}\s*\\end\{center\}(?:\r?\n)?`,
+    "g",
+  );
+  const bareImageRegex = new RegExp(
+    String.raw`(?:\r?\n)?\\includegraphics(?:\[[^\]]*\])?\{${escapedFilename}\}(?:\r?\n)?`,
+    "g",
+  );
+
+  return source
+    .replace(centeredImageBlockRegex, "\n")
+    .replace(bareImageRegex, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function collectTaskAssetsFromTopic(topic) {
+  const tasks = Array.isArray(topic?.tasks) ? topic.tasks : [];
+  const seen = new Set();
+  const assets = [];
+
+  tasks.forEach((task) => {
+    const taskAssets = Array.isArray(task?.assets) ? task.assets : [];
+    taskAssets.forEach((asset) => {
+      const filename = String(asset?.filename || "").trim();
+      const base64 = String(asset?.base64 || "").trim();
+      if (!filename || !base64 || seen.has(filename)) return;
+      seen.add(filename);
+      assets.push({
+        filename,
+        contentType: String(asset?.contentType || "").trim(),
+        base64,
+      });
+    });
+  });
+
+  return assets;
 }
 
 function CompileButton({ disabled, loading, onCompile }) {
@@ -107,35 +301,18 @@ function CompileButton({ disabled, loading, onCompile }) {
         onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            elevation: 3,
-            sx: { mt: 0.5, minWidth: 180, borderRadius: 2 },
-          },
-        }}
       >
-        <MenuItem onClick={() => handleSelect("STUDENT")} sx={{ py: 1.25 }}>
+        <MenuItem onClick={() => handleSelect("STUDENT")}>
           <ListItemIcon>
             <SchoolIcon fontSize="small" color="primary" />
           </ListItemIcon>
-          <ListItemText
-            primary={t("exams.studentVersion")}
-            secondary={t("exams.studentVersionHint")}
-            primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
-            secondaryTypographyProps={{ fontSize: 12 }}
-          />
+          <ListItemText primary={t("exams.studentVersion")} />
         </MenuItem>
-
-        <MenuItem onClick={() => handleSelect("TEACHER")} sx={{ py: 1.25 }}>
+        <MenuItem onClick={() => handleSelect("TEACHER")}>
           <ListItemIcon>
             <MenuBookIcon fontSize="small" color="secondary" />
           </ListItemIcon>
-          <ListItemText
-            primary={t("exams.teacherVersion")}
-            secondary={t("exams.teacherVersionHint")}
-            primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
-            secondaryTypographyProps={{ fontSize: 12 }}
-          />
+          <ListItemText primary={t("exams.teacherVersion")} />
         </MenuItem>
       </Menu>
     </>
@@ -147,6 +324,7 @@ export function TopicFormPage() {
   const theme = useTheme();
   const nav = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const isEditMode = Boolean(id);
   const dropdownPaperBg =
     theme.palette.mode === "light"
@@ -164,6 +342,37 @@ export function TopicFormPage() {
 
   const [courseQuery, setCourseQuery] = useState("");
   const [debouncedCourseQuery, setDebouncedCourseQuery] = useState("");
+  const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
+  const [collapsedPane, setCollapsedPane] = useState(null);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [isTexDropActive, setIsTexDropActive] = useState(false);
+  const [isImageDropActive, setIsImageDropActive] = useState(false);
+  const [compiledVersion, setCompiledVersion] = useState(null);
+  const [compilerMessages, setCompilerMessages] = useState(null);
+  const [taskAssets, setTaskAssets] = useState([]);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    action: null,
+  });
+  const splitContainerRef = useRef(null);
+  const blockerRef = useRef(null);
+  const blockedLocationRef = useRef(null);
+  const isIntentionalNavigationRef = useRef(false);
+  const autoPreviewKeyRef = useRef("");
+  const initialTaskAssetsRef = useRef([]);
+  const taskAssetsRef = useRef([]);
+  const initialValuesRef = useRef({
+    courseId: "",
+    topic: "",
+    points: "",
+    taskDescription: "",
+    rawLatex: "",
+  });
+  const requestedCourseId = String(searchParams.get("courseId") || "").trim();
+  const requestedTopic = String(searchParams.get("topic") || "").trim();
+  const { pdfUrl, setPdfFromBase64, clearPdf } =
+    usePdfPreview("topic-preview.pdf");
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -191,55 +400,50 @@ export function TopicFormPage() {
   const createM = useCreateTopic();
   const updateM = useUpdateTopic();
   const [isEditable, setIsEditable] = useState(true);
-  const [splitPercent, setSplitPercent] = useState(DEFAULT_SPLIT_PERCENT);
-  const [collapsedPane, setCollapsedPane] = useState(null);
-  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
-  const [isCompiling, setIsCompiling] = useState(false);
-  const [compiledVersion, setCompiledVersion] = useState(null);
-  const [compilerMessages, setCompilerMessages] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({
-    open: false,
-    action: null,
-  });
-  const splitContainerRef = useRef(null);
-  const blockerRef = useRef(null);
-  const blockedLocationRef = useRef(null);
-  const isIntentionalNavigationRef = useRef(false);
-  const initialValuesRef = useRef({
-    courseId: "",
-    topic: "",
-    description: "",
-    points: "",
-    description_img: null,
-    tasks: [getDefaultTask()],
-  });
-  const { pdfUrl, setPdfFromBase64, clearPdf } =
-    usePdfPreview("topic-preview.pdf");
 
   const form = useForm({
     resolver: zodResolver(topicSchema(t)),
     defaultValues: {
       courseId: "",
       topic: "",
-      description: "",
       points: "",
-      description_img: null,
-      tasks: [getDefaultTask()],
+      taskDescription: "",
+      rawLatex: "",
     },
   });
 
+  const {
+    control,
+    clearErrors,
+    formState,
+    getValues,
+    handleSubmit,
+    register,
+    reset,
+    setError,
+    setValue,
+  } = form;
+  const selectedCourseId = useWatch({ control, name: "courseId" }) || "";
+  const selectedTopicValue = useWatch({ control, name: "topic" }) || "";
+  const taskDescriptionValue =
+    useWatch({ control, name: "taskDescription" }) || "";
+  const rawLatexValue = useWatch({ control, name: "rawLatex" }) || "";
+
   useEffect(() => {
     if (!isEditMode) {
+      autoPreviewKeyRef.current = "";
       const defaults = {
         courseId: "",
         topic: "",
-        description: "",
         points: "",
-        description_img: null,
-        tasks: [getDefaultTask()],
+        taskDescription: "",
+        rawLatex: buildTaskTemplateBody({ topicDescription: "" }),
       };
-      form.reset(defaults);
+      reset(defaults);
       initialValuesRef.current = defaults;
+      initialTaskAssetsRef.current = [];
+      taskAssetsRef.current = [];
+      setTaskAssets([]);
       setIsEditable(true);
       setCollapsedPane(null);
       setSplitPercent(DEFAULT_SPLIT_PERCENT);
@@ -259,26 +463,76 @@ export function TopicFormPage() {
     const hydratedValues = {
       courseId: resolvedCourseId,
       topic: resolved?.topic || "",
-      description: resolved?.description || "",
       points: resolved?.points ?? "",
-      description_img: null,
-      tasks: resolved?.tasks?.length
-        ? resolved.tasks.map((task) => ({
-            ...task,
-            points: task?.points ?? "",
-          }))
-        : [getDefaultTask()],
+      taskDescription:
+        Array.isArray(resolved?.tasks) && resolved.tasks.length > 0
+          ? resolved.tasks[0]?.description || ""
+          : "",
+      rawLatex: buildRawLatexFromTopic(resolved),
     };
 
-    form.reset(hydratedValues);
+    reset(hydratedValues);
     initialValuesRef.current = hydratedValues;
-
+    const hydratedTaskAssets = collectTaskAssetsFromTopic(resolved);
+    initialTaskAssetsRef.current = hydratedTaskAssets;
+    applyTaskAssets(hydratedTaskAssets);
     setIsEditable(true);
     setCollapsedPane(null);
     setSplitPercent(DEFAULT_SPLIT_PERCENT);
     setCompilerMessages(null);
     clearPdf();
-  }, [topicData, isEditMode, form, clearPdf]);
+  }, [topicData, isEditMode, reset, clearPdf]);
+
+  useEffect(() => {
+    if (isEditMode || isCoursesLoading) return;
+
+    const currentCourseId = String(form.getValues("courseId") || "").trim();
+    const currentTopic = String(form.getValues("topic") || "").trim();
+
+    if (requestedCourseId && !currentCourseId) {
+      const matchedCourse = courses.find((course) => course.id === requestedCourseId);
+      if (matchedCourse) {
+        form.setValue("courseId", requestedCourseId, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      }
+    }
+
+    const effectiveCourseId = String(
+      form.getValues("courseId") || requestedCourseId || "",
+    ).trim();
+    const matchedCourse = courses.find((course) => course.id === effectiveCourseId);
+    const matchedTopic =
+      requestedTopic &&
+      Array.isArray(matchedCourse?.topics) &&
+      matchedCourse.topics.find(
+        (topic) =>
+          String(topic || "").trim().toLowerCase() === requestedTopic.toLowerCase(),
+      );
+
+    if (matchedTopic && !currentTopic) {
+      form.setValue("topic", matchedTopic, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      form.setValue(
+        "rawLatex",
+        syncTopicTitleIntoLatex(form.getValues("rawLatex"), matchedTopic),
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        },
+      );
+    }
+  }, [
+    courses,
+    form,
+    isCoursesLoading,
+    isEditMode,
+    requestedCourseId,
+    requestedTopic,
+  ]);
 
   useEffect(() => {
     if (!isDraggingSplit) return;
@@ -329,30 +583,9 @@ export function TopicFormPage() {
     };
   }, [isDraggingSplit]);
 
-  const { register, handleSubmit, formState, setValue, control, getValues } =
-    form;
-  const selectedCourseId = useWatch({ control, name: "courseId" }) || "";
-  const descriptionValue = useWatch({ control, name: "description" }) || "";
-  const topicPointsValue = useWatch({ control, name: "points" });
-  const tasksValue = useWatch({
-    control,
-    name: "tasks",
-    defaultValue: [getDefaultTask()],
-  });
-
-  const topicPointsValidation = useMemo(
-    () => validateTopicFormPoints(topicPointsValue, tasksValue),
-    [topicPointsValue, tasksValue],
-  );
-  const hasPointsValidationError = !topicPointsValidation.isValid;
-
   const selectedCourseOption = useMemo(() => {
-    const matchedCourse = (courses || []).find(
-      (c) => c.id === selectedCourseId,
-    );
-    if (matchedCourse) {
-      return matchedCourse;
-    }
+    const matchedCourse = (courses || []).find((course) => course.id === selectedCourseId);
+    if (matchedCourse) return matchedCourse;
 
     const resolved = topicData?.data ?? topicData;
     const course = resolved?.courseId;
@@ -361,88 +594,47 @@ export function TopicFormPage() {
         id: selectedCourseId,
         title: course.title || "",
         shortName: course.shortName || "",
+        topics: course.topics || [],
       };
     }
 
     return null;
   }, [courses, selectedCourseId, topicData]);
 
-  // const setDescriptionImage = async (file) => {
-  //   if (!file) {
-  //     setValue("description_img", null);
-  //     return;
-  //   }
-  //   const base64 = await fileToBase64(file);
-  //   setValue("description_img", {
-  //     base64,
-  //     contentType: file.type || "application/octet-stream",
-  //     filename: file.name || "",
-  //   });
-  // };
+  const topicOptions = useMemo(() => {
+    const matchedCourse = (courses || []).find((course) => course.id === selectedCourseId);
+    if (matchedCourse && Array.isArray(matchedCourse.topics)) return matchedCourse.topics;
 
-  const addTask = () => {
-    const current = getValues("tasks") || [];
-    setValue("tasks", [...current, getDefaultTask()]);
+    if (selectedCourseOption?.topics) return selectedCourseOption.topics;
+    return [];
+  }, [courses, selectedCourseId, selectedCourseOption]);
+
+  const buildCompileResources = (assets) =>
+    (Array.isArray(assets) ? assets : [])
+      .filter((asset) => String(asset?.filename || "").trim() && String(asset?.base64 || "").trim())
+      .map((asset) => ({
+        path: asset.filename,
+        content: asset.base64,
+      }));
+
+  const applyTaskAssets = (nextAssets) => {
+    const normalizedAssets = Array.isArray(nextAssets) ? nextAssets : [];
+    taskAssetsRef.current = normalizedAssets;
+    setTaskAssets(normalizedAssets);
   };
 
-  const submit = handleSubmit(async (values) => {
-    if (hasPointsValidationError) return;
-    if (isEditMode) await updateM.mutateAsync({ id, body: values });
-    else await createM.mutateAsync(values);
-    // After successful save, sync baseline from live form state used by blocker.
-    const currentFormValues = form.getValues();
-    initialValuesRef.current = {
-      courseId: currentFormValues.courseId,
-      topic: currentFormValues.topic,
-      description: currentFormValues.description,
-      points: currentFormValues.points,
-      description_img: currentFormValues.description_img,
-      tasks: currentFormValues.tasks,
-    };
-
-    // Mark post-save redirect as intentional so blocker won't show confirmation.
-    isIntentionalNavigationRef.current = true;
-    nav("/tasks/list");
-  });
-
-  const buildCombinedLatex = (version = "STUDENT") => {
-    const values = getValues();
-    const selectedCourse = (courses || []).find(
-      (c) => c.id === values.courseId,
-    );
-    const tasks = values.tasks || [];
-
-    const sections = [
-      `\\section*{${t("topics.previewDocTitle")}}`,
-      values.topic ? `\\textbf{${t("common.topic")}:} ${values.topic}\\\\` : "",
-      selectedCourse
-        ? `\\textbf{${t("common.course")}:} ${selectedCourse.title} (${selectedCourse.shortName})\\\\`
-        : "",
-      `\\textbf{${t("common.points")}:} ${Number(values.points || 0)}\\\\`,
-      `\\subsection*{${t("common.description")}}`,
-      values.description || "",
-    ];
-
-    tasks.forEach((task, index) => {
-      sections.push(
-        `\\subsection*{${t("topics.taskLabel", { index: index + 1 })}}`,
-      );
-      sections.push(task?.question || "");
-      if (version === "TEACHER") {
-        sections.push(`\\paragraph{${t("common.solution")}}`);
-        sections.push(task?.solution || "");
-      }
-      sections.push(
-        `\\textbf{${t("common.points")}:} ${Number(task?.points || 0)}\\\\`,
-      );
-    });
-
-    return sections.filter(Boolean).join("\n\n");
-  };
-
-  const compilePreview = async (version) => {
-    if (hasPointsValidationError) return;
-    const latexContent = buildCombinedLatex(version);
+  const compilePreview = async (version, options = {}) => {
+    const resourceAssets = Array.isArray(options.assets)
+      ? options.assets
+      : taskAssetsRef.current;
+    const latexContent = String(
+      buildPreviewLatex(
+        options.latexContent ?? getValues("rawLatex"),
+        options.topicTitle ?? getValues("topic"),
+        options.points ?? getValues("points"),
+      ) || "",
+    ).trim();
+    if (!latexContent) return;
 
     clearPdf();
     setCompilerMessages(null);
@@ -450,7 +642,11 @@ export function TopicFormPage() {
     setIsCompiling(true);
 
     try {
-      const response = await examsApi.compileLatexOnly({ latexContent });
+      const response = await examsApi.compileLatexOnly({
+        latexContent,
+        version,
+        resources: buildCompileResources(resourceAssets),
+      });
       const { pdfBase64, filename, contentType, diagnostics } =
         getCompileResultPayload(response);
 
@@ -485,8 +681,241 @@ export function TopicFormPage() {
     }
   };
 
+  const processTaskImageFiles = async (filesInput) => {
+    const files = Array.from(filesInput || []);
+    if (files.length === 0) return;
+
+    try {
+      const nextAssets = [];
+
+      for (const file of files) {
+        if (!String(file?.type || "").startsWith("image/")) {
+          notifyError(t("errors.invalidImageFile"));
+          continue;
+        }
+
+        const filename = String(file.name || "").trim() || `pasted-image-${Date.now()}.png`;
+        const hasDuplicate = [...taskAssetsRef.current, ...nextAssets].some(
+          (asset) => String(asset?.filename || "").trim() === filename,
+        );
+
+        if (hasDuplicate) {
+          notifyError(
+            t("errors.duplicateTaskAsset", {
+              filename,
+              defaultValue: `A file named ${filename} is already attached.`,
+            }),
+          );
+          continue;
+        }
+
+        nextAssets.push({
+          filename,
+          contentType: file.type || "application/octet-stream",
+          base64: await fileToBase64(file),
+        });
+      }
+
+      if (nextAssets.length === 0) return;
+
+      const mergedAssets = [...taskAssetsRef.current, ...nextAssets];
+      applyTaskAssets(mergedAssets);
+      const nextRawLatex = injectTaskAssetsIntoLatex(getValues("rawLatex"), mergedAssets);
+      setValue("rawLatex", nextRawLatex, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    } catch {
+      notifyError(t("errors.imageUploadFailed"));
+    }
+  };
+
+  const handleTaskImagesUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    await processTaskImageFiles(files);
+    setIsImageDropActive(false);
+  };
+
+  const handleTaskImagesDrop = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsImageDropActive(false);
+    if (!isEditable) return;
+    await processTaskImageFiles(event.dataTransfer?.files || []);
+  };
+
+  const handleRawLatexPaste = async (event) => {
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageItems = items.filter((item) => String(item.type || "").startsWith("image/"));
+    if (imageItems.length === 0) return;
+
+    event.preventDefault();
+    const normalizedFiles = imageItems
+      .map((item, index) => {
+        const file = item.getAsFile();
+        if (!file) return null;
+        const extension = String(file.type || "image/png").split("/")[1] || "png";
+        return new File(
+          [file],
+          file.name || `pasted-image-${Date.now()}-${index}.${extension}`,
+          { type: file.type || "image/png" },
+        );
+      })
+      .filter(Boolean);
+
+    await processTaskImageFiles(normalizedFiles);
+  };
+
+  const loadTexFile = async (file) => {
+    const filename = String(file?.name || "").toLowerCase();
+    if (!filename.endsWith(".tex")) {
+      notifyError(t("errors.invalidTexFile"));
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setValue("rawLatex", text, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    } catch {
+      notifyError(t("errors.texUploadFailed"));
+    }
+  };
+
+  const handleTexFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await loadTexFile(file);
+    setIsTexDropActive(false);
+  };
+
+  const handleTexDrop = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsTexDropActive(false);
+    if (!isEditable) return;
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    await loadTexFile(file);
+  };
+
+  const removeTaskAsset = (filename) => {
+    const nextAssets = taskAssetsRef.current.filter(
+      (asset) => asset.filename !== filename,
+    );
+    applyTaskAssets(nextAssets);
+    const nextRawLatex = removeTaskAssetFromLatex(getValues("rawLatex"), filename);
+    setValue("rawLatex", nextRawLatex, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const submit = handleSubmit(async (values) => {
+    clearErrors();
+    const latexContent = String(values.rawLatex || "").trim();
+    if (!latexContent) return;
+
+    try {
+      const parseResponse = await topicsApi.parseLatex({
+        latexContent,
+        topic: values.topic,
+        points: values.points,
+      });
+      const parsedTopics = parseResponse?.data?.topics || parseResponse?.topics || [];
+      const parsedTopic = resolveParsedTopic(parsedTopics, values.topic);
+
+      if (!parsedTopic) {
+        setError("rawLatex", {
+          type: "manual",
+          message: t("errors.invalidTaskLatex"),
+        });
+        return;
+      }
+
+      const latexHasSubsections = hasSubsectionBlocks(latexContent);
+      const selectedPoints = Number(values.points);
+      const parsedPoints = Number(parsedTopic.points || 0);
+
+      if (latexHasSubsections && parsedPoints !== selectedPoints) {
+        setError("points", {
+          type: "manual",
+          message: t("errors.taskPointsMismatch"),
+        });
+        return;
+      }
+
+      const currentTaskAssets = taskAssetsRef.current;
+      const normalizedTasks = (parsedTopic.tasks || []).map((task, index) => ({
+        ...task,
+        description: index === 0 ? values.taskDescription : task.description || "",
+        assets: currentTaskAssets,
+      }));
+
+      const payload = {
+        courseId: values.courseId,
+        topic: values.topic,
+        description: parsedTopic.description || "",
+        points: selectedPoints,
+        full_tex_code: values.rawLatex,
+        taskDescription: values.taskDescription,
+        taskAssets: currentTaskAssets,
+        tasks: normalizedTasks,
+      };
+
+      if (isEditMode) await updateM.mutateAsync({ id, body: payload });
+      else await createM.mutateAsync(payload);
+
+      initialValuesRef.current = {
+        courseId: values.courseId,
+        topic: values.topic,
+        points: values.points,
+        taskDescription: values.taskDescription,
+        rawLatex: values.rawLatex,
+      };
+      initialTaskAssetsRef.current = currentTaskAssets;
+      isIntentionalNavigationRef.current = true;
+      nav(buildFilteredTasksListUrl(values.courseId, values.topic));
+    } catch (saveError) {
+      const message =
+        saveError?.response?.data?.error?.message ||
+        saveError?.userMessage ||
+        saveError?.message ||
+        t("errors.requestFailed");
+      setError("rawLatex", { type: "manual", message });
+    }
+  });
+
+  useEffect(() => {
+    if (isEditMode) return;
+
+    const rawLatex = String(rawLatexValue || "").trim();
+    if (!rawLatex) return;
+    const selectedTopicForPreview = String(
+      selectedTopicValue || requestedTopic || "",
+    ).trim();
+
+    if (
+      selectedTopicForPreview &&
+      !new RegExp(`\\\\section\\{${escapeRegExp(selectedTopicForPreview)}\\}`).test(rawLatex)
+    ) {
+      return;
+    }
+
+    const previewKey = `create:${selectedTopicForPreview || "__no_topic__"}`;
+    if (autoPreviewKeyRef.current === previewKey) return;
+
+    autoPreviewKeyRef.current = previewKey;
+    void compilePreview("TEACHER");
+  }, [isEditMode, rawLatexValue, requestedTopic, selectedTopicValue]);
+
   const resetForm = () => {
-    form.reset(initialValuesRef.current);
+    reset(initialValuesRef.current);
+    applyTaskAssets(initialTaskAssetsRef.current);
     setCompiledVersion(null);
     setCompilerMessages(null);
     clearPdf();
@@ -495,42 +924,36 @@ export function TopicFormPage() {
 
   const hasUnsavedChanges = () => {
     const currentValues = {
-      courseId: form.getValues("courseId"),
-      topic: form.getValues("topic"),
-      description: form.getValues("description"),
-      points: form.getValues("points"),
-      tasks: form.getValues("tasks"),
+      courseId: getValues("courseId"),
+      topic: getValues("topic"),
+      points: getValues("points"),
+      taskDescription: getValues("taskDescription"),
+      rawLatex: getValues("rawLatex"),
+      assets: taskAssetsRef.current,
     };
     return (
       JSON.stringify(currentValues) !==
       JSON.stringify({
-        courseId: initialValuesRef.current.courseId,
-        topic: initialValuesRef.current.topic,
-        description: initialValuesRef.current.description,
-        points: initialValuesRef.current.points,
-        tasks: initialValuesRef.current.tasks,
+        ...initialValuesRef.current,
+        assets: initialTaskAssetsRef.current,
       })
     );
   };
 
-  // Block route changes when there are unsaved changes
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       hasUnsavedChanges() && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  // Store blocker in ref and show dialog when navigation is blocked
   useEffect(() => {
     blockerRef.current = blocker;
     if (blocker.state === "blocked") {
-      // Skip if this is an intentional navigation from dialog
       if (isIntentionalNavigationRef.current) {
         isIntentionalNavigationRef.current = false;
         blockerRef.current.proceed();
         return;
       }
 
-      // Only open dialog if this is a new blocked state (different location)
       const currentLocation = blocker.location.pathname;
       if (
         blockedLocationRef.current !== currentLocation &&
@@ -551,7 +974,12 @@ export function TopicFormPage() {
     if (hasUnsavedChanges()) {
       setConfirmDialog({ open: true, action: "cancel" });
     } else {
-      nav("/tasks/list");
+      nav(
+        buildFilteredTasksListUrl(
+          getValues("courseId") || requestedCourseId,
+          getValues("topic") || requestedTopic,
+        ),
+      );
     }
   };
 
@@ -561,7 +989,12 @@ export function TopicFormPage() {
 
     if (action === "cancel") {
       isIntentionalNavigationRef.current = true;
-      nav("/tasks/list");
+      nav(
+        buildFilteredTasksListUrl(
+          getValues("courseId") || requestedCourseId,
+          getValues("topic") || requestedTopic,
+        ),
+      );
     } else if (action === "navigate" && blockerRef.current) {
       blockerRef.current.proceed();
     }
@@ -591,36 +1024,9 @@ export function TopicFormPage() {
     collapsedPane === "left" ? "100%" : `${100 - splitPercent}%`;
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        height: "95vh",
-      }}
-    >
+    <Box sx={{ display: "flex", flexDirection: "column", height: "95vh" }}>
       <PageHeader
-        title={
-          <>
-            {isEditMode ? t("topics.editTitle") : t("topics.createTitle")}
-            {hasPointsValidationError && (
-              <Box
-                component="span"
-                sx={{ ml: 2, color: "error.main", fontSize: 14 }}
-              >
-                {t("common.sumOfTaskPoints")}{" "}
-                <Box component="span" sx={{ fontWeight: 700 }}>
-                  {topicPointsValidation.taskPoints}
-                </Box>{" "}
-                {t("exams.pts")} {t("common.mustEqual")}{" "}
-                {t("common.topicPointsLabel")}{" "}
-                <Box component="span" sx={{ fontWeight: 700 }}>
-                  {topicPointsValidation.topicPoints}
-                </Box>{" "}
-                {t("exams.pts")}
-              </Box>
-            )}
-          </>
-        }
+        title={isEditMode ? t("topics.editTitle") : t("topics.createTitle")}
         right={
           <Stack direction="row" spacing={1}>
             {!isEditMode ? (
@@ -641,12 +1047,7 @@ export function TopicFormPage() {
               startIcon={<SaveIcon />}
               size="small"
               onClick={submit}
-              disabled={
-                createM.isPending ||
-                updateM.isPending ||
-                !isEditable ||
-                hasPointsValidationError
-              }
+              disabled={createM.isPending || updateM.isPending || !isEditable}
             >
               {t("common.save")}
             </Button>
@@ -733,12 +1134,9 @@ export function TopicFormPage() {
                     alignItems="center"
                     sx={{ mb: 2 }}
                   >
-                    <Typography
-                      variant="subtitle2"
-                      color="text.secondary"
-                    ></Typography>
+                    <Typography variant="subtitle2" color="text.secondary" />
                     <CompileButton
-                      disabled={!isEditable || hasPointsValidationError}
+                      disabled={!isEditable}
                       loading={isCompiling}
                       onCompile={compilePreview}
                     />
@@ -758,7 +1156,7 @@ export function TopicFormPage() {
                         display: "grid",
                         gridTemplateColumns: {
                           xs: "1fr",
-                          md: "40% 40% 15%",
+                          md: "1fr 1fr 1fr",
                         },
                         gap: 2,
                         mb: 2,
@@ -773,6 +1171,14 @@ export function TopicFormPage() {
                             value={selectedCourseOption}
                             onChange={(_, option) => {
                               field.onChange(option?.id || "");
+                              setValue("courseId", option?.id || "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                              setValue("topic", "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
                             }}
                             onInputChange={(_, value, reason) => {
                               if (reason === "clear") {
@@ -827,20 +1233,14 @@ export function TopicFormPage() {
                             }
                             getOptionLabel={(option) => {
                               if (!option) return "";
-                              const title = option.title || "";
-                              const shortName = option.shortName
-                                ? ` (${option.shortName})`
-                                : "";
-                              return `${title}${shortName}`.trim();
+                              return String(option.title || "").trim();
                             }}
                             renderInput={(params) => (
                               <TextField
                                 {...params}
-                                label={
-                                  <RequiredLabel label={t("common.course")} />
-                                }
+                                label={<RequiredLabel label={t("common.course")} />}
                                 error={!!formState.errors.courseId}
-                                helperText={formState.errors.courseId?.message}
+                                helperText={formState.errors.courseId?.message || " "}
                                 placeholder={t("common.selectCourse")}
                               />
                             )}
@@ -848,14 +1248,57 @@ export function TopicFormPage() {
                         )}
                       />
 
-                      <TextField
-                        label={<RequiredLabel label={t("common.topic")} />}
-                        fullWidth
-                        size="small"
-                        {...register("topic")}
-                        error={!!formState.errors.topic}
-                        helperText={formState.errors.topic?.message}
-                        disabled={!isEditable}
+                      <Controller
+                        name="topic"
+                        control={control}
+                        render={({ field }) => (
+                          <Autocomplete
+                            options={topicOptions}
+                            value={field.value || ""}
+                            fullWidth
+                            size="small"
+                            onChange={(_, value) => {
+                              const nextValue = value || "";
+                              field.onChange(nextValue);
+                              setValue("topic", nextValue, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                              if (nextValue) {
+                                setValue(
+                                  "rawLatex",
+                                  syncTopicTitleIntoLatex(
+                                    getValues("rawLatex"),
+                                    nextValue,
+                                  ),
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  },
+                                );
+                              }
+                              if (nextValue) clearErrors("topic");
+                            }}
+                            isOptionEqualToValue={(option, value) =>
+                              String(option || "") === String(value || "")
+                            }
+                            disabled={!isEditable || !selectedCourseId}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label={<RequiredLabel label={t("common.topic")} />}
+                                error={!!formState.errors.topic}
+                                helperText={
+                                  formState.errors.topic?.message ||
+                                  (!selectedCourseId
+                                    ? t("common.selectCourseFirst")
+                                    : " ")
+                                }
+                                placeholder={t("topics.selectTopicOnly")}
+                              />
+                            )}
+                          />
+                        )}
                       />
 
                       <TextField
@@ -872,85 +1315,206 @@ export function TopicFormPage() {
                       />
                     </Box>
 
-                    <Box sx={{ mb: 2 }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ mb: 0.5, display: "block" }}
-                      >
-                        {t("topics.descriptionLatex")}
-                      </Typography>
-                      <LatexEditor
-                        value={descriptionValue}
-                        onChange={(value) => {
-                          if (!isEditable) return;
-                          setValue("description", value, {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          });
-                        }}
-                        height={220}
-                        placeholder={t("topics.descriptionLatex")}
-                      />
-                      {formState.errors.description?.message ? (
-                        <Typography
-                          variant="caption"
-                          color="error.main"
-                          sx={{ mt: 0.75, display: "block" }}
-                        >
-                          {formState.errors.description.message}
-                        </Typography>
-                      ) : null}
-                    </Box>
-
-                    {/* <Box
-                      className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
+                    <TextField
+                      label={t("topics.taskDescription")}
+                      fullWidth
+                      size="small"
+                      multiline
+                      minRows={2}
+                      value={taskDescriptionValue}
+                      error={!!formState.errors.taskDescription}
+                      helperText={formState.errors.taskDescription?.message}
+                      onChange={(event) => {
+                        if (!isEditable) return;
+                        setValue("taskDescription", event.target.value, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }}
+                      disabled={!isEditable}
                       sx={{ mb: 2 }}
-                    >
-                      <Button
-                        variant="outlined"
-                        component="label"
-                        startIcon={<UploadIcon />}
-                        className="justify-between"
-                        fullWidth
-                        size="small"
-                        disabled={!isEditable}
-                      >
-                        {t("topics.uploadImage")}
-                        <input
-                          hidden
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) =>
-                            setDescriptionImage(e.target.files?.[0] || null)
-                          }
-                        />
-                      </Button>
-                    </Box> */}
+                    />
 
                     <Box
                       className="rounded-2xl border p-4"
                       sx={{ overflow: "auto" }}
                     >
-                      <Box className="flex items-center mb-4">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 1.5,
+                          mb: 2,
+                          flexWrap: "wrap",
+                        }}
+                      >
                         <Typography className="font-semibold">
-                          {t("topics.taskBlockTitle")}
+                          {t("topics.rawLatex")}
                         </Typography>
+
+                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            size="small"
+                            disabled={!isEditable}
+                            onDragEnter={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (isEditable) setIsTexDropActive(true);
+                            }}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (isEditable) {
+                                event.dataTransfer.dropEffect = "copy";
+                                setIsTexDropActive(true);
+                              }
+                            }}
+                            onDragLeave={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setIsTexDropActive(false);
+                            }}
+                            onDrop={handleTexDrop}
+                            sx={{
+                              borderColor: isTexDropActive ? "primary.main" : undefined,
+                              bgcolor: isTexDropActive
+                                ? alpha(theme.palette.primary.main, 0.08)
+                                : undefined,
+                            }}
+                          >
+                            {t("topics.uploadTexFile")}
+                            <input
+                              hidden
+                              type="file"
+                              accept=".tex,text/x-tex,application/x-tex"
+                              onChange={handleTexFileUpload}
+                            />
+                          </Button>
+
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            size="small"
+                            disabled={!isEditable}
+                            onDragEnter={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (isEditable) setIsImageDropActive(true);
+                            }}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (isEditable) {
+                                event.dataTransfer.dropEffect = "copy";
+                                setIsImageDropActive(true);
+                              }
+                            }}
+                            onDragLeave={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setIsImageDropActive(false);
+                            }}
+                            onDrop={handleTaskImagesDrop}
+                            sx={{
+                              borderColor: isImageDropActive
+                                ? "primary.main"
+                                : undefined,
+                              bgcolor: isImageDropActive
+                                ? alpha(theme.palette.primary.main, 0.08)
+                                : undefined,
+                            }}
+                          >
+                            {t("topics.uploadTaskImages")}
+                            <input
+                              hidden
+                              multiple
+                              type="file"
+                              accept="image/*"
+                              onChange={handleTaskImagesUpload}
+                            />
+                          </Button>
+                        </Stack>
                       </Box>
 
-                      <TaskEditor
-                        control={control}
-                        register={register}
-                        setValue={setValue}
-                        errors={formState.errors}
-                        editable={isEditable}
+                      {taskAssets.length ? (
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          useFlexGap
+                          flexWrap="wrap"
+                          sx={{ mb: 2, justifyContent: "flex-end" }}
+                        >
+                          {taskAssets.map((asset) => (
+                            <Box
+                              key={asset.filename}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.75,
+                                px: 1,
+                                py: 0.5,
+                                border: 1,
+                                borderColor: "divider",
+                                borderRadius: 999,
+                                bgcolor: "background.default",
+                                maxWidth: 280,
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  minWidth: 0,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {asset.filename}
+                              </Typography>
+                              <Button
+                                size="small"
+                                color="inherit"
+                                onClick={() => removeTaskAsset(asset.filename)}
+                                disabled={!isEditable}
+                                sx={{
+                                  minWidth: 0,
+                                  px: 0.75,
+                                  py: 0.25,
+                                  lineHeight: 1,
+                                }}
+                              >
+                                {t("topics.remove")}
+                              </Button>
+                            </Box>
+                          ))}
+                        </Stack>
+                      ) : null}
+
+                      <LatexEditor
+                        value={rawLatexValue}
+                        onPaste={handleRawLatexPaste}
+                        onChange={(value) => {
+                          if (!isEditable) return;
+                          setValue("rawLatex", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
+                        height={420}
+                        placeholder={t("topics.rawLatexPlaceholder")}
                       />
-
-                      <Box className="mt-4 flex justify-end">
-                        <IconButton onClick={addTask} disabled={!isEditable}>
-                          <AddIcon />
-                        </IconButton>
-                      </Box>
+                      {formState.errors.rawLatex?.message ? (
+                        <Typography
+                          variant="caption"
+                          color="error.main"
+                          sx={{ mt: 0.75, display: "block" }}
+                        >
+                          {formState.errors.rawLatex.message}
+                        </Typography>
+                      ) : null}
                     </Box>
                   </Box>
                 </Paper>
@@ -1004,9 +1568,7 @@ export function TopicFormPage() {
                         px: 0.25,
                         py: 0.2,
                         borderRadius: 1,
-                        color: isDraggingSplit
-                          ? "primary.main"
-                          : "text.secondary",
+                        color: isDraggingSplit ? "primary.main" : "text.secondary",
                       }}
                     >
                       <DragIndicatorIcon fontSize="small" />

@@ -24,7 +24,10 @@ export function useCreateTopic() {
     mutationFn: topicsApi.create,
     onSuccess: () => {
       notifySuccess(i18n.t("notifications.topicCreated"));
-      return qc.invalidateQueries({ queryKey: ["topics"] });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ["topics"] }),
+        qc.invalidateQueries({ queryKey: ["courses"] }),
+      ]);
     },
   });
 }
@@ -35,7 +38,10 @@ export function useUpdateTopic() {
     mutationFn: ({ id, body }) => topicsApi.update(id, body),
     onSuccess: () => {
       notifySuccess(i18n.t("notifications.topicUpdated"));
-      return qc.invalidateQueries({ queryKey: ["topics"] });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ["topics"] }),
+        qc.invalidateQueries({ queryKey: ["courses"] }),
+      ]);
     },
   });
 }
@@ -44,9 +50,20 @@ export function useDeleteTopic() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: topicsApi.remove,
-    onSuccess: () => {
+    onSuccess: (_data, deletedId) => {
       notifySuccess(i18n.t("notifications.topicDeleted"));
-      return qc.invalidateQueries({ queryKey: ["topics"] });
+      qc.setQueriesData({ queryKey: ["topics"] }, (current) => {
+        if (!current || !Array.isArray(current.data)) return current;
+        return {
+          ...current,
+          data: current.data.filter((row) => row.id !== deletedId),
+        };
+      });
+      qc.removeQueries({ queryKey: ["topic", deletedId] });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ["topics"] }),
+        qc.invalidateQueries({ queryKey: ["courses"] }),
+      ]);
     },
   });
 }

@@ -9,11 +9,48 @@ const SOLUTION_SPACE_OPTIONS = [
 ];
 const DEFAULT_SOLUTION_SPACE = "1 Page";
 
+function bufferLikeToBase64(value) {
+  if (!value) {
+    return "";
+  }
+  if (Buffer.isBuffer(value)) {
+    return value.toString("base64");
+  }
+  if (value && typeof value.toString === "function" && value._bsontype === "Binary") {
+    try {
+      return Buffer.from(value.buffer).toString("base64");
+    } catch (_error) {
+      return "";
+    }
+  }
+  if (value && Buffer.isBuffer(value.buffer)) {
+    return value.buffer.toString("base64");
+  }
+  if (value && Array.isArray(value.data)) {
+    return Buffer.from(value.data).toString("base64");
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return "";
+}
+
 const imageSchema = new mongoose.Schema(
   {
     data: { type: Buffer, default: null },
-    contentType: { type: String, default: "" }, // "image/png"
-    filename: { type: String, default: "" }, // optional
+    contentType: { type: String, default: "" },
+    filename: { type: String, default: "" },
+  },
+  {
+    _id: false,
+  },
+);
+
+const assetSchema = new mongoose.Schema(
+  {
+    data: { type: Buffer, default: null },
+    contentType: { type: String, default: "" },
+    filename: { type: String, default: "" },
   },
   {
     _id: false,
@@ -22,10 +59,13 @@ const imageSchema = new mongoose.Schema(
 
 const taskSchema = new mongoose.Schema(
   {
-    question: { type: String, required: true, trim: true }, // LaTeX
+    description: { type: String, default: "", trim: true },
+    full_tex_code: { type: String, default: "", trim: true },
+    question: { type: String, required: true, trim: true },
     points: { type: Number, required: true, min: 0 },
-    question_img: { type: imageSchema, default: () => ({}) }, // stored in DB
-    solution: { type: String, default: "", trim: true }, // LaTeX
+    question_img: { type: imageSchema, default: () => ({}) },
+    solution: { type: String, default: "", trim: true },
+    assets: { type: [assetSchema], default: [] },
     solutionSpace: {
       type: String,
       enum: SOLUTION_SPACE_OPTIONS,
@@ -53,6 +93,17 @@ const taskSchema = new mongoose.Schema(
           ret.question_img = { hasImage: false };
         }
 
+        ret.assets = Array.isArray(ret.assets)
+          ? ret.assets
+              .filter((asset) => asset && asset.data)
+              .map((asset) => ({
+                filename: asset.filename || "",
+                contentType: asset.contentType || "",
+                base64: bufferLikeToBase64(asset.data),
+              }))
+              .filter((asset) => asset.base64)
+          : [];
+
         return ret;
       },
     },
@@ -67,12 +118,13 @@ const topicSchema = new mongoose.Schema(
       required: true,
     },
 
-    topic: { type: String, required: true, trim: true }, // LaTeX
-    description: { type: String, default: "", trim: true }, // LaTeX
+    full_tex_code: { type: String, default: "", trim: true },
+    topic: { type: String, required: true, trim: true },
+    description: { type: String, default: "", trim: true },
     points: { type: Number, required: true, min: 0 },
     isDeleted: { type: Boolean, default: false },
 
-    description_img: { type: imageSchema, default: () => ({}) }, // stored in DB
+    description_img: { type: imageSchema, default: () => ({}) },
     tasks: { type: [taskSchema], default: [] },
   },
   {

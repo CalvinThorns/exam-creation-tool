@@ -23,7 +23,11 @@ const {
   validateDraftTopicsShape,
 } = require("./helpers/examDraftHelpers");
 const {
+  hasLatexErrors,
   pickOutputFile,
+  downloadTextFileIfAny,
+  parseLatexErrorsFromLog,
+  extractWarningsFromLog,
   buildCompileDiagnostics,
 } = require("./helpers/latexCompileHelpers");
 const { normalizePagination, buildMeta } = require("../utils/pagination");
@@ -164,16 +168,103 @@ function createExamService({ examRepo, courseRepo }) {
     return validateBaseTemplateContent(content);
   }
 
-  function wrapRawLatexIfNeeded(latexContent, baseTemplateContent) {
-    const src = String(latexContent || "").trim();
-    if (!src) throw badRequest("latexContent is required");
+  function withShowSolutionsFlag(template, showSolutions) {
+    const source = String(template || "");
+    const desired = showSolutions
+      ? "\\showsolutionstrue"
+      : "\\showsolutionsfalse";
 
-    if (/\\begin\{document\}/i.test(src)) {
-      return src;
+    if (/\\showsolutions(?:true|false)/.test(source)) {
+      return source.replace(/\\showsolutions(?:true|false)/, desired);
     }
 
-    const template = validateBaseTemplateContent(baseTemplateContent);
-    return template.replace(BASE_TEMPLATE_PLACEHOLDER, src);
+    if (/\\newif\\ifshowsolutions/.test(source)) {
+      return source.replace(
+        /\\newif\\ifshowsolutions/,
+        `\\newif\\ifshowsolutions\n${desired}`,
+      );
+    }
+
+    return source;
+  }
+
+  function stripSolutionEnvironments(source) {
+    return String(source || "")
+      .replace(/\\begin\{solution\}[\s\S]*?\\end\{solution\}\s*/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function stripDataUrlPrefix(base64) {
+    const value = String(base64 || "");
+    const match = value.match(/^data:([^;]+);base64,(.*)$/);
+    return match ? match[2] : value;
+  }
+
+  function sanitizeAssetFilename(filename) {
+    return path.basename(String(filename || "").trim());
+  }
+
+  function prepareLatexOnlySource({
+    latexContent,
+    baseTemplateContent,
+    version,
+  }) {
+    const src = String(latexContent || "").trim();
+    if (!src) throw badRequest("latexContent is required");
+    const normalizedVersion = String(version || "TEACHER").toUpperCase();
+    const showSolutions = normalizedVersion !== "STUDENT";
+    const sourceWithVersion = showSolutions
+      ? src
+      : stripSolutionEnvironments(src);
+
+    if (/\\begin\{document\}/i.test(sourceWithVersion)) {
+      return withShowSolutionsFlag(sourceWithVersion, showSolutions);
+    }
+
+    const template = withShowSolutionsFlag(
+      validateBaseTemplateContent(baseTemplateContent),
+      showSolutions,
+    );
+    return template.replace(BASE_TEMPLATE_PLACEHOLDER, sourceWithVersion);
+  }
+
+  async function buildLatexOnlyResources(resources, apiBaseUrl) {
+    const normalizedResources = Array.isArray(resources) ? resources : [];
+    if (normalizedResources.length === 0) {
+      return [];
+    }
+
+    if (!apiBaseUrl) {
+      const e = new Error("API_INTERNAL_BASE_URL is not configured");
+      e.status = 500;
+      throw e;
+    }
+
+    const token = randomProjectId();
+    const assetsRoot =
+      process.env.DRAFT_ASSETS_DIR || "/tmp/autogenex-draft-assets";
+    const assetsDir = path.join(assetsRoot, token);
+    await fs.mkdir(assetsDir, { recursive: true });
+
+    const clsiResources = [];
+
+    for (const resource of normalizedResources) {
+      const filename = sanitizeAssetFilename(resource?.path);
+      const content = String(resource?.content || "").trim();
+      if (!filename || !content) continue;
+
+      const diskPath = path.join(assetsDir, filename);
+      await fs.writeFile(diskPath, Buffer.from(stripDataUrlPrefix(content), "base64"));
+
+      clsiResources.push({
+        path: filename,
+        url: `${apiBaseUrl}/api/exams/draft/assets/${token}/${encodeURIComponent(filename)}`,
+        modified: Date.now(),
+      });
+    }
+
+    return clsiResources;
   }
 
   async function compileLatexOnlyImpl(body, reqId) {
@@ -186,8 +277,17 @@ function createExamService({ examRepo, courseRepo }) {
 
     const latexContent = String(body?.latexContent || "").trim();
     if (!latexContent) throw badRequest("latexContent is required");
+    const apiBaseUrl = String(process.env.API_INTERNAL_BASE_URL || "").trim();
     const baseTemplateContent = await loadBaseTemplateContent();
-    const mainTex = wrapRawLatexIfNeeded(latexContent, baseTemplateContent);
+    const mainTex = prepareLatexOnlySource({
+      latexContent,
+      baseTemplateContent,
+      version: body?.version,
+    });
+    const extraResources = await buildLatexOnlyResources(
+      body?.resources,
+      apiBaseUrl,
+    );
 
     const projectId = randomProjectId();
     const compileBody = {
@@ -197,7 +297,7 @@ function createExamService({ examRepo, courseRepo }) {
           timeout: 300,
         },
         rootResourcePath: "main.tex",
-        resources: [{ path: "main.tex", content: mainTex }],
+        resources: [{ path: "main.tex", content: mainTex }, ...extraResources],
       },
     };
 
@@ -303,6 +403,16 @@ function createExamService({ examRepo, courseRepo }) {
         isDeleted: { $ne: true },
       }).lean();
 
+    if (!courseDoc && body?.course && typeof body.course === "object") {
+      courseDoc = {
+        _id: courseId,
+        id: courseId,
+        title: String(body.course.title || ""),
+        shortName: String(body.course.shortName || ""),
+        coverPage: String(body.course.coverPage || ""),
+      };
+    }
+
     if (!courseDoc) throw notFound("Course not found");
 
     const coverPageFromBody = String(body?.coverPage || "").trim();
@@ -340,6 +450,7 @@ function createExamService({ examRepo, courseRepo }) {
       topics: nextTopics,
       version,
       baseTemplate: baseTemplateContent,
+      courseTitle: String(courseDoc.title || body?.course?.title || ""),
     });
 
     const projectId = randomProjectId();

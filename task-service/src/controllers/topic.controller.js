@@ -4,6 +4,15 @@ function createTopicController({ topicService }) {
   const getUserId = (req) => req.user?.userId || req.user?.id || req.user?._id;
 
   return {
+    parseLatex: async (req, res, next) => {
+      try {
+        const parsed = await topicService.parseLatex(req.body, getUserId(req));
+        res.json({ data: parsed });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     create: async (req, res, next) => {
       try {
         const topic = await topicService.createTopic(req.body, getUserId(req));

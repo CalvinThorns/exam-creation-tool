@@ -6,6 +6,7 @@ function createTopicRoutes({ topicController }) {
 
   router.use(protect); 
 
+  router.post("/parse-latex", topicController.parseLatex);
   router.post("/", topicController.create);
   router.get("/", topicController.list);
   router.get("/:id", topicController.getById);
